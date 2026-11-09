@@ -2,6 +2,7 @@ export * from './tipos';
 export * from './definicoes';
 export * from './datas';
 export * from './controle';
+export * from './relatorio';
 export * from './exemplo';
 export * from './leitor/normalizar';
 export * from './leitor/totais';

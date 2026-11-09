@@ -1,4 +1,14 @@
-import { pessoasExemplo, type ControleCard, type Pessoa, type Snapshot } from '@supervisao/core';
+import { pessoasExemplo, type ControleCard, type CorSemaforo, type Pessoa, type Snapshot } from '@supervisao/core';
+
+// o que eu escrevo no relatório de cada foto
+export interface NotasRelatorio
+{
+  semaforo?: CorSemaforo;
+  resumo?: string;
+  destaques?: string;
+  decisoes?: string;
+  proximosPassos?: string;
+}
 
 const CHAVE = 'relatorio-semanal-v1';
 
@@ -8,11 +18,12 @@ export interface Dados
   prefixo: string;
   fotos: Snapshot[];
   controle: Record<string, ControleCard>;
+  relatorios: Record<string, NotasRelatorio>;
 }
 
 function padrao(): Dados
 {
-  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {} };
+  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {} };
 }
 
 export function carregar(): Dados

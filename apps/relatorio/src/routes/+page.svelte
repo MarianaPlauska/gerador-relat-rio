@@ -143,7 +143,7 @@
     <label class="botao">Importar JSON <input type="file" accept="application/json" onchange={aoImportar} hidden /></label>
   </header>
 
-  <section>
+  <section class="cartao">
     <h2>1. Cole aqui (Ctrl+V)</h2>
     <p class="dica">
       Selecione um trecho do painel e copie (Ctrl+C), ou tire um print (Win+Shift+S). Depois clique na caixa e cole.
@@ -171,7 +171,7 @@
   </section>
 
   {#if leu}
-    <section>
+    <section class="cartao">
       <h2>2. Confira antes de salvar</h2>
 
       <h3>Totais encontrados ({chavesLidas.length})</h3>
@@ -251,7 +251,7 @@
     </section>
   {/if}
 
-  <section>
+  <section class="cartao">
     <h2>Foto de {dataFoto}</h2>
     <p class="dica">{Object.keys(foto.totais).length} totais e {foto.cards.length} cards salvos.</p>
     <details>
@@ -284,9 +284,9 @@
 <style>
   main
   {
-    max-width: 1200px;
+    max-width: 1240px;
     margin: 0 auto;
-    padding: 16px;
+    padding: 24px;
   }
   header, .linha
   {
@@ -297,33 +297,19 @@
   }
   h1
   {
-    margin-right: auto;
-    font-size: 1.4rem;
-  }
-  section
-  {
-    background: #fff;
-    border: 1px solid #dde1e5;
-    border-radius: 8px;
-    padding: 16px;
-    margin-top: 16px;
+    margin: 0 auto 0 0;
   }
   textarea
   {
     width: 100%;
-    box-sizing: border-box;
-    font-family: ui-monospace, monospace;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 0.82rem;
+    margin: 8px 0;
+    background: #fafbfc;
   }
-  table
+  table input, table select
   {
-    border-collapse: collapse;
-    font-size: 0.9rem;
-  }
-  th, td
-  {
-    border-bottom: 1px solid #eceff1;
-    padding: 4px 6px;
-    text-align: left;
+    padding: 3px 6px;
   }
   .rolagem
   {
@@ -335,7 +321,7 @@
   }
   .mini
   {
-    width: 48px;
+    width: 52px;
   }
   .etapas
   {
@@ -344,46 +330,39 @@
   .grade
   {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 8px 16px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 8px 20px;
     margin: 12px 0;
   }
   .grade label
   {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     gap: 8px;
-    font-size: 0.9rem;
+  }
+  summary
+  {
+    cursor: pointer;
+    color: var(--marca);
+    font-weight: 600;
+    margin: 8px 0;
   }
   .conferir
   {
-    background: #fff1f0;
+    background: var(--vermelho-fundo);
   }
   .avisos
   {
-    color: #b42318;
-    font-size: 0.85rem;
-  }
-  .dica
-  {
-    color: #5c6670;
-    font-size: 0.9rem;
+    color: var(--vermelho);
+    font-size: 0.82rem;
   }
   .aviso
   {
-    background: #fff6e0;
-    padding: 8px;
-    border-radius: 6px;
-  }
-  .botao
-  {
-    cursor: pointer;
-    text-decoration: underline;
+    margin-top: 12px;
   }
   .principal
   {
-    margin-top: 12px;
-    padding: 8px 16px;
-    font-weight: 600;
+    margin-top: 16px;
   }
 </style>
