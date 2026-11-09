@@ -11,6 +11,8 @@ export interface NotasRelatorio
   destaques?: string;
   decisoes?: string;
   proximosPassos?: string;
+  secoesOcultas?: string[];
+  frasesOcultas?: string[];
 }
 
 const CHAVE = 'relatorio-semanal-v1';

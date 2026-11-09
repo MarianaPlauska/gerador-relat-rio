@@ -1,21 +1,23 @@
 :root
 {
-  --fundo: #f3f5f7;
+  --fundo: #f6f5f2;
   --superficie: #ffffff;
-  --borda: #e2e7ec;
-  --texto: #16212b;
-  --suave: #5b6b79;
-  --marca: #0f4c5c;
-  --marca-escura: #0b3640;
-  --marca-clara: #e5f0f2;
+  --borda: #e7e4de;
+  --texto: #1f2328;
+  --suave: #6b6f76;
+  --marca: #e8590c;
+  --marca-escura: #1f2328;
+  --marca-clara: #fff1e7;
   --verde: #1a7f43;
-  --verde-fundo: #e6f6ec;
+  --verde-fundo: #e7f5ec;
   --amarelo: #b54708;
-  --amarelo-fundo: #fff1e6;
-  --vermelho: #b42318;
-  --vermelho-fundo: #fdecec;
-  --raio: 10px;
-  --sombra: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 8%);
+  --amarelo-fundo: #fff3e3;
+  --vermelho: #c0261a;
+  --vermelho-fundo: #fdecea;
+  --raio: 12px;
+  --sombra: 0 1px 2px rgb(31 35 40 / 4%), 0 4px 16px rgb(31 35 40 / 6%);
+  --fonte-maquina: "Courier Prime", "Courier New", monospace;
+  --fonte-texto: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
 }
 
 *
@@ -26,7 +28,7 @@
 body
 {
   margin: 0;
-  font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  font-family: var(--fonte-texto);
   background: var(--fundo);
   color: var(--texto);
   line-height: 1.45;
@@ -34,16 +36,18 @@ body
 
 h1, h2, h3
 {
+  font-family: var(--fonte-maquina);
   line-height: 1.2;
   margin: 0 0 12px;
+  letter-spacing: -0.01em;
 }
 h1
 {
-  font-size: 1.5rem;
+  font-size: 1.7rem;
 }
 h2
 {
-  font-size: 1.1rem;
+  font-size: 1.2rem;
 }
 h3
 {
@@ -55,14 +59,16 @@ h3
 button, .botao
 {
   font: inherit;
-  font-size: 0.9rem;
-  padding: 6px 14px;
-  border-radius: 8px;
+  font-family: var(--fonte-maquina);
+  font-size: 0.92rem;
+  padding: 7px 16px;
+  border-radius: 999px;
   border: 1px solid var(--borda);
   background: var(--superficie);
   color: var(--texto);
   cursor: pointer;
   display: inline-block;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 button:hover:not(:disabled), .botao:hover
 {
@@ -71,7 +77,7 @@ button:hover:not(:disabled), .botao:hover
 }
 button:disabled
 {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
 }
 button.principal
@@ -79,11 +85,11 @@ button.principal
   background: var(--marca);
   border-color: var(--marca);
   color: #fff;
-  font-weight: 600;
+  font-weight: 700;
 }
 button.principal:hover:not(:disabled)
 {
-  background: var(--marca-escura);
+  background: #c94a06;
   color: #fff;
 }
 
@@ -94,17 +100,17 @@ input, select, textarea
   color: var(--texto);
   background: var(--superficie);
   border: 1px solid var(--borda);
-  border-radius: 6px;
-  padding: 5px 8px;
+  border-radius: 8px;
+  padding: 6px 9px;
 }
 input:focus, select:focus, textarea:focus
 {
-  outline: 2px solid var(--marca-clara);
+  outline: 3px solid var(--marca-clara);
   border-color: var(--marca);
 }
 label
 {
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: var(--suave);
 }
 
@@ -117,11 +123,12 @@ table
 th
 {
   text-align: left;
-  font-size: 0.7rem;
+  font-family: var(--fonte-maquina);
+  font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   color: var(--suave);
-  font-weight: 600;
+  font-weight: 700;
 }
 th, td
 {
@@ -136,8 +143,8 @@ th, td
   border: 1px solid var(--borda);
   border-radius: var(--raio);
   box-shadow: var(--sombra);
-  padding: 20px;
-  margin-top: 16px;
+  padding: 22px;
+  margin-top: 18px;
 }
 
 .dica
@@ -164,7 +171,7 @@ th, td
   font-weight: 600;
   white-space: nowrap;
 }
-.no_ritmo, .verde, .melhorou
+.no_ritmo, .verde, .melhorou, .positivo
 {
   background: var(--verde-fundo);
   color: var(--verde);
@@ -174,30 +181,27 @@ th, td
   background: var(--amarelo-fundo);
   color: var(--amarelo);
 }
-.atrasado, .vermelho, .piorou
+.atrasado, .vermelho, .piorou, .atencao
 {
   background: var(--vermelho-fundo);
   color: var(--vermelho);
 }
 
+.num, .maquina
+{
+  font-family: var(--fonte-maquina);
+  font-variant-numeric: tabular-nums;
+}
 .num
 {
   text-align: right;
-  font-variant-numeric: tabular-nums;
 }
 
-@page
+.etiqueta
 {
-  size: A4;
-  margin: 12mm 12mm 14mm;
-}
-
-@media print
-{
-  body
-  {
-    background: #fff;
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
-  }
+  font-family: var(--fonte-maquina);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--suave);
 }
