@@ -1,4 +1,4 @@
-import { pessoasExemplo, type Pessoa, type Snapshot } from '@supervisao/core';
+import { pessoasExemplo, type ControleCard, type Pessoa, type Snapshot } from '@supervisao/core';
 
 const CHAVE = 'relatorio-semanal-v1';
 
@@ -7,11 +7,12 @@ export interface Dados
   pessoas: Pessoa[];
   prefixo: string;
   fotos: Snapshot[];
+  controle: Record<string, ControleCard>;
 }
 
 function padrao(): Dados
 {
-  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [] };
+  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {} };
 }
 
 export function carregar(): Dados

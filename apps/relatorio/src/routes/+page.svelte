@@ -19,6 +19,7 @@
   let totaisLidos = $state<TotaisPainel>({});
   let cardsLidos = $state<CardSnapshot[]>([]);
   let leu = $state(false);
+  let trechos = $state(0);
 
   const foto = $derived(dados.fotos.find((f) => f.data === dataFoto) ?? fotoVazia(dataFoto));
   const origemDetectada = $derived(texto ? detectarOrigem(texto) : null);
@@ -44,13 +45,30 @@
       ler();
       return;
     }
-    aviso = 'Lendo a imagem... na primeira vez baixa o idioma português, pode demorar.';
-    progresso = 0;
+    await lerImagens([colado.imagem]);
+  }
+
+  function aoSoltar(e: DragEvent)
+  {
+    const imagens = [...(e.dataTransfer?.files ?? [])].filter((f) => f.type.startsWith('image/'));
+    if (!imagens.length) return;
+    e.preventDefault();
+    lerImagens(imagens);
+  }
+
+  // lê um print de cada vez e vai somando no que já foi lido
+  async function lerImagens(imagens: Blob[])
+  {
     try
     {
-      texto = await lerImagem(colado.imagem, (p) => (progresso = p));
-      aviso = 'Imagem lida. Confira o texto e os campos abaixo, a leitura de imagem pode errar.';
-      ler();
+      for (const [i, imagem] of imagens.entries())
+      {
+        aviso = `Lendo a imagem ${i + 1} de ${imagens.length}... na primeira vez baixa o idioma português, pode demorar.`;
+        progresso = 0;
+        texto = await lerImagem(imagem, (p) => (progresso = p));
+        ler();
+      }
+      aviso = 'Imagem lida. Confira os campos abaixo, a leitura de imagem pode errar. Pode colar o próximo print.';
     }
     catch (erro)
     {
@@ -65,9 +83,22 @@
   function ler()
   {
     const origem = origemEscolhida === 'auto' ? undefined : origemEscolhida;
-    totaisLidos = lerTotais(texto);
-    cardsLidos = lerCards(texto, { prefixo: dados.prefixo, pessoas: dados.pessoas, origem, hoje: dataFoto });
+    const totais = lerTotais(texto);
+    const cards = lerCards(texto, { prefixo: dados.prefixo, pessoas: dados.pessoas, origem, hoje: dataFoto });
+    const acumulado = mesclarNaFoto({ data: dataFoto, totais: $state.snapshot(totaisLidos), cards: $state.snapshot(cardsLidos) }, totais, cards);
+    totaisLidos = acumulado.totais;
+    cardsLidos = acumulado.cards;
+    trechos++;
     leu = true;
+  }
+
+  function limparLeitura()
+  {
+    texto = '';
+    totaisLidos = {};
+    cardsLidos = [];
+    trechos = 0;
+    leu = false;
   }
 
   function salvarNaFoto()
@@ -76,10 +107,7 @@
     dados.fotos = [...dados.fotos.filter((f) => f.data !== dataFoto), nova].sort((a, b) => a.data.localeCompare(b.data));
     salvar($state.snapshot(dados));
     aviso = `Salvo na foto de ${dataFoto}: ${chavesLidas.length} totais e ${cardsLidos.length} cards.`;
-    texto = '';
-    totaisLidos = {};
-    cardsLidos = [];
-    leu = false;
+    limparLeitura();
   }
 
   async function aoImportar(e: Event)
@@ -117,8 +145,11 @@
 
   <section>
     <h2>1. Cole aqui (Ctrl+V)</h2>
-    <p class="dica">Selecione um trecho do painel e copie (Ctrl+C), ou tire um print (Win+Shift+S). Depois clique na caixa e cole.</p>
-    <textarea rows="8" bind:value={texto} onpaste={aoColar} placeholder="Cole o texto ou o print do painel"></textarea>
+    <p class="dica">
+      Selecione um trecho do painel e copie (Ctrl+C), ou tire um print (Win+Shift+S). Depois clique na caixa e cole.
+      Pode colar vários prints seguidos: cada um soma no que já foi lido. Também dá para arrastar várias imagens para a caixa.
+    </p>
+    <textarea rows="8" bind:value={texto} onpaste={aoColar} ondrop={aoSoltar} ondragover={(e) => e.preventDefault()} placeholder="Cole o texto ou o print do painel"></textarea>
     <div class="linha">
       <label>Trecho
         <select bind:value={origemEscolhida}>
@@ -128,7 +159,12 @@
           {/each}
         </select>
       </label>
-      <button onclick={ler} disabled={!texto}>Ler de novo</button>
+      <button onclick={ler} disabled={!texto}>Ler este texto</button>
+      <label class="botao">Escolher imagens
+        <input type="file" accept="image/*" multiple hidden onchange={(e) => lerImagens([...(e.currentTarget.files ?? [])])} />
+      </label>
+      {#if trechos}<span class="dica">{trechos} {trechos === 1 ? 'trecho lido' : 'trechos lidos'}</span>{/if}
+      <button onclick={limparLeitura} disabled={!leu}>Limpar leitura</button>
       {#if progresso !== null}<progress value={progresso}></progress>{/if}
     </div>
     {#if aviso}<p class="aviso">{aviso}</p>{/if}
@@ -246,13 +282,6 @@
 </main>
 
 <style>
-  :global(body)
-  {
-    font-family: system-ui, sans-serif;
-    margin: 0;
-    background: #f6f7f8;
-    color: #1d2329;
-  }
   main
   {
     max-width: 1200px;

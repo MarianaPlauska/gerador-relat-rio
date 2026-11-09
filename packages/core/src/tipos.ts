@@ -147,3 +147,13 @@ export interface ComentarioSecao
   texto: string;
   incluirNoRelatorio: boolean;
 }
+
+// o que eu marquei no meu acompanhamento entre uma foto do painel e outra
+export interface ControleCard
+{
+  etapasConcluidas?: number;
+  etapaAtual?: string;
+  responsavelEtapaAtual?: string;
+  etapaAtualStatus?: CardSnapshot['etapaAtualStatus'];
+  atualizadoEm: string;
+}
