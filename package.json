@@ -1,0 +1,12 @@
+{
+  "name": "supervisao",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "npm test --workspaces --if-present",
+    "check": "npm run check --workspaces --if-present"
+  }
+}
