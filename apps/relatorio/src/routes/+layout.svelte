@@ -7,6 +7,7 @@
   const links = [
     { href: '/', nome: 'Entrada do painel' },
     { href: '/cards', nome: 'Cards' },
+    { href: '/semana', nome: 'Semana' },
     { href: '/relatorio', nome: 'Relatório' },
   ];
 </script>

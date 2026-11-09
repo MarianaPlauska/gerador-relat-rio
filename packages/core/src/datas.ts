@@ -37,3 +37,8 @@ export function segundaDaSemana(iso: string): string
   const diaSemana = new Date(t).getUTCDay();
   return paraIso(t - ((diaSemana + 6) % 7) * UM_DIA);
 }
+
+export function somarDias(iso: string, dias: number): string
+{
+  return paraIso(paraUtc(iso) + dias * UM_DIA);
+}

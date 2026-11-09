@@ -91,10 +91,17 @@ export interface ItemPlano
   cardCodigo?: string;
   descricao: string;
   objetivo?: string;
+  // frente de trabalho e dor do cliente/área que o item ataca
+  frente?: string;
+  dor?: string;
+  // data combinada para entregar; a original fica guardada para saber se foi alterada
+  ate?: string;
+  ateOriginal?: string;
   tipo: 'planejado' | 'nao_planejado';
-  horasEstimadas: number;
+  horasEstimadas?: number;
   horasRealizadas?: number;
   status: 'a_fazer' | 'fazendo' | 'feito' | 'bloqueado' | 'adiado';
+  entregueEm?: string;
   motivoNaoFeito?: string;
   causa?: 'requisito_mudou' | 'dependencia_externa' | 'estimativa_errada' | 'bloqueio' | 'urgencia' | 'outro';
 }
@@ -103,6 +110,8 @@ export interface PlanoPessoa
 {
   pessoaId: string;
   itens: ItemPlano[];
+  // maior problema ou dificuldade da pessoa na semana
+  dificuldade?: string;
   observacao?: string;
 }
 
@@ -110,6 +119,8 @@ export interface PlanoSemana
 {
   inicio: string;
   pessoas: PlanoPessoa[];
+  // a partir daqui as datas combinadas ficam guardadas e mudança conta como alteração
+  confirmadoEm?: string;
   fechadoEm?: string;
 }
 

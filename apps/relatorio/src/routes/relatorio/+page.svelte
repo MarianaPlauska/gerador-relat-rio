@@ -1,8 +1,9 @@
 <script lang="ts">
   import
   {
-    aplicarControle, compararTotais, definicoesPadrao, nomesTotais, ritmoPorPessoa, segundaDaSemana, semaforoPrazo,
-    type CardSnapshot, type CorSemaforo, type Ritmo, type TotaisPainel,
+    alertasDoPlano, aplicarControle, compararTotais, datasAlteradasNoPainel, definicoesPadrao, kpisDosItens, mapaDeDores, mapaDeFrentes,
+    nomesTotais, ritmoPorPessoa, segundaDaSemana, semaforoPrazo, somarDias,
+    type CardSnapshot, type CorSemaforo, type ItemPlano, type Ritmo, type TotaisPainel,
   } from '@supervisao/core';
   import { carregar, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
 
@@ -54,7 +55,37 @@
   const semaforo = $derived(notas.semaforo ?? semaforoAuto);
 
   const segunda = $derived(dataFoto ? segundaDaSemana(dataFoto) : '');
-  const sexta = $derived(segunda ? new Date(Date.parse(segunda) + 4 * 86_400_000).toISOString().slice(0, 10) : '');
+  const sexta = $derived(segunda ? somarDias(segunda, 4) : '');
+
+  const plano = $derived(dados.planos.find((p) => p.inicio === segunda));
+  const cardsFoto = $derived(foto?.cards ?? []);
+  const porCodigo = $derived(new Map(cardsFoto.map((c) => [c.codigo, c])));
+  const kpisPlano = $derived(plano ? kpisDosItens(plano.pessoas.flatMap((pp) => pp.itens), cardsFoto) : undefined);
+  const alertasPlano = $derived(plano ? alertasDoPlano(plano, cardsFoto, dados.pessoas) : []);
+  const datasMudadas = $derived(foto && anterior ? datasAlteradasNoPainel(foto.cards, anterior.cards) : []);
+  const frentes = $derived(plano ? mapaDeFrentes(plano) : []);
+  const doresPlano = $derived(plano ? mapaDeDores(plano) : []);
+  const pessoasNoPlano = $derived(
+    dados.pessoas
+      .map((pessoa) => ({ pessoa, pp: plano?.pessoas.find((x) => x.pessoaId === pessoa.id) }))
+      .filter(({ pp }) => pp && (pp.itens.length || pp.dificuldade))
+      .map(({ pessoa, pp }) => ({ pessoa, pp: pp!, kpis: kpisDosItens(pp!.itens, cardsFoto) })),
+  );
+  const pessoasComFrente = $derived(dados.pessoas.filter((p) => frentes.some((f) => f.porPessoa[p.id])));
+  const naoSaiu = $derived(
+    plano?.pessoas.flatMap((pp) => pp.itens.filter((i) => i.status !== 'feito' && (plano.fechadoEm || i.motivoNaoFeito)).map((item) => ({ pessoaId: pp.pessoaId, item }))) ?? [],
+  );
+  const riscos = $derived(dados.riscos.filter((r) => r.status === 'aberto' || (r.sinalizadoEm >= segunda && r.sinalizadoEm <= sexta)));
+  const promessas = $derived(dados.promessas.filter((p) => p.semana === segunda));
+  const promessasAnteriores = $derived(dados.promessas.filter((p) => p.semana === somarDias(segunda, -7)));
+
+  const nomesStatus: Record<ItemPlano['status'], string> = { a_fazer: 'A fazer', fazendo: 'Fazendo', feito: 'Feito', bloqueado: 'Bloqueado', adiado: 'Adiado' };
+  const nomesCausa: Record<NonNullable<ItemPlano['causa']>, string> = {
+    requisito_mudou: 'requisito mudou', dependencia_externa: 'dependência externa', estimativa_errada: 'estimativa errada',
+    bloqueio: 'bloqueio', urgencia: 'entrou urgência', outro: 'outro',
+  };
+  const corStatus = (s: ItemPlano['status']) => (s === 'feito' ? 'verde' : s === 'bloqueado' || s === 'adiado' ? 'vermelho' : '');
+  const rotuloItem = (item: ItemPlano) => item.cardCodigo ?? 'Sem card';
 
   const dataCurta = (iso?: string) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(2, 4)}` : '-');
   const nomePessoa = (id?: string) => dados.pessoas.find((p) => p.id === id)?.nome ?? id ?? '-';
@@ -91,6 +122,14 @@
     {#if comparativo[chave]?.diferenca !== undefined}
       <span class="variacao {comparativo[chave]?.tendencia}">{variacao(chave)} vs {dataCurta(anterior?.data)}</span>
     {/if}
+  </div>
+{/snippet}
+
+{#snippet kpiLivre(rotulo: string, valorTexto: string, detalhe: string)}
+  <div class="kpi plano-kpi">
+    <span class="rotulo">{rotulo}</span>
+    <span class="valor">{valorTexto}</span>
+    <span class="detalhe">{detalhe}</span>
   </div>
 {/snippet}
 
@@ -161,6 +200,17 @@
         {@render kpi('Atrasados', 'atrasadosVencimento', '', 'vencimento já passou')}
         {@render kpi('Vencem em até 15 dias', 'vencem15Dias', '', '')}
       </div>
+      {#if kpisPlano}
+        <h3>Execução do plano da semana</h3>
+        <div class="kpis">
+          {@render kpiLivre('Itens feitos', `${kpisPlano.feitos}/${kpisPlano.planejados}`,
+            `${kpisPlano.pctFeitos !== undefined ? `${kpisPlano.pctFeitos}% do planejado` : 'nada planejado'}${kpisPlano.naoPlanejadosFeitos ? ` · +${kpisPlano.naoPlanejadosFeitos} não planejados` : ''}`)}
+          {@render kpiLivre('Itens alterados', String(kpisPlano.alterados),
+            `datas mudadas ou adiados no plano${anterior ? ` · ${datasMudadas.length} ${datasMudadas.length === 1 ? 'data mudada' : 'datas mudadas'} no painel` : ''}`)}
+          {@render kpiLivre('Continuidade no cronograma', kpisPlano.pctDentroDoCronograma !== undefined ? `${kpisPlano.pctDentroDoCronograma}%` : '-',
+            kpisPlano.feitosComLimite ? `${kpisPlano.dentroDoCronograma} de ${kpisPlano.feitosComLimite} entregas dentro da previsão do card` : 'sem entregas ainda')}
+        </div>
+      {/if}
       {@render nota('resumo', 'Leitura da semana', 'Em 2 ou 3 frases: como a semana está e o que muda para a gestão.')}
     </section>
 
@@ -197,8 +247,117 @@
       {/if}
     </section>
 
+    {#if plano}
+      <section>
+        <h2>3. Frentes e responsáveis</h2>
+        <table class="matriz">
+          <thead>
+            <tr><th>Frente</th>{#each pessoasComFrente as p (p.id)}<th>{p.nome}</th>{/each}</tr>
+          </thead>
+          <tbody>
+            {#each frentes as f (f.frente)}
+              <tr>
+                <td class="frente">{f.frente}</td>
+                {#each pessoasComFrente as p (p.id)}
+                  <td>
+                    {#each f.porPessoa[p.id] ?? [] as item (item.id)}
+                      <div class="celula {corStatus(item.status)}"><b>{rotuloItem(item)}</b> {item.descricao}</div>
+                    {/each}
+                  </td>
+                {/each}
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+        {#if doresPlano.length}
+          <h3>Dores que estamos atacando</h3>
+          <ul class="dores">
+            {#each doresPlano as d (d.dor)}
+              <li>
+                <b>{d.dor}</b>
+                <span>{d.itens.map(({ pessoaId, item }) => `${rotuloItem(item)} (${nomePessoa(pessoaId).split(' ')[0]})`).join(', ')}</span>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </section>
+
+      <section class="pode-quebrar">
+        <h2>4. Plano por pessoa</h2>
+        {#each pessoasNoPlano as { pessoa, pp, kpis } (pessoa.id)}
+          <div class="bloco-pessoa">
+            <div class="cabeca-pessoa">
+              <b>{pessoa.nome}</b>
+              <span class="trilho-plano"><span style:width="{kpis.pctFeitos ?? 0}%"></span></span>
+              <span class="dica">{kpis.feitos} de {kpis.planejados} feitos{kpis.alterados ? ` · ${kpis.alterados} alterados` : ''}</span>
+            </div>
+            {#if pp.dificuldade}<p class="dificuldade"><b>Maior dificuldade:</b> {pp.dificuldade}</p>{/if}
+            {#if pp.itens.length}
+              <table>
+                <thead><tr><th>Card</th><th>O que</th><th>Para quê</th><th>Frente</th><th>Até</th><th>Status</th></tr></thead>
+                <tbody>
+                  {#each pp.itens as item (item.id)}
+                    {@const card = item.cardCodigo ? porCodigo.get(item.cardCodigo) : undefined}
+                    <tr>
+                      <td class="codigo">{rotuloItem(item)}{#if card?.titulo}<small>{card.titulo}</small>{/if}</td>
+                      <td>{item.descricao}{#if item.tipo === 'nao_planejado'}<small>não planejado</small>{/if}</td>
+                      <td>{item.objetivo ?? ''}</td>
+                      <td>{item.frente ?? ''}</td>
+                      <td>
+                        {dataCurta(item.ate)}
+                        {#if item.ateOriginal && item.ate !== item.ateOriginal}<small>era {dataCurta(item.ateOriginal)}</small>{/if}
+                        {#if alertasPlano.some((a) => a.itemId === item.id)}<small class="vencida">passa do painel</small>{/if}
+                      </td>
+                      <td><span class="pilula {corStatus(item.status)}">{nomesStatus[item.status]}</span></td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            {/if}
+          </div>
+        {:else}
+          <p class="dica">Plano da semana ainda vazio.</p>
+        {/each}
+      </section>
+
+      {#if naoSaiu.length}
+        <section>
+          <h2>4.1 Fechamento: o que não saiu</h2>
+          <table>
+            <thead><tr><th>Quem</th><th>Item</th><th>Status</th><th>Causa</th><th>Motivo</th></tr></thead>
+            <tbody>
+              {#each naoSaiu as { pessoaId, item } (item.id)}
+                <tr>
+                  <td>{nomePessoa(pessoaId)}</td>
+                  <td><b>{rotuloItem(item)}</b> {item.descricao}</td>
+                  <td><span class="pilula {corStatus(item.status)}">{nomesStatus[item.status]}</span></td>
+                  <td>{item.causa ? nomesCausa[item.causa] : '-'}</td>
+                  <td>{item.motivoNaoFeito ?? '-'}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </section>
+      {/if}
+    {/if}
+
     <section>
-      <h2>3. Pontos de atenção</h2>
+      <h2>5. Pontos de atenção</h2>
+      {#if alertasPlano.length}
+        <h3>O plano passa do que o painel espera</h3>
+        <ul class="lista-alertas">
+          {#each alertasPlano as a, i (i)}<li class={a.nivel === 'alto' ? 'vermelho' : 'amarelo'}>{a.texto}</li>{/each}
+        </ul>
+      {/if}
+      {#if datasMudadas.length}
+        <h3>Datas alteradas no painel desde {dataCurta(anterior?.data)}</h3>
+        <ul class="lista-alertas">
+          {#each datasMudadas as m (m.codigo + m.campo)}
+            <li>{m.codigo}: {m.campo === 'previsao' ? 'previsão' : 'vencimento'} de {dataCurta(m.de)} para {dataCurta(m.para)}</li>
+          {/each}
+        </ul>
+      {/if}
+      <h3>Demandas em risco, atrasadas ou com previsão vencida</h3>
       {#if atencao.length}
         <table>
           <thead><tr><th>Card</th><th>Demanda</th><th>Etapa atual · quem</th><th class="num">Etapas</th><th>Previsão</th><th>Ritmo</th></tr></thead>
@@ -221,8 +380,50 @@
       {@render nota('decisoes', 'Decisões e apoio necessários', 'O que a gestão precisa decidir ou destravar, com prazo.')}
     </section>
 
-    <section>
-      <h2>4. Quem está cuidando de quê</h2>
+    {#if riscos.length}
+      <section>
+        <h2>6. Riscos e plano B</h2>
+        <table>
+          <thead><tr><th>Risco</th><th>Chance · impacto</th><th>Gatilho</th><th>Plano B</th><th>Decisão necessária</th></tr></thead>
+          <tbody>
+            {#each riscos as r (r.id)}
+              <tr>
+                <td>{r.descricao}<small>{[r.cardCodigo, r.pessoaId && nomePessoa(r.pessoaId), r.status !== 'aberto' && r.status].filter(Boolean).join(' · ')}</small></td>
+                <td><span class="pilula {r.impacto === 'alto' || r.probabilidade === 'alta' ? 'vermelho' : 'amarelo'}">{r.probabilidade} · {r.impacto}</span></td>
+                <td>{r.gatilho}</td>
+                <td>{r.planoB}</td>
+                <td>{r.decisaoNecessaria ?? ''}{#if r.prazoDecisao}<small>até {dataCurta(r.prazoDecisao)}</small>{/if}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </section>
+    {/if}
+
+    {#if promessas.length || promessasAnteriores.length}
+      <section>
+        <h2>7. Compromissos com a gestão</h2>
+        <table>
+          <thead><tr><th>Semana</th><th>Compromisso</th><th>Situação</th></tr></thead>
+          <tbody>
+            {#each [...promessasAnteriores, ...promessas] as p (p.id)}
+              <tr>
+                <td>{dataCurta(p.semana)}</td>
+                <td>{p.texto}{#if p.justificativa}<small>{p.justificativa}</small>{/if}</td>
+                <td>
+                  <span class="pilula {p.cumprida === true ? 'verde' : p.cumprida === false ? 'vermelho' : ''}">
+                    {p.cumprida === true ? 'cumprido' : p.cumprida === false ? 'não cumprido' : 'em aberto'}
+                  </span>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </section>
+    {/if}
+
+    <section class="pode-quebrar">
+      <h2>8. Quem está cuidando de quê</h2>
       <table>
         <thead><tr><th>Card</th><th>Demanda</th><th class="num">Nível</th><th>Etapa atual · quem</th><th class="num">Etapas</th><th>Previsão</th><th>Ritmo</th></tr></thead>
         <tbody>
@@ -248,7 +449,7 @@
     </section>
 
     <section>
-      <h2>5. Comparativo {anterior ? `com a foto de ${dataCurta(anterior.data)}` : 'dos números do painel'}</h2>
+      <h2>9. Comparativo {anterior ? `com a foto de ${dataCurta(anterior.data)}` : 'dos números do painel'}</h2>
       <table class="comparativo">
         <thead>
           <tr><th>Indicador</th>{#if anterior}<th class="num">{dataCurta(anterior.data)}</th>{/if}<th class="num">{dataCurta(dataFoto)}</th>{#if anterior}<th class="num">Variação</th>{/if}</tr>
@@ -267,7 +468,7 @@
     </section>
 
     <section>
-      <h2>6. Destaques e próximos passos</h2>
+      <h2>10. Destaques e próximos passos</h2>
       {@render nota('destaques', 'Destaques da semana', 'Entregas, avanços e o que deu certo.')}
       {@render nota('proximosPassos', 'Próximos passos', 'O que será feito, por quem, até quando e com qual objetivo.')}
     </section>
@@ -587,6 +788,102 @@
   .so-imprimir
   {
     display: none;
+  }
+  .pode-quebrar
+  {
+    break-inside: auto;
+  }
+  .plano-kpi
+  {
+    background: var(--marca-clara);
+    border-color: transparent;
+  }
+  .matriz td
+  {
+    min-width: 120px;
+  }
+  .frente
+  {
+    font-weight: 700;
+    color: var(--marca-escura);
+  }
+  .celula
+  {
+    font-size: 0.78rem;
+    background: #f1f4f6;
+    border-radius: 4px;
+    padding: 3px 6px;
+    margin-bottom: 3px;
+  }
+  .dores
+  {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 0.85rem;
+  }
+  .dores span
+  {
+    color: var(--suave);
+    margin-left: 6px;
+  }
+  .bloco-pessoa td.codigo
+  {
+    width: 32%;
+    white-space: normal;
+  }
+  .bloco-pessoa td.codigo small
+  {
+    font-weight: 400;
+  }
+  .bloco-pessoa
+  {
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    break-inside: avoid;
+  }
+  .cabeca-pessoa
+  {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .trilho-plano
+  {
+    flex: 0 0 120px;
+    height: 8px;
+    background: #e8edf1;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .trilho-plano span
+  {
+    display: block;
+    height: 100%;
+    background: var(--verde);
+  }
+  .dificuldade
+  {
+    margin: 6px 0;
+    font-size: 0.85rem;
+    background: var(--amarelo-fundo);
+    padding: 6px 10px;
+    border-radius: 6px;
+  }
+  .lista-alertas
+  {
+    margin: 0 0 8px;
+    padding: 0;
+    list-style: none;
+    font-size: 0.82rem;
+  }
+  .lista-alertas li
+  {
+    padding: 4px 10px;
+    border-radius: 4px;
+    margin-bottom: 3px;
+    background: #f1f4f6;
   }
   @media print
   {

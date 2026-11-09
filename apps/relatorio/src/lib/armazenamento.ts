@@ -1,4 +1,7 @@
-import { pessoasExemplo, type ControleCard, type CorSemaforo, type Pessoa, type Snapshot } from '@supervisao/core';
+import
+{
+  pessoasExemplo, type ControleCard, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type Risco, type Snapshot,
+} from '@supervisao/core';
 
 // o que eu escrevo no relatório de cada foto
 export interface NotasRelatorio
@@ -19,11 +22,14 @@ export interface Dados
   fotos: Snapshot[];
   controle: Record<string, ControleCard>;
   relatorios: Record<string, NotasRelatorio>;
+  planos: PlanoSemana[];
+  riscos: Risco[];
+  promessas: Promessa[];
 }
 
 function padrao(): Dados
 {
-  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {} };
+  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [] };
 }
 
 export function carregar(): Dados
