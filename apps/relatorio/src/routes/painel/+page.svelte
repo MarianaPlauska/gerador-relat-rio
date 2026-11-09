@@ -18,7 +18,7 @@
     {
       titulo: 'Outros números (opcional)',
       secundario: true,
-      dica: 'Idade = há quantos dias as demandas abertas estão paradas, separadas em faixas. Só preencha se quiser guardar.',
+      dica: '"Parada há" mostra há quantos dias as demandas abertas estão sem andar, separadas em faixas. Só preencha se quiser guardar.',
       chaves: ['aindaPlanejado', 'emExecucao', 'datasFixadas', 'paradasEntreEtapas', 'emAbertoAgora', 'foraDoPrazo', 'previsoesSemana', 'previsaoVencida', 'qualidadePct', 'idadeAte1Dia', 'idade1a3Dias', 'idade3a7Dias', 'idade7a15Dias', 'idadeMais15Dias'],
     },
   ];

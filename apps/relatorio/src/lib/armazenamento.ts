@@ -15,6 +15,15 @@ export interface NotasRelatorio
   frasesOcultas?: string[];
 }
 
+// dados fixos que aparecem na capa e no termo de aprovação
+export interface Identificacao
+{
+  area: string;
+  elaboradoPor: string;
+  cargo: string;
+  destinatario: string;
+}
+
 const CHAVE = 'relatorio-semanal-v1';
 
 export interface Dados
@@ -27,11 +36,12 @@ export interface Dados
   planos: PlanoSemana[];
   riscos: Risco[];
   promessas: Promessa[];
+  identificacao: Identificacao;
 }
 
 function padrao(): Dados
 {
-  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [] };
+  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' } };
 }
 
 export function carregar(): Dados

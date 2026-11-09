@@ -39,8 +39,9 @@ export function svgLinha(
   const max = Math.max(...valores) * 1.1 || 1;
   const min = Math.max(0, Math.min(...valores) - (max - Math.min(...valores)) * 0.3);
   const y = (v: number) => base - ((v - min) / (max - min || 1)) * (base - topo);
-  const passo = pontos.length > 1 ? (largura - esq - dir) / (pontos.length - 1) : 0;
-  const x = (i: number) => (pontos.length > 1 ? esq + i * passo : largura / 2);
+  const folga = 22;
+  const passo = pontos.length > 1 ? (largura - esq - dir - 2 * folga) / (pontos.length - 1) : 0;
+  const x = (i: number) => (pontos.length > 1 ? esq + folga + i * passo : largura / 2);
   const partes: string[] = [];
   for (let i = 0; i <= 3; i++)
   {

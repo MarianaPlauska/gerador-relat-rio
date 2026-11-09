@@ -138,7 +138,16 @@
     </div>
 
     <div class="bloco">
+      <h2>Identificação (capa e aprovação)</h2>
+      <label>Área <input bind:value={dados.identificacao.area} /></label>
+      <label>Elaborado por <input bind:value={dados.identificacao.elaboradoPor} placeholder="Seu nome" /></label>
+      <label>Cargo <input bind:value={dados.identificacao.cargo} /></label>
+      <label>Destinatário <input bind:value={dados.identificacao.destinatario} placeholder="Nome do gestor" /></label>
+    </div>
+
+    <div class="bloco">
       <h2>Texto da supervisão</h2>
+      <p class="dica">Uma linha por item: cada linha vira um tópico no PDF.</p>
       <label>Destaques da semana
         <textarea rows="3" value={notas.destaques ?? ''} oninput={(e) => anotar('destaques', e.currentTarget.value || undefined)} placeholder="Entregas, avanços e o que deu certo."></textarea>
       </label>
