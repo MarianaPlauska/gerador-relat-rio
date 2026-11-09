@@ -18,8 +18,6 @@
   ];
 </script>
 
-<canvas class="chuva-fundo" use:chuva={{ fundo: 'rgba(246, 245, 242, 0.12)', cor: '#12a454', tamanho: 16, fps: 12 }}></canvas>
-
 <nav>
   <canvas class="chuva-nav" use:chuva={{ fundo: 'rgba(14, 19, 17, 0.18)', cor: '#12a454', tamanho: 12 }}></canvas>
   <a href="/" class="marca">supervisão<span>_dev</span></a>
@@ -40,12 +38,6 @@
     width: 100%;
     height: 100%;
     pointer-events: none;
-  }
-  .chuva-fundo
-  {
-    position: fixed;
-    z-index: -1;
-    opacity: 0.13;
   }
   .chuva-nav
   {
