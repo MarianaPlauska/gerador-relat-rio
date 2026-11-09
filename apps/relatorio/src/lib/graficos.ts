@@ -1,12 +1,12 @@
 // gráficos em svg puro: o mesmo desenho vai para a tela e para o pdf
 export const cores = {
-  tinta: '#1f2328',
+  tinta: '#121614',
   suave: '#6b6f76',
   grade: '#e7e4de',
-  laranja: '#e8590c',
-  laranjaClaro: '#fbc9a8',
+  marca: '#12a454',
+  marcaClara: '#b5e6c8',
   verde: '#2e9e5b',
-  amarelo: '#f08c2e',
+  amarelo: '#d99a00',
   vermelho: '#d64545',
   cinza: '#b8b4ad',
 };
@@ -28,7 +28,7 @@ function texto(x: number, y: number, conteudo: string, fonte: string, extra = ''
 // linha do tempo de um indicador, com a meta tracejada
 export function svgLinha(
   pontos: { rotulo: string; valor: number }[],
-  { largura = 520, fonte = 'IBM Plex Sans', meta, sufixo = '', altura = 190, cor = cores.laranja }: OpcoesGrafico & { meta?: number; sufixo?: string; altura?: number; cor?: string } = {},
+  { largura = 520, fonte = 'IBM Plex Sans', meta, sufixo = '', altura = 190, cor = cores.marca }: OpcoesGrafico & { meta?: number; sufixo?: string; altura?: number; cor?: string } = {},
 ): string
 {
   const esq = 36;
@@ -68,7 +68,7 @@ export function svgLinha(
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${largura}" height="${altura}" viewBox="0 0 ${largura} ${altura}">${partes.join('')}</svg>`;
 }
 
-export function svgSparkline(valores: number[], largura = 120, altura = 34, cor = cores.laranja): string
+export function svgSparkline(valores: number[], largura = 120, altura = 34, cor = cores.marca): string
 {
   if (valores.length < 2) return '';
   const max = Math.max(...valores);
@@ -125,9 +125,9 @@ export function svgBarrasComparadas(
   const util = largura - rotulo - 46;
   const w = (v: number) => (Math.min(v, max) / max) * util;
   const partes: string[] = [
-    `<rect x="0" y="4" width="10" height="10" rx="2" fill="${cores.laranjaClaro}"/>`,
+    `<rect x="0" y="4" width="10" height="10" rx="2" fill="${cores.marcaClara}"/>`,
     texto(14, 13, legendaAntes, fonte, `font-size="9" fill="${cores.suave}"`),
-    `<rect x="100" y="4" width="10" height="10" rx="2" fill="${cores.laranja}"/>`,
+    `<rect x="100" y="4" width="10" height="10" rx="2" fill="${cores.marca}"/>`,
     texto(114, 13, legendaAgora, fonte, `font-size="9" fill="${cores.suave}"`),
   ];
   linhas.forEach((l, i) =>
@@ -136,10 +136,10 @@ export function svgBarrasComparadas(
     partes.push(texto(0, yl + 18, l.rotulo, fonte, `font-size="10" fill="${cores.tinta}"`));
     if (l.antes !== undefined)
     {
-      partes.push(`<rect x="${rotulo}" y="${yl + 3}" width="${Math.max(w(l.antes), 1)}" height="11" rx="2" fill="${cores.laranjaClaro}"/>`);
+      partes.push(`<rect x="${rotulo}" y="${yl + 3}" width="${Math.max(w(l.antes), 1)}" height="11" rx="2" fill="${cores.marcaClara}"/>`);
       partes.push(texto(rotulo + w(l.antes) + 4, yl + 12, `${fmt(l.antes)}${sufixo}`, fonte, `font-size="8" fill="${cores.suave}"`));
     }
-    partes.push(`<rect x="${rotulo}" y="${yl + 16}" width="${Math.max(w(l.agora), 1)}" height="13" rx="2" fill="${cores.laranja}"/>`);
+    partes.push(`<rect x="${rotulo}" y="${yl + 16}" width="${Math.max(w(l.agora), 1)}" height="13" rx="2" fill="${cores.marca}"/>`);
     partes.push(texto(rotulo + w(l.agora) + 4, yl + 26, `${fmt(l.agora)}${sufixo}`, fonte, `font-size="9" font-weight="bold" fill="${cores.tinta}"`));
   });
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${largura}" height="${altura}" viewBox="0 0 ${largura} ${altura}">${partes.join('')}</svg>`;

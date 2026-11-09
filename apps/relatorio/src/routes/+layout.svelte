@@ -36,9 +36,8 @@
     gap: 24px;
     padding: 0 28px;
     height: 60px;
-    background: rgb(255 255 255 / 85%);
-    backdrop-filter: blur(8px);
-    border-bottom: 1px solid var(--borda);
+    background: var(--marca-escura);
+    border-bottom: 1px solid #000;
     position: sticky;
     top: 0;
     z-index: 10;
@@ -48,7 +47,7 @@
     font-family: var(--fonte-maquina);
     font-weight: 700;
     font-size: 1.15rem;
-    color: var(--texto);
+    color: #fff;
     text-decoration: none;
   }
   .marca span
@@ -67,7 +66,7 @@
     display: flex;
     align-items: center;
     font-family: var(--fonte-maquina);
-    color: var(--suave);
+    color: #9aa39e;
     text-decoration: none;
     padding: 0 14px;
     font-size: 0.95rem;
@@ -76,11 +75,11 @@
   }
   .links a:hover
   {
-    color: var(--texto);
+    color: #fff;
   }
   .links .ativo
   {
-    color: var(--texto);
+    color: #fff;
     border-bottom-color: var(--marca);
     font-weight: 700;
   }

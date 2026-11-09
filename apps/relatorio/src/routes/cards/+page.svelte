@@ -300,9 +300,9 @@
   }
   .em_risco
   {
-    background: #fff1e6;
-    color: #b54708;
-    border-color: #b54708;
+    background: #fff6d9;
+    color: #9a6700;
+    border-color: #9a6700;
   }
   .atrasado
   {

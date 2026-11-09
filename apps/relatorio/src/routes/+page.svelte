@@ -181,7 +181,7 @@
   }
   .botao-principal:hover
   {
-    background: #c94a06;
+    background: #0b7d40;
   }
   .passos
   {
@@ -289,7 +289,7 @@
   }
   .kpi.alerta .valor
   {
-    color: #ff8a4c;
+    color: #f5c542;
   }
   .barra
   {
@@ -341,7 +341,7 @@
   }
   .frases .atencao i
   {
-    background: var(--marca);
+    background: var(--amarelo);
   }
   .pessoa
   {

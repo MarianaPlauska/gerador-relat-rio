@@ -244,7 +244,7 @@
   }
   .marcavel.atencao
   {
-    border-left: 3px solid var(--marca);
+    border-left: 3px solid var(--amarelo);
   }
   .marcavel.positivo
   {

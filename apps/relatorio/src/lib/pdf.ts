@@ -31,7 +31,7 @@ export const secoesRelatorio = {
 export type Secao = keyof typeof secoesRelatorio;
 
 const LARGURA = 515;
-const corTom = { positivo: cores.verde, atencao: cores.laranja, neutro: cores.cinza };
+const corTom = { positivo: cores.verde, atencao: cores.amarelo, neutro: cores.cinza };
 const corTendencia: Record<Tendencia, string> = { melhorou: cores.verde, piorou: cores.vermelho, igual: cores.suave, neutra: cores.suave };
 const nomesSemaforo: Record<CorSemaforo, string> = { verde: 'NO CAMINHO', amarelo: 'ATENÇÃO', vermelho: 'FORA DA META' };
 const corSemaforo: Record<CorSemaforo, string> = { verde: cores.verde, amarelo: cores.amarelo, vermelho: cores.vermelho };
@@ -167,7 +167,7 @@ export function montarDocumento({ dados, ctx, notas, resumo }: EntradaPdf): TDoc
     numero++;
     return {
       stack: [
-        { columns: [{ text: String(numero).padStart(2, '0'), width: 26, font: 'Maquina', bold: true, fontSize: 13, color: cores.laranja }, { text: texto, font: 'Maquina', bold: true, fontSize: 13 }] },
+        { columns: [{ text: String(numero).padStart(2, '0'), width: 26, font: 'Maquina', bold: true, fontSize: 13, color: cores.marca }, { text: texto, font: 'Maquina', bold: true, fontSize: 13 }] },
         { canvas: [{ type: 'line', x1: 0, y1: 4, x2: LARGURA, y2: 4, lineWidth: 0.8, lineColor: cores.grade }] },
       ],
       margin: [0, 16, 0, 8],
@@ -177,7 +177,7 @@ export function montarDocumento({ dados, ctx, notas, resumo }: EntradaPdf): TDoc
 
   // capa
   conteudo.push(
-    { text: 'RELATÓRIO DE ACOMPANHAMENTO SEMANAL', font: 'Maquina', bold: true, fontSize: 9, color: cores.laranja, characterSpacing: 1 },
+    { text: 'RELATÓRIO DE ACOMPANHAMENTO SEMANAL', font: 'Maquina', bold: true, fontSize: 9, color: cores.marca, characterSpacing: 1 },
     { text: `Desenvolvimento (${dados.prefixo})`, font: 'Maquina', bold: true, fontSize: 26, margin: [0, 4, 0, 2] },
     {
       columns: [
@@ -196,7 +196,7 @@ export function montarDocumento({ dados, ctx, notas, resumo }: EntradaPdf): TDoc
           : { text: '', width: 'auto' },
       ],
     },
-    { canvas: [{ type: 'rect', x: 0, y: 8, w: LARGURA, h: 3, color: cores.laranja }], margin: [0, 0, 0, 6] },
+    { canvas: [{ type: 'rect', x: 0, y: 8, w: LARGURA, h: 3, color: cores.marca }], margin: [0, 0, 0, 6] },
   );
 
   // resumo e kpis
@@ -435,7 +435,7 @@ export function montarDocumento({ dados, ctx, notas, resumo }: EntradaPdf): TDoc
               const alerta = ctx.alertas.some((a) => a.itemId === i.id);
               return [
                 { stack: [{ text: i.cardCodigo ?? 'sem card', bold: true, font: 'Maquina' }, pequeno(c?.titulo)] },
-                { stack: [i.descricao, i.tipo === 'nao_planejado' ? pequeno('não planejado', cores.laranja) : '', i.frente ? pequeno(`frente: ${i.frente}`) : ''] },
+                { stack: [i.descricao, i.tipo === 'nao_planejado' ? pequeno('não planejado', cores.marca) : '', i.frente ? pequeno(`frente: ${i.frente}`) : ''] },
                 { text: i.objetivo ?? '', fontSize: 8.5 },
                 {
                   stack: [
@@ -525,7 +525,7 @@ export function montarDocumento({ dados, ctx, notas, resumo }: EntradaPdf): TDoc
       { stack: [{ text: r.descricao, bold: true }, pequeno([r.cardCodigo, r.pessoaId && nomePessoa(r.pessoaId), r.gatilho && `gatilho: ${r.gatilho}`].filter(Boolean).join(' · '))] },
       marcador(`${r.probabilidade} · ${r.impacto}`, r.impacto === 'alto' || r.probabilidade === 'alta' ? cores.vermelho : cores.amarelo),
       r.planoB,
-      { stack: [r.decisaoNecessaria ?? '-', r.prazoDecisao ? pequeno(`até ${dataMedia(r.prazoDecisao)}`, cores.laranja) : ''] },
+      { stack: [r.decisaoNecessaria ?? '-', r.prazoDecisao ? pequeno(`até ${dataMedia(r.prazoDecisao)}`, cores.marca) : ''] },
     ]), ['*', 70, 150, 100]));
   }
 
@@ -548,7 +548,7 @@ export function montarDocumento({ dados, ctx, notas, resumo }: EntradaPdf): TDoc
     conteudo.push(titulo(secoesRelatorio.notas));
     for (const [rotulo, valor] of notasTexto.filter(([, v]) => v?.trim()))
     {
-      conteudo.push(etiqueta(rotulo, cores.laranja));
+      conteudo.push(etiqueta(rotulo, cores.marca));
       conteudo.push({ text: valor!, fontSize: 9.5, margin: [0, 2, 0, 8] });
     }
   }
@@ -563,7 +563,7 @@ export function montarDocumento({ dados, ctx, notas, resumo }: EntradaPdf): TDoc
     styles: { th: { font: 'Maquina', bold: true, fontSize: 7.5, color: cores.suave } },
     header: (pagina) => (pagina === 1 ? '' : {
       columns: [
-        { text: [{ text: 'supervisão', bold: true }, { text: '_dev', bold: true, color: cores.laranja }], font: 'Maquina', fontSize: 8 },
+        { text: [{ text: 'supervisão', bold: true }, { text: '_dev', bold: true, color: cores.marca }], font: 'Maquina', fontSize: 8 },
         { text: `Relatório semanal · ${dataMedia(atual.inicio)} a ${dataMedia(ctx.sexta)}`, alignment: 'right', fontSize: 7.5, color: cores.suave },
       ],
       margin: [40, 20, 40, 0],

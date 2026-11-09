@@ -3,19 +3,19 @@
   --fundo: #f6f5f2;
   --superficie: #ffffff;
   --borda: #e7e4de;
-  --texto: #1f2328;
+  --texto: #121614;
   --suave: #6b6f76;
-  --marca: #e8590c;
-  --marca-escura: #1f2328;
-  --marca-clara: #fff1e7;
+  --marca: #12a454;
+  --marca-escura: #0e1311;
+  --marca-clara: #e3f6ea;
   --verde: #1a7f43;
   --verde-fundo: #e7f5ec;
-  --amarelo: #b54708;
-  --amarelo-fundo: #fff3e3;
+  --amarelo: #9a6700;
+  --amarelo-fundo: #fff6d9;
   --vermelho: #c0261a;
   --vermelho-fundo: #fdecea;
   --raio: 12px;
-  --sombra: 0 1px 2px rgb(31 35 40 / 4%), 0 4px 16px rgb(31 35 40 / 6%);
+  --sombra: 0 1px 2px rgb(14 19 17 / 5%), 0 4px 16px rgb(14 19 17 / 7%);
   --fonte-maquina: "Courier Prime", "Courier New", monospace;
   --fonte-texto: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
 }
@@ -89,7 +89,7 @@ button.principal
 }
 button.principal:hover:not(:disabled)
 {
-  background: #c94a06;
+  background: #0b7d40;
   color: #fff;
 }
 
