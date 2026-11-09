@@ -1,0 +1,360 @@
+<script lang="ts">
+  import
+  {
+    detectarOrigem, fotoVazia, lerCards, lerTotais, mesclarNaFoto, nomesTotais,
+    type CardSnapshot, type OrigemLeitura, type Ritmo, type Situacao, type TotaisPainel,
+  } from '@supervisao/core';
+  import { carregar, exportarJson, importarJson, salvar, type Dados } from '#lib/armazenamento.ts';
+  import { lerColagem } from '#lib/colagem.ts';
+  import { lerImagem } from '#lib/ocr.ts';
+
+  type ChaveTotal = keyof TotaisPainel;
+
+  let dados = $state<Dados>(carregar());
+  let dataFoto = $state(new Date().toISOString().slice(0, 10));
+  let texto = $state('');
+  let origemEscolhida = $state<'auto' | OrigemLeitura>('auto');
+  let aviso = $state('');
+  let progresso = $state<number | null>(null);
+  let totaisLidos = $state<TotaisPainel>({});
+  let cardsLidos = $state<CardSnapshot[]>([]);
+  let leu = $state(false);
+
+  const foto = $derived(dados.fotos.find((f) => f.data === dataFoto) ?? fotoVazia(dataFoto));
+  const origemDetectada = $derived(texto ? detectarOrigem(texto) : null);
+  const chavesLidas = $derived(Object.keys(totaisLidos) as ChaveTotal[]);
+  const nomePessoa = (id?: string) => dados.pessoas.find((p) => p.id === id)?.nome ?? id ?? '';
+
+  const nomesOrigem: Record<OrigemLeitura, string> = {
+    em_execucao: 'Quem está cuidando de quê',
+    fila: 'Fila - demandas a iniciar',
+    cronograma: 'Lista do cronograma',
+  };
+  const ritmos: Ritmo[] = ['no_ritmo', 'em_risco', 'atrasado'];
+  const situacoes: Situacao[] = ['concluido', 'atrasado', 'vence_15_dias', 'a_iniciar', 'em_execucao', 'sem_data'];
+
+  async function aoColar(e: ClipboardEvent)
+  {
+    const colado = lerColagem(e);
+    if (!colado) return;
+    e.preventDefault();
+    if (colado.tipo === 'texto')
+    {
+      texto = colado.texto;
+      ler();
+      return;
+    }
+    aviso = 'Lendo a imagem... na primeira vez baixa o idioma português, pode demorar.';
+    progresso = 0;
+    try
+    {
+      texto = await lerImagem(colado.imagem, (p) => (progresso = p));
+      aviso = 'Imagem lida. Confira o texto e os campos abaixo, a leitura de imagem pode errar.';
+      ler();
+    }
+    catch (erro)
+    {
+      aviso = `Não consegui ler a imagem: ${String(erro)}`;
+    }
+    finally
+    {
+      progresso = null;
+    }
+  }
+
+  function ler()
+  {
+    const origem = origemEscolhida === 'auto' ? undefined : origemEscolhida;
+    totaisLidos = lerTotais(texto);
+    cardsLidos = lerCards(texto, { prefixo: dados.prefixo, pessoas: dados.pessoas, origem, hoje: dataFoto });
+    leu = true;
+  }
+
+  function salvarNaFoto()
+  {
+    const nova = mesclarNaFoto(foto, totaisLidos, $state.snapshot(cardsLidos));
+    dados.fotos = [...dados.fotos.filter((f) => f.data !== dataFoto), nova].sort((a, b) => a.data.localeCompare(b.data));
+    salvar($state.snapshot(dados));
+    aviso = `Salvo na foto de ${dataFoto}: ${chavesLidas.length} totais e ${cardsLidos.length} cards.`;
+    texto = '';
+    totaisLidos = {};
+    cardsLidos = [];
+    leu = false;
+  }
+
+  async function aoImportar(e: Event)
+  {
+    const arquivo = (e.currentTarget as HTMLInputElement).files?.[0];
+    if (!arquivo) return;
+    dados = await importarJson(arquivo);
+    salvar($state.snapshot(dados));
+    aviso = 'Dados importados.';
+  }
+
+  function digitarTotal(chave: ChaveTotal, valor: string)
+  {
+    const numero = valor === '' ? undefined : Number(valor);
+    const nova = { ...foto, totais: { ...foto.totais, [chave]: numero } };
+    if (numero === undefined) delete nova.totais[chave];
+    dados.fotos = [...dados.fotos.filter((f) => f.data !== dataFoto), nova].sort((a, b) => a.data.localeCompare(b.data));
+    salvar($state.snapshot(dados));
+  }
+
+  function contar(pessoaId: string, ritmo: Ritmo): number
+  {
+    return foto.cards.filter((c) => c.responsavelEtapaAtual === pessoaId && c.ritmoPainel === ritmo).length;
+  }
+</script>
+
+<main>
+  <header>
+    <h1>Entrada do painel</h1>
+    <label>Foto de <input type="date" bind:value={dataFoto} /></label>
+    <label>Prefixo dos cards <input class="curto" bind:value={dados.prefixo} /></label>
+    <button onclick={() => exportarJson($state.snapshot(dados))}>Exportar JSON</button>
+    <label class="botao">Importar JSON <input type="file" accept="application/json" onchange={aoImportar} hidden /></label>
+  </header>
+
+  <section>
+    <h2>1. Cole aqui (Ctrl+V)</h2>
+    <p class="dica">Selecione um trecho do painel e copie (Ctrl+C), ou tire um print (Win+Shift+S). Depois clique na caixa e cole.</p>
+    <textarea rows="8" bind:value={texto} onpaste={aoColar} placeholder="Cole o texto ou o print do painel"></textarea>
+    <div class="linha">
+      <label>Trecho
+        <select bind:value={origemEscolhida}>
+          <option value="auto">Detectar{origemDetectada ? ` (${nomesOrigem[origemDetectada]})` : ''}</option>
+          {#each Object.entries(nomesOrigem) as [valor, nome] (valor)}
+            <option value={valor}>{nome}</option>
+          {/each}
+        </select>
+      </label>
+      <button onclick={ler} disabled={!texto}>Ler de novo</button>
+      {#if progresso !== null}<progress value={progresso}></progress>{/if}
+    </div>
+    {#if aviso}<p class="aviso">{aviso}</p>{/if}
+  </section>
+
+  {#if leu}
+    <section>
+      <h2>2. Confira antes de salvar</h2>
+
+      <h3>Totais encontrados ({chavesLidas.length})</h3>
+      {#if chavesLidas.length}
+        <table>
+          <tbody>
+            {#each chavesLidas as chave (chave)}
+              <tr>
+                <td>{nomesTotais[chave]}</td>
+                <td><input type="number" class="curto" bind:value={totaisLidos[chave]} /></td>
+                <td><button onclick={() => delete totaisLidos[chave]}>remover</button></td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {:else}
+        <p class="dica">Nenhum total neste trecho.</p>
+      {/if}
+
+      <h3>Cards encontrados ({cardsLidos.length})</h3>
+      {#if cardsLidos.length}
+        <div class="rolagem">
+          <table>
+            <thead>
+              <tr>
+                <th>Card</th><th>Título</th><th>Pessoa (etapa atual)</th><th>Etapa</th><th>Etapas</th>
+                <th>Início</th><th>Previsão</th><th>Vencimento</th><th>Ritmo</th><th>Situação</th><th>Conferir</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each cardsLidos as card, i (card.codigo)}
+                <tr class:conferir={card.avisosLeitura?.length}>
+                  <td><input class="curto" bind:value={card.codigo} /></td>
+                  <td><input bind:value={card.titulo} /></td>
+                  <td>
+                    <select bind:value={card.responsavelEtapaAtual}>
+                      <option value={undefined}>-</option>
+                      {#each dados.pessoas as p (p.id)}<option value={p.id}>{p.nome}</option>{/each}
+                      {#if card.responsavelEtapaAtual && !dados.pessoas.some((p) => p.id === card.responsavelEtapaAtual)}
+                        <option value={card.responsavelEtapaAtual}>{card.responsavelEtapaAtual} (não cadastrada)</option>
+                      {/if}
+                    </select>
+                  </td>
+                  <td><input bind:value={card.etapaAtual} /></td>
+                  <td class="etapas">
+                    <input type="number" class="mini" bind:value={card.etapasConcluidas} />/<input type="number" class="mini" bind:value={card.etapasTotal} />
+                  </td>
+                  <td><input type="date" bind:value={card.inicio} /></td>
+                  <td><input type="date" bind:value={card.previsao} /></td>
+                  <td><input type="date" bind:value={card.vencimento} /></td>
+                  <td>
+                    <select bind:value={card.ritmoPainel}>
+                      <option value={undefined}>-</option>
+                      {#each ritmos as r (r)}<option value={r}>{r.replace('_', ' ')}</option>{/each}
+                    </select>
+                  </td>
+                  <td>
+                    <select bind:value={card.situacao}>
+                      <option value={undefined}>-</option>
+                      {#each situacoes as s (s)}<option value={s}>{s.replaceAll('_', ' ')}</option>{/each}
+                    </select>
+                  </td>
+                  <td class="avisos">{card.avisosLeitura?.join(', ')}</td>
+                  <td><button onclick={() => cardsLidos.splice(i, 1)}>remover</button></td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {:else}
+        <p class="dica">Nenhum card com o prefixo {dados.prefixo}- neste trecho.</p>
+      {/if}
+
+      <button class="principal" onclick={salvarNaFoto} disabled={!chavesLidas.length && !cardsLidos.length}>
+        Salvar na foto de {dataFoto}
+      </button>
+    </section>
+  {/if}
+
+  <section>
+    <h2>Foto de {dataFoto}</h2>
+    <p class="dica">{Object.keys(foto.totais).length} totais e {foto.cards.length} cards salvos.</p>
+    <details>
+      <summary>Totais do painel (digitar ou corrigir)</summary>
+      <div class="grade">
+        {#each Object.entries(nomesTotais) as [chave, nome] (chave)}
+          <label>
+            {nome}
+            <input
+              type="number"
+              class="curto"
+              value={foto.totais[chave as ChaveTotal] ?? ''}
+              onchange={(e) => digitarTotal(chave as ChaveTotal, e.currentTarget.value)}
+            />
+          </label>
+        {/each}
+      </div>
+    </details>
+    <table>
+      <thead><tr><th>Pessoa</th><th>No ritmo</th><th>Em risco</th><th>Atrasado</th></tr></thead>
+      <tbody>
+        {#each dados.pessoas as p (p.id)}
+          <tr><td>{nomePessoa(p.id)}</td>{#each ritmos as r (r)}<td>{contar(p.id, r)}</td>{/each}</tr>
+        {/each}
+      </tbody>
+    </table>
+  </section>
+</main>
+
+<style>
+  :global(body)
+  {
+    font-family: system-ui, sans-serif;
+    margin: 0;
+    background: #f6f7f8;
+    color: #1d2329;
+  }
+  main
+  {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  header, .linha
+  {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+  }
+  h1
+  {
+    margin-right: auto;
+    font-size: 1.4rem;
+  }
+  section
+  {
+    background: #fff;
+    border: 1px solid #dde1e5;
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 16px;
+  }
+  textarea
+  {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: ui-monospace, monospace;
+  }
+  table
+  {
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  th, td
+  {
+    border-bottom: 1px solid #eceff1;
+    padding: 4px 6px;
+    text-align: left;
+  }
+  .rolagem
+  {
+    overflow-x: auto;
+  }
+  .curto
+  {
+    width: 90px;
+  }
+  .mini
+  {
+    width: 48px;
+  }
+  .etapas
+  {
+    white-space: nowrap;
+  }
+  .grade
+  {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 8px 16px;
+    margin: 12px 0;
+  }
+  .grade label
+  {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 0.9rem;
+  }
+  .conferir
+  {
+    background: #fff1f0;
+  }
+  .avisos
+  {
+    color: #b42318;
+    font-size: 0.85rem;
+  }
+  .dica
+  {
+    color: #5c6670;
+    font-size: 0.9rem;
+  }
+  .aviso
+  {
+    background: #fff6e0;
+    padding: 8px;
+    border-radius: 6px;
+  }
+  .botao
+  {
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .principal
+  {
+    margin-top: 12px;
+    padding: 8px 16px;
+    font-weight: 600;
+  }
+</style>

@@ -7,6 +7,8 @@
   ],
   "scripts": {
     "test": "npm test --workspaces --if-present",
-    "check": "npm run check --workspaces --if-present"
+    "check": "npm run check --workspaces --if-present",
+    "dev": "npm run dev -w @supervisao/relatorio",
+    "build": "npm run build -w @supervisao/relatorio"
   }
 }

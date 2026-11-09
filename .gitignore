@@ -3,3 +3,4 @@ dist
 .svelte-kit
 build
 coverage
+*.traineddata
