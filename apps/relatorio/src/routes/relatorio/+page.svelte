@@ -236,7 +236,7 @@
     background: none;
     color: var(--texto);
     font-size: 0.86rem;
-    cursor: pointer;
+    cursor: var(--cursor-clique);
   }
   .marcavel:hover
   {

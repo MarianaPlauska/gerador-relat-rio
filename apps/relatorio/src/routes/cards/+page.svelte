@@ -190,7 +190,7 @@
     border: 1px solid #c9d1d9;
     background: #fff;
     padding: 4px 12px;
-    cursor: pointer;
+    cursor: var(--cursor-clique);
   }
   .chip.desligado
   {
@@ -325,7 +325,7 @@
     background: none;
     color: #175cd3;
     text-decoration: underline;
-    cursor: pointer;
+    cursor: var(--cursor-clique);
   }
   .dica
   {

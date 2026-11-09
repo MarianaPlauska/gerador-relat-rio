@@ -17,12 +17,24 @@
   --raio: 12px;
   --sombra: 0 1px 2px rgb(14 19 17 / 5%), 0 4px 16px rgb(14 19 17 / 7%);
   --fonte-maquina: "Courier Prime", "Courier New", monospace;
+  --cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'26'%20height%3D'28'%20viewBox%3D'0%200%2026%2028'%3E%3Cpath%20d%3D'M3%202%20L3%2021%20L8%2016%20L12%2025%20L16%2023.5%20L12%2015%20L19%2015%20Z'%20fill%3D'%230e1311'%20stroke%3D'%2312a454'%20stroke-width%3D'2'%20stroke-linejoin%3D'round'%2F%3E%3C%2Fsvg%3E") 3 2, auto;
+  --cursor-clique: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'26'%20height%3D'28'%20viewBox%3D'0%200%2026%2028'%3E%3Cpath%20d%3D'M3%202%20L3%2021%20L8%2016%20L12%2025%20L16%2023.5%20L12%2015%20L19%2015%20Z'%20fill%3D'%2312a454'%20stroke%3D'%230e1311'%20stroke-width%3D'2'%20stroke-linejoin%3D'round'%2F%3E%3C%2Fsvg%3E") 3 2, pointer;
   --fonte-texto: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
 }
 
 *
 {
   box-sizing: border-box;
+}
+
+html
+{
+  cursor: var(--cursor);
+}
+
+a, select, label, summary, input[type="checkbox"], input[type="radio"]
+{
+  cursor: var(--cursor-clique);
 }
 
 body
@@ -66,7 +78,7 @@ button, .botao
   border: 1px solid var(--borda);
   background: var(--superficie);
   color: var(--texto);
-  cursor: pointer;
+  cursor: var(--cursor-clique);
   display: inline-block;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
@@ -78,7 +90,7 @@ button:hover:not(:disabled), .botao:hover
 button:disabled
 {
   opacity: 0.45;
-  cursor: default;
+  cursor: var(--cursor);
 }
 button.principal
 {

@@ -380,7 +380,7 @@
   }
   summary
   {
-    cursor: pointer;
+    cursor: var(--cursor-clique);
     color: var(--marca);
     font-weight: 600;
     margin: 8px 0;
