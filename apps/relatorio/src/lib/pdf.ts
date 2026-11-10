@@ -169,7 +169,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
     nSub = 0;
     return {
       stack: [
-        { text: `${nSecao}. ${texto.toUpperCase()}`, style: 'h1', tocItem: true, tocStyle: { bold: true }, tocMargin: [0, 3, 0, 0], headlineLevel: 1 },
+        { text: `${nSecao}. ${texto.toUpperCase()}`, style: 'h1', tocItem: true, tocStyle: { bold: true, fontSize: 9, lineHeight: 1.1 }, tocNumberStyle: { bold: true, fontSize: 9, lineHeight: 1.1 }, tocMargin: [0, 3, 0, 0], headlineLevel: 1 },
         { canvas: [{ type: 'line', x1: 0, y1: 3, x2: LARGURA, y2: 3, lineWidth: 1.2, lineColor: cores.marca }] },
       ],
       margin: [0, 18, 0, 8],
@@ -180,7 +180,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
     const letra = String.fromCharCode(65 + nAnexo++);
     return {
       stack: [
-        { text: `ANEXO ${letra} - ${texto.toUpperCase()}`, style: 'h1', tocItem: true, tocStyle: { bold: true }, tocMargin: [0, 3, 0, 0] },
+        { text: `ANEXO ${letra} - ${texto.toUpperCase()}`, style: 'h1', tocItem: true, tocStyle: { bold: true, fontSize: 9, lineHeight: 1.1 }, tocNumberStyle: { bold: true, fontSize: 9, lineHeight: 1.1 }, tocMargin: [0, 3, 0, 0] },
         { canvas: [{ type: 'line', x1: 0, y1: 3, x2: LARGURA, y2: 3, lineWidth: 1.2, lineColor: cores.marca }] },
       ],
       margin: [0, 0, 0, 8],
@@ -293,7 +293,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
       toc: {
         title: { text: 'SUMÁRIO', style: 'h1', margin: [0, 0, 0, 14] },
         textStyle: { fontSize: 9, lineHeight: 1.1 },
-        numberStyle: { font: 'Maquina', fontSize: 9 },
+        numberStyle: { fontSize: 9, lineHeight: 1.1 },
       },
     });
     conteudo.push({ text: '', pageBreak: 'after' });
