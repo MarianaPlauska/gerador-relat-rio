@@ -1,13 +1,22 @@
 <script lang="ts">
-  import { dicionarioPadrao, resumoSugerido, segundaDaSemana, somarDias, type CorSemaforo } from '@supervisao/core';
+  import { dicionarioPadrao, resumoSugerido, segundaDaSemana, somarDias, type Bloco, type CorSemaforo } from '@supervisao/core';
   import { carregar, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
-  import { baixarPdf, gerarPdf, secoesRelatorio, type Secao } from '#lib/pdf.ts';
+  import ListaDeBlocos from '#lib/ListaDeBlocos.svelte';
+  import { acharModelo, blocosDoRelatorio, chaveDoRelatorio, ehPronto, novoId, todosModelos } from '#lib/modelos.ts';
+  import { baixarPdf, gerarPdf } from '#lib/pdf.ts';
   import { baixarTexto, copiar, textoPacote, textoTeams } from '#lib/saidas.ts';
-  import { contextoDaSemana, dataCurta, hoje, semaforoDoRelatorio, semanasDisponiveis } from '#lib/semana.ts';
+  import { contextoDoRelatorio, dataCurta, hoje, periodoDaSemana, semaforoDoRelatorio, semanasDisponiveis, type Periodo } from '#lib/semana.ts';
 
   let dados = $state<Dados>(carregar());
   let semana = $state(segundaDaSemana(hoje()));
   let semanaAnterior = $state(somarDias(segundaDaSemana(hoje()), -7));
+  // período livre: por padrão as últimas 4 semanas até a sexta desta
+  let de = $state(somarDias(segundaDaSemana(hoje()), -21));
+  let ate = $state(somarDias(segundaDaSemana(hoje()), 4));
+  let modeloId = $state(dados.ultimoModelo);
+  const modelo = $derived(acharModelo(dados, modeloId));
+  const periodo = $derived<Periodo>(modelo.periodo === 'livre' ? { inicio: de, fim: ate, livre: true } : periodoDaSemana(semana, semanaAnterior));
+  const chave = $derived(chaveDoRelatorio(periodo));
   let previa = $state('');
   let gerando = $state(false);
   let erro = $state('');
@@ -24,15 +33,17 @@
 
   const semanas = $derived(semanasDisponiveis(dados));
   const opcoesAnteriores = $derived([...new Set([somarDias(semana, -7), ...semanas.filter((s) => s < semana)])].sort().reverse());
-  const ctx = $derived(contextoDaSemana(dados, semana, semanaAnterior));
-  const notas = $derived<NotasRelatorio>(dados.relatorios[semana] ?? {});
+  const ctx = $derived(contextoDoRelatorio(dados, periodo));
+  const notas = $derived<NotasRelatorio>(dados.relatorios[chave] ?? {});
+  const blocos = $derived(blocosDoRelatorio(modelo, notas));
+  const mexido = $derived(!!notas.blocos?.[modelo.id]);
   const sugestao = $derived(resumoSugerido(ctx.frases));
   const semaforoAuto = $derived(semaforoDoRelatorio(ctx, {}));
   const nomesSemaforo: Record<CorSemaforo, string> = { verde: 'No caminho', amarelo: 'Atenção', vermelho: 'Fora da meta' };
 
   function anotar<K extends keyof NotasRelatorio>(campo: K, valor: NotasRelatorio[K])
   {
-    dados.relatorios[semana] = { ...notas, [campo]: valor };
+    dados.relatorios[chave] = { ...notas, [campo]: valor };
   }
 
   function trocarSemana(nova: string)
@@ -41,10 +52,39 @@
     semanaAnterior = somarDias(nova, -7);
   }
 
-  function alternar(campo: 'secoesOcultas' | 'frasesOcultas', valor: string)
+  function trocarModelo(id: string)
+  {
+    modeloId = id;
+    dados.ultimoModelo = id;
+  }
+
+  function alternar(campo: 'frasesOcultas', valor: string)
   {
     const atual = notas[campo] ?? [];
     anotar(campo, atual.includes(valor) ? atual.filter((x) => x !== valor) : [...atual, valor]);
+  }
+
+  // mexer nos blocos vale só para este relatório; o modelo continua igual
+  function mudarBlocos(novos: Bloco[])
+  {
+    anotar('blocos', { ...notas.blocos, [modelo.id]: novos });
+  }
+
+  function voltarAoModelo()
+  {
+    const { [modelo.id]: _, ...outros } = notas.blocos ?? {};
+    const { secoesOcultas: _antigas, ...resto } = notas;
+    dados.relatorios[chave] = { ...resto, blocos: outros };
+  }
+
+  function salvarComoModelo()
+  {
+    const nome = prompt('Nome do modelo novo:', `${modelo.nome} (cópia)`)?.trim();
+    if (!nome) return;
+    const novo = { ...$state.snapshot(modelo), id: novoId(), nome, blocos: $state.snapshot(blocos) as Bloco[] };
+    dados.modelos.push(novo);
+    voltarAoModelo();
+    trocarModelo(novo.id);
   }
 
   const entrada = () => ({
@@ -52,6 +92,8 @@
     ctx,
     notas: $state.snapshot(notas) as NotasRelatorio,
     resumo: notas.resumo ?? sugestao,
+    modelo: $state.snapshot(modelo),
+    blocos: $state.snapshot(blocos) as Bloco[],
   });
 
   // refaz a prévia meio segundo depois da última mudança
@@ -87,16 +129,29 @@
     <h1>Gerador de PDF<span class="cursor">_</span></h1>
 
     <div class="grupo">
-      <label>Semana
-        <select value={semana} onchange={(e) => trocarSemana(e.currentTarget.value)}>
-          {#each semanas as s (s)}<option value={s}>{dataCurta(s)} a {dataCurta(somarDias(s, 4))}</option>{/each}
+      <label>Modelo
+        <select value={modelo.id} onchange={(e) => trocarModelo(e.currentTarget.value)}>
+          {#each todosModelos(dados) as m (m.id)}<option value={m.id}>{m.nome}{ehPronto(m.id) ? '' : ' (meu)'}</option>{/each}
         </select>
       </label>
-      <label>Comparar com
-        <select bind:value={semanaAnterior}>
-          {#each opcoesAnteriores as s (s)}<option value={s}>{dataCurta(s)} a {dataCurta(somarDias(s, 4))}</option>{/each}
-        </select>
-      </label>
+      <p class="dica">{modelo.descricao} <a href="/modelos">gerenciar modelos</a></p>
+      {#if modelo.periodo === 'livre'}
+        <div class="datas">
+          <label>De <input type="date" bind:value={de} max={ate} /></label>
+          <label>Até <input type="date" bind:value={ate} min={de} /></label>
+        </div>
+      {:else}
+        <label>Semana
+          <select value={semana} onchange={(e) => trocarSemana(e.currentTarget.value)}>
+            {#each semanas as s (s)}<option value={s}>{dataCurta(s)} a {dataCurta(somarDias(s, 4))}</option>{/each}
+          </select>
+        </label>
+        <label>Comparar com
+          <select bind:value={semanaAnterior}>
+            {#each opcoesAnteriores as s (s)}<option value={s}>{dataCurta(s)} a {dataCurta(somarDias(s, 4))}</option>{/each}
+          </select>
+        </label>
+      {/if}
       <label>Semáforo
         <select value={notas.semaforo ?? ''} onchange={(e) => anotar('semaforo', (e.currentTarget.value || undefined) as CorSemaforo | undefined)}>
           <option value="">Automático{semaforoAuto ? ` (${nomesSemaforo[semaforoAuto]})` : ''}</option>
@@ -104,8 +159,8 @@
         </select>
       </label>
     </div>
-    {#if !ctx.atual.foto}<p class="aviso">Esta semana ainda não tem foto do painel. <a href="/painel">Colar o painel</a></p>{/if}
-    {#if !ctx.anterior}<p class="dica">Sem dados da semana anterior: o comparativo aparece quando existir uma semana antes desta.</p>{/if}
+    {#if !ctx.atual.foto}<p class="aviso">{ctx.livre ? "Este período" : "Esta semana"} ainda não tem foto do painel. <a href="/painel">Colar o painel</a></p>{/if}
+    {#if !ctx.anterior}<p class="dica">{ctx.livre ? "Sem foto antes do período: o comparativo usa a primeira foto do período quando houver duas." : "Sem dados da semana anterior: o comparativo aparece quando existir uma semana antes desta."}</p>{/if}
 
     <div class="bloco">
       <div class="titulo-bloco">
@@ -135,15 +190,13 @@
     </div>
 
     <div class="bloco">
-      <h2>Seções do PDF</h2>
-      <div class="secoes">
-        {#each Object.entries(secoesRelatorio) as [chave, nome] (chave)}
-          <label class="marcavel">
-            <input type="checkbox" checked={!notas.secoesOcultas?.includes(chave)} onchange={() => alternar('secoesOcultas', chave as Secao)} />
-            <span>{nome}</span>
-          </label>
-        {/each}
+      <div class="titulo-bloco">
+        <h2>Blocos deste relatório</h2>
+        {#if mexido}<button class="link" onclick={voltarAoModelo}>voltar ao modelo</button>{/if}
       </div>
+      <p class="dica">O PDF segue esta ordem. Adicione texto, gráfico ou tabela em qualquer ponto e suba ou desça. Mexer aqui não muda o modelo.</p>
+      <ListaDeBlocos {blocos} onmudar={mudarBlocos} />
+      <button class="link salvar-modelo" onclick={salvarComoModelo}>salvar estes blocos como modelo novo</button>
     </div>
 
     <div class="bloco">
@@ -179,7 +232,7 @@
     <div class="saidas">
       <button onclick={() => copiarSaida('teams', textoTeams(dados, ctx, notas))}>{copiado === 'teams' ? 'Copiado!' : 'Copiar mensagem do Teams'}</button>
       <button onclick={() => copiarSaida('pacote', textoPacote(dados, ctx, notas))}>{copiado === 'pacote' ? 'Copiado!' : 'Copiar pacote para IA'}</button>
-      <button onclick={() => baixarTexto(textoPacote(dados, ctx, notas), `pacote-ia-${dados.prefixo}-${semana}.md`)}>Baixar pacote (.md)</button>
+      <button onclick={() => baixarTexto(textoPacote(dados, ctx, notas), `pacote-ia-${dados.prefixo}-${chave}.md`)}>Baixar pacote (.md)</button>
     </div>
   </aside>
 
@@ -289,10 +342,15 @@
     margin-top: 3px;
     accent-color: var(--marca);
   }
-  .secoes
+  .datas
   {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .salvar-modelo
+  {
+    margin-top: 10px;
   }
   .grande
   {

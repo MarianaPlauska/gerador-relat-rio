@@ -20,7 +20,7 @@
   const t = $derived<TotaisPainel>(ctx.atual.foto?.totais ?? {});
   const ta = $derived<TotaisPainel>(ctx.anterior?.foto?.totais ?? {});
   const kp = $derived(ctx.comp.planoAtual);
-  const fotosAteSemana = $derived(dados.fotos.filter((f) => f.data <= ctx.sexta));
+  const fotosAteSemana = $derived(dados.fotos.filter((f) => f.data <= ctx.fim));
   const serie = (chave: keyof TotaisPainel) => historico(fotosAteSemana, chave).slice(-8);
   const promessasDaSemana = $derived(dados.promessas.filter((p) => p.semana === semana));
   const emAberto = $derived(promessasDaSemana.filter((p) => p.cumprida === undefined));
@@ -90,7 +90,7 @@
 <main>
   <section class="topo">
     <div>
-      <span class="etiqueta">{saudacao}{primeiroNome ? `, ${primeiroNome}` : ''} · semana de {dataMedia(semana)} a {dataMedia(ctx.sexta)}</span>
+      <span class="etiqueta">{saudacao}{primeiroNome ? `, ${primeiroNome}` : ''} · semana de {dataMedia(semana)} a {dataMedia(ctx.fim)}</span>
       <h1>OrbisOS<span class="cursor">_</span></h1>
       <p class="lema">seu giro da semana: painel, plano, riscos e relatório num lugar só.</p>
     </div>
@@ -213,7 +213,7 @@
     <div class="pilha">
       <section class="cartao saidas">
         <h2>Saídas</h2>
-        <a class="saida principal" href="/relatorio"><b>Gerar PDF</b><span>relatório oficial com estatísticas</span></a>
+        <a class="saida principal" href="/relatorio"><b>Gerar PDF</b><span>semanal, executivo, período ou seus modelos</span></a>
         <button class="saida" onclick={() => copiarSaida('teams', textoTeams(dados, ctx, notas))}>
           <b>{copiado === 'teams' ? 'Copiado!' : 'Mensagem do Teams'}</b><span>8 a 10 linhas, pronta para colar</span>
         </button>
@@ -224,6 +224,7 @@
           <button class="link" onclick={() => exportarJson($state.snapshot(dados) as Dados)}>baixar backup</button>
           <button class="link" onclick={() => entradaBackup?.click()}>restaurar backup</button>
           <button class="link" onclick={() => baixarTexto(textoPacote(dados, ctx, notas), `pacote-ia-${dados.prefixo}-${semana}.md`)}>baixar pacote .md</button>
+          <a class="link" href="/modelos">modelos de relatório</a>
           <input type="file" accept="application/json" hidden bind:this={entradaBackup} onchange={(e) => restaurar(e.currentTarget.files?.[0])} />
         </div>
       </section>

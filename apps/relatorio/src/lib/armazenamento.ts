@@ -1,6 +1,6 @@
 import
 {
-  dicionarioPadrao, pessoasExemplo, type ControleCard, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type Risco, type Snapshot,
+  dicionarioPadrao, pessoasExemplo, type Bloco, type ControleCard, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type Risco, type Snapshot,
 } from '@supervisao/core';
 
 // o que eu escrevo no relatório de cada foto
@@ -11,8 +11,11 @@ export interface NotasRelatorio
   destaques?: string;
   decisoes?: string;
   proximosPassos?: string;
+  // antigo: seções desmarcadas antes dos modelos; vale até o relatório ganhar blocos próprios
   secoesOcultas?: string[];
   frasesOcultas?: string[];
+  // blocos mexidos neste relatório, por modelo; sem isso valem os do modelo
+  blocos?: Record<string, Bloco[]>;
 }
 
 // dados fixos que aparecem na capa e no termo de aprovação
@@ -39,11 +42,14 @@ export interface Dados
   identificacao: Identificacao;
   // significado de cada indicador do painel do gestor, uma linha "Termo: definição" por item
   dicionario: string;
+  // modelos criados pela supervisora; os prontos ficam no core
+  modelos: Modelo[];
+  ultimoModelo: string;
 }
 
 function padrao(): Dados
 {
-  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao };
+  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal' };
 }
 
 export function carregar(): Dados

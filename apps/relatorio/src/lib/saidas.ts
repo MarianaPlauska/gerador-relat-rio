@@ -1,8 +1,6 @@
 import { mensagemTeams, montarPacote } from '@supervisao/core';
 import type { Dados, NotasRelatorio } from './armazenamento.ts';
-import { semaforoDoRelatorio, type contextoDaSemana } from './semana.ts';
-
-type Contexto = ReturnType<typeof contextoDaSemana>;
+import { semaforoDoRelatorio, type Contexto } from './semana.ts';
 
 export function textoTeams(dados: Dados, ctx: Contexto, notas: NotasRelatorio): string
 {
