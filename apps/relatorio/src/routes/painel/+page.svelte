@@ -2,11 +2,12 @@
   import
   {
     detectarOrigem, fotoVazia, lerCards, lerTotais, mesclarNaFoto, nomesTotais,
-    type CardSnapshot, type OrigemLeitura, type Ritmo, type Situacao, type TotaisPainel,
+    type CardSnapshot, type OrigemLeitura, type Ritmo, type TotaisPainel,
   } from '@supervisao/core';
   import { carregar, exportarJson, importarJson, salvar, type Dados } from '#lib/armazenamento.ts';
   import { lerColagem } from '#lib/colagem.ts';
   import { lerImagem } from '#lib/ocr.ts';
+  import TabelaCards from '#lib/TabelaCards.svelte';
 
   type ChaveTotal = keyof TotaisPainel;
 
@@ -34,7 +35,11 @@
   let leu = $state(false);
   let trechos = $state(0);
 
-  const foto = $derived(dados.fotos.find((f) => f.data === dataFoto) ?? fotoVazia(dataFoto));
+  // correções feitas na foto salva gravam na hora
+  $effect(() => salvar($state.snapshot(dados)));
+
+  const indiceFoto = $derived(dados.fotos.findIndex((f) => f.data === dataFoto));
+  const foto = $derived(dados.fotos[indiceFoto] ?? fotoVazia(dataFoto));
   const origemDetectada = $derived(texto ? detectarOrigem(texto) : null);
   const chavesLidas = $derived(Object.keys(totaisLidos) as ChaveTotal[]);
   const nomePessoa = (id?: string) => dados.pessoas.find((p) => p.id === id)?.nome ?? id ?? '';
@@ -45,7 +50,13 @@
     cronograma: 'Lista do cronograma',
   };
   const ritmos: Ritmo[] = ['no_ritmo', 'em_risco', 'atrasado'];
-  const situacoes: Situacao[] = ['concluido', 'atrasado', 'vence_15_dias', 'a_iniciar', 'em_execucao', 'sem_data'];
+
+  function apagarFoto()
+  {
+    if (!confirm(`Apagar a foto de ${dataFoto} inteira (${Object.keys(foto.totais).length} totais e ${foto.cards.length} cards)?`)) return;
+    dados.fotos = dados.fotos.filter((f) => f.data !== dataFoto);
+    aviso = `Foto de ${dataFoto} apagada.`;
+  }
 
   async function aoColar(e: ClipboardEvent)
   {
@@ -206,54 +217,7 @@
 
       <h3>Cards encontrados ({cardsLidos.length})</h3>
       {#if cardsLidos.length}
-        <div class="rolagem">
-          <table>
-            <thead>
-              <tr>
-                <th>Card</th><th>Título</th><th>Pessoa (etapa atual)</th><th>Etapa</th><th>Etapas</th>
-                <th>Início</th><th>Previsão</th><th>Vencimento</th><th>Ritmo</th><th>Situação</th><th>Conferir</th><th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each cardsLidos as card, i (card.codigo)}
-                <tr class:conferir={card.avisosLeitura?.length}>
-                  <td><input class="curto" bind:value={card.codigo} /></td>
-                  <td><input bind:value={card.titulo} /></td>
-                  <td>
-                    <select bind:value={card.responsavelEtapaAtual}>
-                      <option value={undefined}>-</option>
-                      {#each dados.pessoas as p (p.id)}<option value={p.id}>{p.nome}</option>{/each}
-                      {#if card.responsavelEtapaAtual && !dados.pessoas.some((p) => p.id === card.responsavelEtapaAtual)}
-                        <option value={card.responsavelEtapaAtual}>{card.responsavelEtapaAtual} (não cadastrada)</option>
-                      {/if}
-                    </select>
-                  </td>
-                  <td><input bind:value={card.etapaAtual} /></td>
-                  <td class="etapas">
-                    <input type="number" class="mini" bind:value={card.etapasConcluidas} />/<input type="number" class="mini" bind:value={card.etapasTotal} />
-                  </td>
-                  <td><input type="date" bind:value={card.inicio} /></td>
-                  <td><input type="date" bind:value={card.previsao} /></td>
-                  <td><input type="date" bind:value={card.vencimento} /></td>
-                  <td>
-                    <select bind:value={card.ritmoPainel}>
-                      <option value={undefined}>-</option>
-                      {#each ritmos as r (r)}<option value={r}>{r.replace('_', ' ')}</option>{/each}
-                    </select>
-                  </td>
-                  <td>
-                    <select bind:value={card.situacao}>
-                      <option value={undefined}>-</option>
-                      {#each situacoes as s (s)}<option value={s}>{s.replaceAll('_', ' ')}</option>{/each}
-                    </select>
-                  </td>
-                  <td class="avisos">{card.avisosLeitura?.join(', ')}</td>
-                  <td><button onclick={() => cardsLidos.splice(i, 1)}>remover</button></td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
+        <TabelaCards bind:cards={cardsLidos} pessoas={dados.pessoas} />
       {:else}
         <p class="dica">Nenhum card com o prefixo {dados.prefixo}- neste trecho.</p>
       {/if}
@@ -266,7 +230,17 @@
 
   <section class="cartao">
     <h2>Foto de {dataFoto}</h2>
-    <p class="dica">{Object.keys(foto.totais).length} totais e {foto.cards.length} cards salvos.</p>
+    <p class="dica">
+      {Object.keys(foto.totais).length} totais e {foto.cards.length} cards salvos.
+      {#if indiceFoto >= 0}<button class="link perigo" onclick={apagarFoto}>apagar esta foto</button>{/if}
+    </p>
+    {#if indiceFoto >= 0 && foto.cards.length}
+      <details>
+        <summary>Cards desta foto (corrigir ou remover)</summary>
+        <p class="dica">O que mudar aqui grava na hora e o relatório já usa a versão corrigida. Card com código errado: corrija o código ou remova.</p>
+        <TabelaCards bind:cards={dados.fotos[indiceFoto]!.cards} pessoas={dados.pessoas} />
+      </details>
+    {/if}
     <details>
       <summary>Números do painel (digitar ou corrigir)</summary>
       <p class="dica">Preencha só o que aparece no painel do gestor. Campo vazio fica fora do relatório.</p>
@@ -327,26 +301,6 @@
     margin: 8px 0;
     background: #fafbfc;
   }
-  table input, table select
-  {
-    padding: 3px 6px;
-  }
-  .rolagem
-  {
-    overflow-x: auto;
-  }
-  .curto
-  {
-    width: 90px;
-  }
-  .mini
-  {
-    width: 52px;
-  }
-  .etapas
-  {
-    white-space: nowrap;
-  }
   .grade
   {
     display: grid;
@@ -385,14 +339,22 @@
     font-weight: 600;
     margin: 8px 0;
   }
-  .conferir
+  .curto
   {
-    background: var(--vermelho-fundo);
+    width: 90px;
   }
-  .avisos
+  .link
+  {
+    border: none;
+    background: none;
+    padding: 0;
+    margin-left: 8px;
+    text-decoration: underline;
+    font-size: 0.82rem;
+  }
+  .perigo
   {
     color: var(--vermelho);
-    font-size: 0.82rem;
   }
   .aviso
   {

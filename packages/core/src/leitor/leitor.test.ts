@@ -246,3 +246,80 @@ describe('foto do dia', () =>
     expect(foto.totais).toMatchObject({ itensCronograma: 212, demandasEmAndamento: 42 });
   });
 });
+
+// saída real da leitura de imagem dos prints de 10/11/26
+const vencimentosImagem = `ITEM VENC. CARD ONDA SITUAÇÃO
+
+Continuar plano de staging e modo 10/11/26 DEV-192 1 e Vence em até 15 dias
+desenvolvedor/homologação *
+
+Kitu Sistema
+
+Acompanhar o eSocial * 10/11/26 DEV-225 1 e Vence em até 15 dias
+Kitu Sistema
+
+Erro no sistema MAS consigo seguir - Kitu Sistema > 10/11/26 DEV-236 = e Vence em até 15 dias
+Cadastros
+
+Suporte Kitu
+
+Nos cadastros de serviços contratados, quando for 13/11/26 DEV-235 1 e Vence em até 1
+
+um caso de todos os municípios do estado *`;
+
+const cronogramaImagem = `SITUAÇÃO - DESMARQUE O QUE NÃO QUER VER
+| MW Concluído 138 )/ Mw Atrasado O )/ MW Venceematé15dias 25 ) | MW Ainiciar 53 // MW Emexecução 5 | | Semdata 4 ) Desmarcar todas
+CARD ITEM ID INÍCIO VENC. SITUAÇÃO —
+DEV-136 Formatação da página de absenteísmo. Kitu Sistema 23/10/26 28/10/26 * e Concluído DR
+DEV-O080 — Hub do Cliente — busca e download de docum.. — SST-686 23/10/26 06/11/26 *k e Concluído Pr
+DEV-016 Verificar seoPGR está emitindo páginas a mais... Kitu Sistema 82/11/26 64/11/26 *k e Concluído '
+DEV-196  COlocar visão geral para a Dani, como matriz d... Kitu Sistema 03/11/26 03/11/26 * e Concluído [+
+DEV-948  Logodosclientes SST-096 63/11/26 05/11/26 * e Concluído [
+DEV-192 Continuar plano de staging e modo desenvolve... Kitu Sistema 63/11/26 10/11/26 * e Vence em até 15 dias *
+DEV-040 CIPA votação eletrônica SSsT-037 63/11/26 16/11/26 *k e Vence em até 15 dias * |`;
+
+describe('próximos 10 vencimentos (imagem)', () =>
+{
+  const cards = lerCards(vencimentosImagem, opcoes);
+
+  it('liga cada título ao seu card', () =>
+  {
+    expect(cards.map((c) => c.codigo)).toEqual(['DEV-192', 'DEV-225', 'DEV-236', 'DEV-235']);
+    expect(cards[0]).toMatchObject({ titulo: 'Continuar plano de staging e modo desenvolvedor/homologação', sistema: 'Kitu Sistema', vencimento: '2026-11-10', dataFixada: true, situacao: 'vence_15_dias' });
+    expect(cards[1]).toMatchObject({ titulo: 'Acompanhar o eSocial', sistema: 'Kitu Sistema' });
+    expect(cards[2]).toMatchObject({ titulo: 'Erro no sistema MAS consigo seguir - Kitu Sistema > Cadastros', sistema: 'Suporte Kitu' });
+    expect(cards[3]).toMatchObject({ titulo: 'Nos cadastros de serviços contratados, quando for um caso de todos os municípios do estado', sistema: undefined, vencimento: '2026-11-13' });
+  });
+
+  it('não lê a onda como criticidade', () =>
+  {
+    expect(cards.every((c) => c.criticidade === undefined)).toBe(true);
+  });
+});
+
+describe('lista do cronograma (imagem)', () =>
+{
+  const cards = lerCards(cronogramaImagem, opcoes);
+  const card = (codigo: string) => cards.find((c) => c.codigo === codigo)!;
+
+  it('é cronograma mesmo com o filtro "A iniciar" na tela', () =>
+  {
+    expect(detectarOrigem(cronogramaImagem)).toBe('cronograma');
+  });
+
+  it('separa título e sistema na mesma linha', () =>
+  {
+    expect(card('DEV-136')).toMatchObject({ titulo: 'Formatação da página de absenteísmo', sistema: 'Kitu Sistema', inicio: '2026-10-23', vencimento: '2026-10-28', situacao: 'concluido', dataFixada: true });
+    expect(card('DEV-040')).toMatchObject({ titulo: 'CIPA votação eletrônica', sistema: 'SSsT-037', situacao: 'vence_15_dias' });
+  });
+
+  it('corrige o que a imagem troca e avisa', () =>
+  {
+    expect(card('DEV-080')).toMatchObject({ titulo: 'Hub do Cliente — busca e download de docum', sistema: 'SST-686' });
+    expect(card('DEV-080').avisosLeitura).toContain('código corrigido, confira');
+    expect(card('DEV-016')).toMatchObject({ inicio: '2026-11-02', vencimento: '2026-11-04' });
+    expect(card('DEV-016').avisosLeitura).toContain('data corrigida, confira');
+    expect(card('DEV-948').avisosLeitura).toContain('código estranho, confira');
+    expect(card('DEV-136').avisosLeitura).toEqual([]);
+  });
+});
