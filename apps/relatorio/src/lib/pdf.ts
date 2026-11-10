@@ -2,8 +2,8 @@ import pdfMake from 'pdfmake/build/pdfmake';
 import type { Content, CustomTableLayout, TableCell, TDocumentDefinitions } from 'pdfmake/interfaces';
 import
 {
-  aplicarControle, definicoesPadrao, estatisticasDoPlano, kpisDosItens, mapaDeDores, mapaDeFrentes, nomesTotais, posicaoNaFaixa,
-  resumirSerie, ritmoPorPessoa, semaforoPrazo, semanaDoAno, serieSemanal, somarDias,
+  aplicarControle, estatisticasDoPlano, kpisDosItens, lerDicionario, mapaDeDores, mapaDeFrentes, nomesTotais, posicaoNaFaixa,
+  resumirSerie, ritmoPorPessoa, semanaDoAno, serieSemanal, somarDias,
   type CorSemaforo, type ItemPlano, type ResumoSerie, type Ritmo, type Tendencia, type TotaisPainel,
 } from '@supervisao/core';
 import maquina400 from '@fontsource/courier-prime/files/courier-prime-latin-400-normal.woff?url';
@@ -13,7 +13,7 @@ import texto400i from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-i
 import texto600 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff?url';
 import type { Dados, NotasRelatorio } from './armazenamento.ts';
 import { cores, svgBarrasComparadas, svgBarrasEmpilhadas, svgLinha } from './graficos.ts';
-import { dataCurta, dataMedia, type contextoDaSemana } from './semana.ts';
+import { dataCurta, dataMedia, semaforoDoRelatorio, type contextoDaSemana } from './semana.ts';
 
 type Contexto = ReturnType<typeof contextoDaSemana>;
 
@@ -48,15 +48,8 @@ const nomesCausa: Record<string, string> = {
   bloqueio: 'Bloqueio', urgencia: 'Entrou urgência', outro: 'Outro',
 };
 
-const glossario: [string, string][] = [
-  ['Dentro do prazo (%)', 'Percentual das entregas concluídas no período que saíram até o vencimento, como calculado pelo painel do gestor.'],
-  ['Meta do painel (%)', 'Meta de entregas dentro do prazo definida no painel para o mês.'],
-  ['Concluídos', 'Itens do cronograma já concluídos, contados pelo painel.'],
-  ['Concluídas no período', 'Entregas concluídas na janela de tempo que o painel considera.'],
-  ['Demandas em andamento', 'Demandas com alguma etapa aberta no momento da foto do painel.'],
-  ['Ritmo', 'Classificação do painel para cada demanda em execução: no ritmo, em risco ou atrasada.'],
-  ['Atrasados (vencimento passou)', 'Itens ainda abertos cujo vencimento já passou.'],
-  ['Eficiência da área', 'Índice do painel composto por prazo, vazão e qualidade.'],
+// termos do plano e da estatística; os do painel vêm do dicionário editável
+const glossarioFixo: [string, string][] = [
   ['Itens feitos (plano)', 'Itens planejados pela supervisão para a semana que foram marcados como feitos.'],
   ['Itens alterados', 'Itens do plano que foram adiados ou tiveram a data combinada mudada depois da confirmação.'],
   ['Continuidade no cronograma', 'Das entregas feitas, quantas saíram até a previsão ou o vencimento do card no painel.'],
@@ -145,11 +138,6 @@ export interface EntradaPdf
   ctx: Contexto;
   notas: NotasRelatorio;
   resumo: string;
-}
-
-export function semaforoDoRelatorio(ctx: Contexto, notas: NotasRelatorio): CorSemaforo | undefined
-{
-  return notas.semaforo ?? semaforoPrazo(ctx.atual.foto?.totais.dentroDoPrazoPct, ctx.meta, definicoesPadrao.semaforo.amareloAte);
 }
 
 export const numeroDoRelatorio = (prefixo: string, inicio: string) => `RS-${prefixo}-${inicio.slice(0, 4)}-S${String(semanaDoAno(inicio)).padStart(2, '0')}`;
@@ -774,7 +762,7 @@ export function montarDocumento({ dados, ctx, notas, resumo }: EntradaPdf): TDoc
   if (secao('glossario'))
   {
     conteudo.push(anexo('Glossário dos indicadores'));
-    conteudo.push(tabela('Definições', ['Termo', 'Definição'], glossario.map(([a, b]) => [{ text: a, bold: true }, b]), [140, '*'], 'supervisão'));
+    conteudo.push(tabela('Definições', ['Termo', 'Definição'], [...lerDicionario(dados.dicionario), ...glossarioFixo].map(([a, b]) => [{ text: a, bold: true }, b]), [140, '*'], 'supervisão'));
   }
 
   return {
@@ -811,7 +799,9 @@ export function montarDocumento({ dados, ctx, notas, resumo }: EntradaPdf): TDoc
         { canvas: [{ type: 'line', x1: 0, y1: 5, x2: LARGURA, y2: 5, lineWidth: 0.5, lineColor: cores.grade }] },
       ],
     }),
-    footer: (pagina, total) => (pagina === 1 ? null : {
+    footer: (pagina, total) => (pagina === 1
+      ? { text: [{ text: 'gerado por ' }, { text: 'OrbisOS', bold: true, color: '#ffffff' }, { text: '_', bold: true, color: cores.marca }], font: 'Maquina', fontSize: 8, color: '#9aa39e', margin: [50, 34, 0, 0] }
+      : {
       margin: [40, 18, 40, 0],
       columns: [
         { text: `${ident.area} (${dados.prefixo}) - semana de ${periodo}`, fontSize: 7, color: cores.suave },

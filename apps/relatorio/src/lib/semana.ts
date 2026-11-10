@@ -1,9 +1,9 @@
 import
 {
-  alertasDoPlano, analisarSemana, compararSemanas, definicoesPadrao, fotoDaSemana, segundaDaSemana, somarDias,
-  type DadosSemana,
+  alertasDoPlano, analisarSemana, compararSemanas, definicoesPadrao, fotoDaSemana, segundaDaSemana, semaforoPrazo, somarDias,
+  type CorSemaforo, type DadosSemana,
 } from '@supervisao/core';
-import type { Dados } from './armazenamento.ts';
+import type { Dados, NotasRelatorio } from './armazenamento.ts';
 
 export const hoje = () => new Date().toISOString().slice(0, 10);
 
@@ -32,3 +32,8 @@ export function contextoDaSemana(dados: Dados, inicio: string, inicioAnterior = 
 
 export const dataCurta = (iso?: string) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : '-');
 export const dataMedia = (iso?: string) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(2, 4)}` : '-');
+
+export function semaforoDoRelatorio(ctx: ReturnType<typeof contextoDaSemana>, notas: NotasRelatorio): CorSemaforo | undefined
+{
+  return notas.semaforo ?? semaforoPrazo(ctx.atual.foto?.totais.dentroDoPrazoPct, ctx.meta, definicoesPadrao.semaforo.amareloAte);
+}

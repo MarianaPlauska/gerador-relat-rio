@@ -6,6 +6,8 @@ export * from './relatorio';
 export * from './plano';
 export * from './analise';
 export * from './estatistica';
+export * from './central';
+export * from './pacote';
 export * from './exemplo';
 export * from './leitor/normalizar';
 export * from './leitor/totais';

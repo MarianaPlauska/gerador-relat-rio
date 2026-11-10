@@ -1,6 +1,6 @@
 import
 {
-  pessoasExemplo, type ControleCard, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type Risco, type Snapshot,
+  dicionarioPadrao, pessoasExemplo, type ControleCard, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type Risco, type Snapshot,
 } from '@supervisao/core';
 
 // o que eu escrevo no relatório de cada foto
@@ -37,11 +37,13 @@ export interface Dados
   riscos: Risco[];
   promessas: Promessa[];
   identificacao: Identificacao;
+  // significado de cada indicador do painel do gestor, uma linha "Termo: definição" por item
+  dicionario: string;
 }
 
 function padrao(): Dados
 {
-  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' } };
+  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao };
 }
 
 export function carregar(): Dados

@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { resumoSugerido, segundaDaSemana, somarDias, type CorSemaforo } from '@supervisao/core';
+  import { dicionarioPadrao, resumoSugerido, segundaDaSemana, somarDias, type CorSemaforo } from '@supervisao/core';
   import { carregar, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
-  import { baixarPdf, gerarPdf, secoesRelatorio, semaforoDoRelatorio, type Secao } from '#lib/pdf.ts';
-  import { contextoDaSemana, dataCurta, hoje, semanasDisponiveis } from '#lib/semana.ts';
+  import { baixarPdf, gerarPdf, secoesRelatorio, type Secao } from '#lib/pdf.ts';
+  import { baixarTexto, copiar, textoPacote, textoTeams } from '#lib/saidas.ts';
+  import { contextoDaSemana, dataCurta, hoje, semaforoDoRelatorio, semanasDisponiveis } from '#lib/semana.ts';
 
   let dados = $state<Dados>(carregar());
   let semana = $state(segundaDaSemana(hoje()));
@@ -10,6 +11,14 @@
   let previa = $state('');
   let gerando = $state(false);
   let erro = $state('');
+  let copiado = $state('');
+
+  async function copiarSaida(nome: string, texto: string)
+  {
+    await copiar(texto);
+    copiado = nome;
+    setTimeout(() => (copiado = ''), 2000);
+  }
 
   $effect(() => salvar($state.snapshot(dados)));
 
@@ -159,7 +168,19 @@
       </label>
     </div>
 
+    <div class="bloco">
+      <h2>Dicionário do painel</h2>
+      <p class="dica">O que significa cada número do painel do gestor. Uma linha por termo, no formato "Termo: definição". Vai para o glossário do PDF e para o pacote da IA.</p>
+      <textarea rows="8" bind:value={dados.dicionario}></textarea>
+      <button class="link" onclick={() => (dados.dicionario = dicionarioPadrao)}>voltar ao texto inicial</button>
+    </div>
+
     <button class="principal grande" onclick={() => baixarPdf(entrada())}>Baixar PDF</button>
+    <div class="saidas">
+      <button onclick={() => copiarSaida('teams', textoTeams(dados, ctx, notas))}>{copiado === 'teams' ? 'Copiado!' : 'Copiar mensagem do Teams'}</button>
+      <button onclick={() => copiarSaida('pacote', textoPacote(dados, ctx, notas))}>{copiado === 'pacote' ? 'Copiado!' : 'Copiar pacote para IA'}</button>
+      <button onclick={() => baixarTexto(textoPacote(dados, ctx, notas), `pacote-ia-${dados.prefixo}-${semana}.md`)}>Baixar pacote (.md)</button>
+    </div>
   </aside>
 
   <section class="previa">
@@ -279,6 +300,12 @@
     margin: 16px 0 8px;
     padding: 12px;
     font-size: 1rem;
+  }
+  .saidas
+  {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 16px;
   }
   .link
   {

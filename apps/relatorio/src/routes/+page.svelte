@@ -1,37 +1,67 @@
 <script lang="ts">
-  import { historico, segundaDaSemana, somarDias, type TotaisPainel } from '@supervisao/core';
-  import { carregar, type Dados } from '#lib/armazenamento.ts';
+  import
+  {
+    acoesDeHoje, aplicarControle, historico, linhaDoTempo, ritmoPorPessoa, segundaDaSemana, somarDias,
+    type Destino, type Evento, type TotaisPainel,
+  } from '@supervisao/core';
+  import { carregar, exportarJson, importarJson, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
   import { svgLinha, svgSparkline } from '#lib/graficos.ts';
+  import { baixarTexto, copiar, textoPacote, textoTeams } from '#lib/saidas.ts';
   import { contextoDaSemana, dataCurta, dataMedia, hoje, semanasDisponiveis } from '#lib/semana.ts';
 
-  const dados: Dados = carregar();
-  let semana = $state(segundaDaSemana(hoje()));
+  let dados = $state<Dados>(carregar());
+  const dia = hoje();
+  let semana = $state(segundaDaSemana(dia));
+  let copiado = $state('');
+  let entradaBackup = $state<HTMLInputElement>();
 
   const ctx = $derived(contextoDaSemana(dados, semana));
+  const notas = $derived<NotasRelatorio>(dados.relatorios[semana] ?? {});
   const t = $derived<TotaisPainel>(ctx.atual.foto?.totais ?? {});
   const ta = $derived<TotaisPainel>(ctx.anterior?.foto?.totais ?? {});
-  const plano = $derived(ctx.atual.plano);
   const kp = $derived(ctx.comp.planoAtual);
   const fotosAteSemana = $derived(dados.fotos.filter((f) => f.data <= ctx.sexta));
   const serie = (chave: keyof TotaisPainel) => historico(fotosAteSemana, chave).slice(-8);
+  const promessasDaSemana = $derived(dados.promessas.filter((p) => p.semana === semana));
+  const emAberto = $derived(promessasDaSemana.filter((p) => p.cumprida === undefined));
 
-  const passos = $derived([
-    {
-      n: '01', titulo: 'Colar o painel', href: '/painel', feito: !!ctx.atual.foto,
-      texto: ctx.atual.foto
-        ? `Foto de ${dataCurta(ctx.atual.foto.data)}: ${ctx.atual.foto.cards.length} cards e ${Object.keys(ctx.atual.foto.totais).length} números.`
-        : 'Copie ou tire print do painel do gestor e cole.',
-    },
-    {
-      n: '02', titulo: 'Planejar a semana', href: '/semana', feito: !!plano?.confirmadoEm,
-      texto: plano ? (plano.confirmadoEm ? `Plano confirmado com ${kp?.planejados ?? 0} itens.` : 'Plano começado, falta confirmar.') : 'O que cada pessoa vai fazer, até quando e para quê.',
-    },
-    {
-      n: '03', titulo: 'Fechar a semana', href: '/semana', feito: !!plano?.fechadoEm,
-      texto: plano?.fechadoEm ? `${kp?.feitos ?? 0} de ${kp?.planejados ?? 0} itens feitos.` : 'Na sexta: o que saiu, o que não saiu e por quê.',
-    },
-    { n: '04', titulo: 'Gerar o relatório', href: '/relatorio', feito: false, texto: 'PDF com o comparativo da semana anterior.' },
-  ]);
+  const acoes = $derived(acoesDeHoje({
+    hoje: dia,
+    inicio: semana,
+    fotos: dados.fotos,
+    plano: ctx.atual.plano,
+    alertas: ctx.alertas,
+    riscos: dados.riscos,
+    promessasDaSemana,
+    promessasAnteriores: ctx.promessasAnteriores,
+  }));
+  const eventos = $derived(linhaDoTempo(dados.fotos, ctx.atual.plano, dados.riscos, dados.pessoas, semana));
+  const eventosPorDia = $derived(Object.entries(eventos.reduce<Record<string, Evento[]>>((m, e) => ((m[e.data] ??= []).push(e), m), {})));
+
+  const ritmo = $derived.by(() =>
+  {
+    const foto = ctx.atual.foto;
+    if (!foto) return new Map<string, { no_ritmo: number; em_risco: number; atrasado: number; total: number }>();
+    const emExec = foto.cards.filter((c) => c.origens.includes('em_execucao')).map((c) => aplicarControle(c, foto.data, dados.controle[c.codigo]));
+    return new Map(ritmoPorPessoa(emExec, dados.pessoas).map((r) => [r.pessoa.id, r.contagem]));
+  });
+
+  const nomesDias = ['seg', 'ter', 'qua', 'qui', 'sex'];
+  const rotinaDia = ['colar o painel e planejar', 'acompanhar', 'colar o painel', 'acompanhar', 'colar o painel e fechar'];
+  const regua = $derived(nomesDias.map((nome, i) =>
+  {
+    const data = somarDias(semana, i);
+    return { nome, data, rotina: rotinaDia[i]!, hoje: data === dia, passou: data < dia, foto: dados.fotos.some((f) => f.data === data) };
+  }));
+
+  const rotas: Record<Destino, string> = { painel: '/painel', semana: '/semana', cards: '/cards', relatorio: '/relatorio' };
+  const iconeEvento: Record<Evento['tipo'], string> = {
+    foto: '[foto]', etapa: '[etapa]', previsao: '[previsão]', ritmo: '[ritmo]', entrou: '[entrou]', saiu: '[saiu]', plano: '[plano]', entrega: '[entrega]', risco: '[risco]',
+  };
+
+  const hora = new Date().getHours();
+  const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
+  const primeiroNome = $derived(dados.identificacao.elaboradoPor.split(' ')[0]);
 
   function variacao(chave: keyof TotaisPainel, sufixo = ''): string
   {
@@ -41,38 +71,70 @@
     const d = b - a;
     return `${d > 0 ? '+' : ''}${d}${sufixo} na semana`;
   }
+
+  async function copiarSaida(nome: string, texto: string)
+  {
+    await copiar(texto);
+    copiado = nome;
+    setTimeout(() => (copiado = ''), 2000);
+  }
+
+  async function restaurar(arquivo?: File)
+  {
+    if (!arquivo || !confirm('Restaurar o backup substitui todos os dados deste navegador. Continuar?')) return;
+    dados = await importarJson(arquivo);
+    salvar($state.snapshot(dados) as Dados);
+  }
 </script>
 
 <main>
   <section class="topo">
     <div>
-      <span class="etiqueta">semana de {dataMedia(semana)} a {dataMedia(ctx.sexta)}</span>
-      <h1>Visão da semana<span class="cursor">_</span></h1>
+      <span class="etiqueta">{saudacao}{primeiroNome ? `, ${primeiroNome}` : ''} · semana de {dataMedia(semana)} a {dataMedia(ctx.sexta)}</span>
+      <h1>OrbisOS<span class="cursor">_</span></h1>
+      <p class="lema">seu giro da semana: painel, plano, riscos e relatório num lugar só.</p>
     </div>
-    <div class="acoes">
-      <select bind:value={semana} aria-label="Semana">
-        {#each semanasDisponiveis(dados) as s (s)}<option value={s}>{dataCurta(s)} a {dataCurta(somarDias(s, 4))}</option>{/each}
-      </select>
-      <a class="botao-principal" href="/relatorio">Gerar relatório</a>
-    </div>
+    <select bind:value={semana} aria-label="Semana">
+      {#each semanasDisponiveis(dados) as s (s)}<option value={s}>{dataCurta(s)} a {dataCurta(somarDias(s, 4))}</option>{/each}
+    </select>
   </section>
 
-  <section class="passos">
-    {#each passos as p (p.n)}
-      <a class="passo" class:feito={p.feito} href={p.href}>
-        <span class="n">{p.n}</span>
-        <b>{p.titulo}</b>
-        <span class="estado">{p.feito ? 'feito' : 'pendente'}</span>
-        <p>{p.texto}</p>
-      </a>
+  <ol class="regua">
+    {#each regua as d (d.data)}
+      <li class:hoje={d.hoje} class:passou={d.passou}>
+        <span class="dia maquina">{d.nome} {dataCurta(d.data)}</span>
+        <span class="rotina">{d.rotina}</span>
+        {#if d.foto}<span class="marca-foto" title="foto do painel neste dia">foto</span>{/if}
+      </li>
     {/each}
+  </ol>
+
+  <section class="hoje-painel">
+    <div class="titulo-hoje">
+      <span class="etiqueta">agora</span>
+      <h2>O que fazer</h2>
+    </div>
+    <ul class="acoes">
+      {#each acoes as a, i (i)}
+        <li class={a.nivel}>
+          <i></i>
+          <span>{a.texto}</span>
+          {#if a.destino}<a href={rotas[a.destino]}>abrir</a>{/if}
+        </li>
+      {/each}
+    </ul>
   </section>
 
   <section class="kpis">
     <div class="kpi">
       <span class="etiqueta">dentro do prazo</span>
       <span class="valor">{t.dentroDoPrazoPct !== undefined ? `${t.dentroDoPrazoPct}%` : '-'}</span>
-      <span class="detalhe">{ctx.meta !== undefined ? `meta ${ctx.meta}%` : ''} {variacao('dentroDoPrazoPct', ' pp')}</span>
+      <span class="detalhe">
+        {#if ctx.meta !== undefined && t.dentroDoPrazoPct !== undefined}
+          meta {ctx.meta}% · <b class:abaixo={t.dentroDoPrazoPct < ctx.meta}>{t.dentroDoPrazoPct - ctx.meta >= 0 ? '+' : ''}{t.dentroDoPrazoPct - ctx.meta} pp</b>
+        {/if}
+        {variacao('dentroDoPrazoPct', ' pp')}
+      </span>
       {@html svgSparkline(serie('dentroDoPrazoPct').map((p) => p.valor))}
     </div>
     <div class="kpi">
@@ -109,18 +171,73 @@
     <section class="cartao">
       <h2>Time</h2>
       {#each ctx.comp.pessoas as p (p.pessoa.id)}
+        {@const r = ritmo.get(p.pessoa.id)}
+        {@const dificuldade = ctx.atual.plano?.pessoas.find((x) => x.pessoaId === p.pessoa.id)?.dificuldade}
         <div class="pessoa">
           <div class="linha">
             <b>{p.pessoa.nome}</b>
             {#if p.alertas}<span class="pilula vermelho">{p.alertas} {p.alertas === 1 ? 'alerta' : 'alertas'}</span>{/if}
           </div>
-          <span class="barra"><span style:width="{p.atual.pctFeitos ?? 0}%"></span></span>
+          <span class="barra clara"><span style:width="{p.atual.pctFeitos ?? 0}%"></span></span>
           <span class="dica maquina">
             {p.atual.feitos}/{p.atual.planejados} feitos · <span class:estourou={p.horas > p.pessoa.capacidadeHorasSemana}>{p.horas}h de {p.pessoa.capacidadeHorasSemana}h</span>
           </span>
+          {#if r && r.total}
+            <span class="barra-ritmo" title="demandas em execução por ritmo">
+              {#if r.no_ritmo}<span class="no_ritmo" style:flex={r.no_ritmo}>{r.no_ritmo}</span>{/if}
+              {#if r.em_risco}<span class="em_risco" style:flex={r.em_risco}>{r.em_risco}</span>{/if}
+              {#if r.atrasado}<span class="atrasado" style:flex={r.atrasado}>{r.atrasado}</span>{/if}
+            </span>
+          {/if}
+          {#if dificuldade}<span class="dificuldade">{dificuldade}</span>{/if}
         </div>
       {/each}
     </section>
+  </div>
+
+  <div class="colunas">
+    <section class="cartao">
+      <h2>Linha do tempo da semana</h2>
+      {#each eventosPorDia as [data, lista] (data)}
+        <div class="dia-tempo">
+          <span class="data maquina">{dataMedia(data)}</span>
+          <ul>
+            {#each lista as e, i (i)}<li class={e.tipo}><span class="tipo maquina">{iconeEvento[e.tipo]}</span> {e.texto}</li>{/each}
+          </ul>
+        </div>
+      {:else}
+        <p class="dica">Nada registrado nesta semana ainda.</p>
+      {/each}
+    </section>
+
+    <div class="pilha">
+      <section class="cartao saidas">
+        <h2>Saídas</h2>
+        <a class="saida principal" href="/relatorio"><b>Gerar PDF</b><span>relatório oficial com estatísticas</span></a>
+        <button class="saida" onclick={() => copiarSaida('teams', textoTeams(dados, ctx, notas))}>
+          <b>{copiado === 'teams' ? 'Copiado!' : 'Mensagem do Teams'}</b><span>8 a 10 linhas, pronta para colar</span>
+        </button>
+        <button class="saida" onclick={() => copiarSaida('pacote', textoPacote(dados, ctx, notas))}>
+          <b>{copiado === 'pacote' ? 'Copiado!' : 'Pacote para IA'}</b><span>números conferidos + dicionário; a IA só escreve</span>
+        </button>
+        <div class="backup">
+          <button class="link" onclick={() => exportarJson($state.snapshot(dados) as Dados)}>baixar backup</button>
+          <button class="link" onclick={() => entradaBackup?.click()}>restaurar backup</button>
+          <button class="link" onclick={() => baixarTexto(textoPacote(dados, ctx, notas), `pacote-ia-${dados.prefixo}-${semana}.md`)}>baixar pacote .md</button>
+          <input type="file" accept="application/json" hidden bind:this={entradaBackup} onchange={(e) => restaurar(e.currentTarget.files?.[0])} />
+        </div>
+      </section>
+
+      <section class="cartao">
+        <h2>Compromissos com a gestão</h2>
+        {#each emAberto as p (p.id)}
+          <p class="compromisso">{p.texto}</p>
+        {:else}
+          <p class="dica">{promessasDaSemana.length ? 'Todos os compromissos da semana têm situação.' : 'Nenhum compromisso registrado nesta semana.'}</p>
+        {/each}
+        <a class="link-secao" href="/semana">ver na semana</a>
+      </section>
+    </div>
   </div>
 
   {#if serie('dentroDoPrazoPct').length >= 2}
@@ -148,8 +265,15 @@
   }
   h1
   {
-    font-size: 2.3rem;
+    font-size: 2.8rem;
     margin: 6px 0 0;
+    letter-spacing: -0.02em;
+  }
+  .lema
+  {
+    margin: 4px 0 0;
+    color: var(--suave);
+    font-family: var(--fonte-maquina);
   }
   .cursor
   {
@@ -163,99 +287,140 @@
       opacity: 0;
     }
   }
-  .acoes
+  .regua
   {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-  }
-  .botao-principal
-  {
-    font-family: var(--fonte-maquina);
-    font-weight: 700;
-    background: var(--marca);
-    color: #fff;
-    text-decoration: none;
-    padding: 9px 20px;
-    border-radius: 999px;
-  }
-  .botao-principal:hover
-  {
-    background: #0b7d40;
-  }
-  .passos
-  {
+    list-style: none;
+    padding: 0;
+    margin: 22px 0 0;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
-    margin-top: 26px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
   }
-  .passo
+  .regua li
   {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
+    padding: 10px 12px;
+    border-radius: 10px;
     background: var(--superficie);
     border: 1px solid var(--borda);
-    border-radius: var(--raio);
-    padding: 16px 18px;
-    color: inherit;
-    text-decoration: none;
-    box-shadow: var(--sombra);
-    transition: transform 0.15s, border-color 0.15s;
+    background-image: none;
+    color: var(--texto);
   }
-  .passo:hover
+  .regua li.passou
   {
-    transform: translateY(-2px);
-    border-color: var(--marca);
+    opacity: 0.6;
   }
-  .passo .n
+  .regua li.hoje
   {
-    font-family: var(--fonte-maquina);
-    font-size: 1.6rem;
+    background: var(--marca-escura);
+    border-color: var(--marca-escura);
+    color: #fff;
+    opacity: 1;
+  }
+  .regua .dia
+  {
     font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+  }
+  .regua li.hoje .dia
+  {
     color: var(--marca);
   }
-  .passo b
+  .regua .rotina
   {
-    font-family: var(--fonte-maquina);
-    font-size: 1.05rem;
-  }
-  .passo p
-  {
-    margin: 4px 0 0;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--suave);
   }
-  .estado
+  .regua li.hoje .rotina
+  {
+    color: #cfd8d3;
+  }
+  .marca-foto
   {
     position: absolute;
-    top: 16px;
-    right: 16px;
+    top: 8px;
+    right: 10px;
     font-family: var(--fonte-maquina);
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    color: var(--suave);
-    border: 1px dashed var(--borda);
+    font-size: 0.68rem;
+    color: var(--marca);
+    border: 1px solid var(--marca);
     border-radius: 999px;
-    padding: 1px 8px;
+    padding: 0 6px;
   }
-  .passo.feito
+  .hoje-painel
   {
-    border-top: 4px solid var(--verde);
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 18px;
+    margin-top: 16px;
+    padding: 20px 22px;
+    border-radius: var(--raio);
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-left: 5px solid var(--marca);
+    box-shadow: var(--sombra);
   }
-  .passo.feito .estado
+  .titulo-hoje h2
   {
-    color: var(--verde);
-    border: 1px solid var(--verde);
+    font-size: 1.5rem;
+    margin: 4px 0 0;
+  }
+  .acoes
+  {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .acoes li
+  {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px dashed var(--borda);
+    background: none;
+    color: var(--texto);
+  }
+  .acoes li:last-child
+  {
+    border-bottom: none;
+  }
+  .acoes i
+  {
+    flex: 0 0 9px;
+    height: 9px;
+    border-radius: 2px;
+    background: var(--marca);
+  }
+  .acoes .alto i
+  {
+    background: var(--vermelho);
+  }
+  .acoes .medio i
+  {
+    background: var(--amarelo);
+  }
+  .acoes span
+  {
+    flex: 1;
+  }
+  .acoes a
+  {
+    font-family: var(--fonte-maquina);
+    font-weight: 700;
+    color: var(--marca);
+    font-size: 0.85rem;
   }
   .kpis
   {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 14px;
-    margin-top: 18px;
+    margin-top: 16px;
   }
   .kpi
   {
@@ -287,6 +452,14 @@
     color: #d5d2cc;
     flex: 1;
   }
+  .kpi .detalhe b
+  {
+    color: var(--marca);
+  }
+  .kpi .detalhe b.abaixo
+  {
+    color: #f5c542;
+  }
   .kpi.alerta .valor
   {
     color: #f5c542;
@@ -311,6 +484,11 @@
     grid-template-columns: 3fr 2fr;
     gap: 18px;
   }
+  .pilha
+  {
+    display: flex;
+    flex-direction: column;
+  }
   .frases
   {
     list-style: none;
@@ -333,7 +511,7 @@
     flex: 0 0 9px;
     height: 9px;
     border-radius: 50%;
-    background: var(--cinza, #b8b4ad);
+    background: #b8b4ad;
   }
   .frases .positivo i
   {
@@ -361,6 +539,161 @@
     color: var(--vermelho);
     font-weight: 700;
   }
+  .barra-ritmo
+  {
+    display: flex;
+    height: 16px;
+    border-radius: 4px;
+    overflow: hidden;
+    font-family: var(--fonte-maquina);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .barra-ritmo span
+  {
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .barra-ritmo .no_ritmo
+  {
+    background: var(--verde);
+  }
+  .barra-ritmo .em_risco
+  {
+    background: #d99a00;
+  }
+  .barra-ritmo .atrasado
+  {
+    background: var(--vermelho);
+  }
+  .dificuldade
+  {
+    font-size: 0.8rem;
+    color: var(--suave);
+    font-style: italic;
+  }
+  .dia-tempo
+  {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--borda);
+  }
+  .dia-tempo .data
+  {
+    font-weight: 700;
+    color: var(--marca);
+  }
+  .dia-tempo ul
+  {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .dia-tempo li
+  {
+    padding: 2px 0;
+    font-size: 0.88rem;
+    background: none;
+    color: var(--texto);
+  }
+  .dia-tempo .tipo
+  {
+    color: var(--suave);
+    font-size: 0.75rem;
+  }
+  .dia-tempo .risco .tipo, .dia-tempo .previsao .tipo, .dia-tempo .ritmo .tipo
+  {
+    color: var(--amarelo);
+  }
+  .dia-tempo .entrega .tipo, .dia-tempo .etapa .tipo
+  {
+    color: var(--verde);
+  }
+  .saidas
+  {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .saida
+  {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    text-align: left;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--borda);
+    background: var(--superficie);
+    color: var(--texto);
+    text-decoration: none;
+    font-family: inherit;
+  }
+  .saida b
+  {
+    font-family: var(--fonte-maquina);
+  }
+  .saida span
+  {
+    font-size: 0.8rem;
+    color: var(--suave);
+  }
+  .saida:hover
+  {
+    border-color: var(--marca);
+    background: var(--marca-clara);
+    color: var(--texto);
+  }
+  .saida.principal
+  {
+    background: var(--marca);
+    border-color: var(--marca);
+    color: #fff;
+  }
+  .saida.principal span
+  {
+    color: #e3f6ea;
+  }
+  .saida.principal:hover
+  {
+    background: #0b7d40;
+    color: #fff;
+  }
+  .backup
+  {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 4px;
+  }
+  .link
+  {
+    border: none;
+    background: none;
+    color: var(--marca);
+    text-decoration: underline;
+    padding: 0;
+    font-size: 0.82rem;
+  }
+  .compromisso
+  {
+    margin: 0;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--borda);
+    font-size: 0.9rem;
+  }
+  .link-secao
+  {
+    display: inline-block;
+    margin-top: 8px;
+    color: var(--marca);
+    font-size: 0.85rem;
+  }
   .grafico
   {
     overflow-x: auto;
@@ -372,11 +705,16 @@
   }
   @media (max-width: 900px)
   {
-    .passos, .kpis
+    .kpis
     {
       grid-template-columns: repeat(2, 1fr);
     }
-    .colunas
+    .regua
+    {
+      grid-template-columns: repeat(5, minmax(90px, 1fr));
+      overflow-x: auto;
+    }
+    .colunas, .hoje-painel
     {
       grid-template-columns: 1fr;
     }
