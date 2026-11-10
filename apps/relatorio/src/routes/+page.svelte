@@ -6,6 +6,7 @@
   } from '@supervisao/core';
   import { carregar, exportarJson, importarJson, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
   import { svgLinha, svgSparkline } from '#lib/graficos.ts';
+  import { entrar, nuvem, sairDaNuvem } from '#lib/nuvem.svelte.ts';
   import { baixarTexto, copiar, textoPacote, textoTeams } from '#lib/saidas.ts';
   import { contextoDaSemana, dataCurta, dataMedia, hoje, semanasDisponiveis } from '#lib/semana.ts';
 
@@ -227,6 +228,23 @@
           <a class="link" href="/modelos">modelos de relatório</a>
           <input type="file" accept="application/json" hidden bind:this={entradaBackup} onchange={(e) => restaurar(e.currentTarget.files?.[0])} />
         </div>
+      </section>
+
+      <section class="cartao nuvem">
+        <h2>Nuvem</h2>
+        {#if nuvem.estado === 'desligada'}
+          <p class="dica">Desligada: os dados ficam só neste navegador. Para ligar, preencha a configuração do Firebase (passo a passo no README).</p>
+        {:else if nuvem.estado === 'sem_login'}
+          <p class="dica">Entre com a conta Google para guardar tudo no Firebase e abrir em outro computador.</p>
+          <button onclick={() => entrar().catch((e) => alert(`Não consegui entrar: ${e}`))}>Entrar com Google</button>
+        {:else}
+          <p class="estado {nuvem.estado}">
+            {nuvem.estado === 'sincronizando' ? 'sincronizando...' : nuvem.estado === 'erro' ? 'erro ao sincronizar' : 'tudo guardado na nuvem'}
+          </p>
+          <p class="dica">{nuvem.email}{nuvem.ultimoEnvio ? ` - último envio ${nuvem.ultimoEnvio.slice(11, 16)}` : ''}</p>
+          {#if nuvem.erro}<p class="dica erro">{nuvem.erro}</p>{/if}
+          <button class="link" onclick={() => sairDaNuvem()}>sair</button>
+        {/if}
       </section>
 
       <section class="cartao">
@@ -671,6 +689,19 @@
     flex-wrap: wrap;
     gap: 12px;
     margin-top: 4px;
+  }
+  .nuvem .estado
+  {
+    font-weight: 600;
+    margin: 0;
+  }
+  .nuvem .ok
+  {
+    color: var(--verde);
+  }
+  .nuvem .erro
+  {
+    color: var(--vermelho);
   }
   .link
   {

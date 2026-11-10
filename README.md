@@ -57,6 +57,18 @@ npm run check     # tipos (tsc e svelte-check)
 npm run build     # site estático em apps/relatorio/build
 ```
 
+## Nuvem (Firebase, opcional)
+
+O navegador é a cópia de trabalho (localStorage). Com o Firebase ligado, cada mudança vai para o Firestore 2 s depois. Ao abrir o app, a versão mais nova vence; num navegador novo, a nuvem vence e o que havia ali é baixado como backup.
+
+1. Em console.firebase.google.com, crie um projeto (plano Spark, gratuito).
+2. Em Authentication, ative o provedor Google.
+3. Em Firestore Database, crie o banco e cole as regras de [firestore.rules](firestore.rules).
+4. Em Configurações do projeto > Seus apps, crie um app Web e copie a configuração para [apps/relatorio/src/lib/firebaseConfig.ts](apps/relatorio/src/lib/firebaseConfig.ts).
+5. Se o app for publicado (GitHub Pages, por exemplo), adicione o domínio em Authentication > Configurações > Domínios autorizados.
+
+Estrutura: `usuarios/{uid}/geral/dados` guarda tudo menos as fotos, e `usuarios/{uid}/fotos/{data}` guarda uma foto do painel por documento. A configuração do app web não é segredo; quem protege os dados são as regras.
+
 ## Convenções
 
 - Nomes em português, chaves de bloco na linha de baixo, TypeScript estrito sem `any`.

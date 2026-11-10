@@ -2,6 +2,7 @@ import
 {
   dicionarioPadrao, pessoasExemplo, type Bloco, type ControleCard, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type Risco, type Snapshot,
 } from '@supervisao/core';
+import { agendarEnvio, iniciarNuvem, marcarLocal } from './nuvem.svelte.ts';
 
 // o que eu escrevo no relatório de cada foto
 export interface NotasRelatorio
@@ -52,7 +53,7 @@ function padrao(): Dados
   return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal' };
 }
 
-export function carregar(): Dados
+function lerLocal(): Dados
 {
   try
   {
@@ -65,9 +66,32 @@ export function carregar(): Dados
   }
 }
 
+// a versão mais nova da nuvem substitui a deste navegador e a tela recarrega com ela
+function receberDaNuvem(dados: Dados, quando: string, primeiraVez: boolean): void
+{
+  const json = JSON.stringify({ ...padrao(), ...dados });
+  const mudou = json !== localStorage.getItem(CHAVE);
+  // primeira vez nesta conta: o que havia só neste navegador vira um backup baixado antes de ser trocado
+  const local = lerLocal();
+  if (primeiraVez && mudou && (local.fotos.length || local.planos.length)) exportarJson(local);
+  localStorage.setItem(CHAVE, json);
+  marcarLocal(quando);
+  if (mudou) location.reload();
+}
+
+export function carregar(): Dados
+{
+  iniciarNuvem(receberDaNuvem, lerLocal);
+  return lerLocal();
+}
+
 export function salvar(dados: Dados): void
 {
-  localStorage.setItem(CHAVE, JSON.stringify(dados));
+  const json = JSON.stringify(dados);
+  if (json === localStorage.getItem(CHAVE)) return;
+  localStorage.setItem(CHAVE, json);
+  marcarLocal();
+  agendarEnvio(dados);
 }
 
 export function exportarJson(dados: Dados): void
