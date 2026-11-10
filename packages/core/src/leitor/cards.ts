@@ -40,6 +40,7 @@ export interface OpcoesLeitura
 export function detectarOrigem(texto: string): OrigemLeitura
 {
   const t = semAcento(texto);
+  if (/registros filtrados|solicitante\s+tipo/.test(t)) return 'demandas';
   // listas do cronograma têm a coluna de vencimento; os chips de filtro ("A iniciar") não mudam isso
   if (/\bvenc\b/.test(t) && /situacao/.test(t)) return 'cronograma';
   if (/fila|a iniciar|ordenadas pela abertura/.test(t) && !/ritmo/.test(t)) return 'fila';
@@ -48,8 +49,10 @@ export function detectarOrigem(texto: string): OrigemLeitura
 }
 
 // separa o texto em pedaços que começam no código do card (ex.: DEV-218)
-export function lerCards(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
+export function lerCards(textoLido: string, opcoes: OpcoesLeitura): CardSnapshot[]
 {
+  // a imagem às vezes separa o código: "DEV -077"
+  const texto = textoLido.replace(new RegExp(`\\b${opcoes.prefixo} ?- ?(?=[0-9A-Z]{2,4}\\b)`, 'g'), `${opcoes.prefixo}-`);
   const origem = opcoes.origem ?? detectarOrigem(texto);
   if (origem === 'cronograma' && /item\s+venc\.?\s+card\s+onda/.test(semAcento(texto))) return lerVencimentos(texto, opcoes);
   // aceita letras depois do prefixo para não perder card que a imagem leu errado (ex.: DEV-NS)
@@ -61,12 +64,74 @@ export function lerCards(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
     const inicio = m.index + m[0].length;
     const fim = marcas[i + 1]?.index ?? texto.length;
     const { codigo, corrigido } = corrigirCodigo(m[0], opcoes.prefixo);
-    const card = lerTrecho(codigo, texto.slice(inicio, fim), origem, opcoes.pessoas);
+    const trecho = texto.slice(inicio, fim);
+    const card = origem === 'demandas' ? lerDemanda(codigo, trecho, opcoes.pessoas) : lerTrecho(codigo, trecho, origem, opcoes.pessoas);
     card.avisosLeitura = [...(corrigido ? ['código corrigido, confira'] : []), ...(card.avisosLeitura ?? []), ...avisar(card, origem, opcoes.hoje)];
     const anterior = porCodigo.get(card.codigo);
     porCodigo.set(card.codigo, anterior ? juntarCard(anterior, card) : card);
   });
   return marcarCodigosEstranhos([...porCodigo.values()]);
+}
+
+const RE_TIPO = /Kitu Sistema|Suporte Kitu|Outras Aplica[cç][oõ]es ou de Terceiros|Direcionamento/i;
+const RE_STATUS_CARD = /em andamento|planejado|novo|resolvido|cancelado|aguardando (?:cliente|time \S+)/i;
+// coluna Tempo da lista ("0 min", "3 h"); a imagem lê 0 como O
+const RE_TEMPO = /\b[O0o\d][\d,]*\s*(?:min|h|d)\b/;
+
+// nome completo, ou nome e sobrenome em linhas diferentes (a coluna quebra "Mariana / Coutinho")
+function pessoasNoTexto(normal: string, pessoas: Pessoa[]): Pessoa[]
+{
+  return pessoas.filter((p) =>
+  {
+    const partes = semAcento(p.nome).split(' ');
+    return normal.includes(semAcento(p.nome)) || (partes.length > 1 && new RegExp(`\\b${partes[0]}\\b[\\s\\S]*\\b${partes.at(-1)}\\b`).test(normal));
+  });
+}
+
+// lista de Demandas: ID + abertura, solicitante, tipo, descrição, responsável, tempo, status
+function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[]): CardSnapshot
+{
+  const card: CardSnapshot = { codigo, responsaveis: [], origens: ['demandas'] };
+  const normal = semAcento(trecho);
+  const achadas = pessoasNoTexto(normal, pessoas);
+  card.responsaveis = achadas.map((p) => p.id);
+
+  const abertura = trecho.match(/(?:^|\n)[\s\t]*(\d{2}\/\d{2}\/\d{2,4})/);
+  if (abertura) card.abertura = lerDatas(abertura[1]!).datas[0];
+  const comeca = trecho.match(/come[cç]a\s+(\d{2}\/\d{2}\/\d{2,4})/i);
+  if (comeca) card.planejadoPara = lerDatas(comeca[1]!).datas[0];
+
+  // o status vem depois do tempo; antes dele "novo" pode ser parte da descrição
+  const tempo = trecho.match(RE_TEMPO);
+  const aposTempo = tempo ? trecho.slice(tempo.index! + tempo[0].length) : trecho;
+  const status = aposTempo.match(RE_STATUS_CARD)?.[0];
+  if (status) card.statusCard = status[0]!.toUpperCase() + status.slice(1).toLowerCase().replace(/time (\S)/, (_, l: string) => `Time ${l.toUpperCase()}`);
+  card.sistema = trecho.match(RE_TIPO)?.[0];
+
+  if (trecho.includes('\t'))
+  {
+    const celulas = trecho.split(/\t|\r?\n/).map((c) => c.trim());
+    const i = celulas.findIndex((c) => RE_TIPO.test(c));
+    if (i >= 0) card.titulo = celulas[i + 1] || undefined;
+    return card;
+  }
+
+  // imagem: a 1a linha tem tipo, começo da descrição, nome e tempo; a 2a tem a abertura, o resto da descrição e o sobrenome
+  const linhas = trecho.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const primeira = linhas[0] ?? '';
+  const tipo = primeira.match(RE_TIPO);
+  let comeco = tipo ? primeira.slice(tipo.index! + tipo[0].length) : primeira;
+  const corte = comeco.search(RE_TEMPO);
+  if (corte >= 0) comeco = comeco.slice(0, corte);
+  let resto = (linhas[1] ?? '').replace(/^\d{2}\/\d{2}\/\d{2,4}\s*/, '').replace(/^(baixa|m[eé]dia|alta|urgente)\s+/i, '');
+  for (const p of achadas)
+  {
+    const partes = p.nome.split(' ');
+    comeco = comeco.replace(new RegExp(`\\s*${partes[0]}\\s*$`, 'i'), '');
+    resto = resto.replace(new RegExp(`\\s*${partes.slice(1).join(' ')}\\s*$`, 'i'), '');
+  }
+  card.titulo = `${comeco.trim()} ${resto.trim()}`.trim() || undefined;
+  return card;
 }
 
 // a imagem lê 0 como O: DEV-O080 -> DEV-080
@@ -93,7 +158,7 @@ function marcarCodigosEstranhos(cards: CardSnapshot[]): CardSnapshot[]
 }
 
 // a imagem lê 0 como 6 ou 8 no dia (63/11/26); só corrige o que não pode ser data
-function lerDatas(trecho: string): { datas: string[]; corrigida: boolean }
+export function lerDatas(trecho: string): { datas: string[]; corrigida: boolean }
 {
   let corrigida = false;
   const datas = [...trecho.matchAll(RE_DATA)].map((d) =>
@@ -166,6 +231,12 @@ function avisar(card: CardSnapshot, origem: OrigemLeitura, hoje?: string): strin
 {
   const avisos: string[] = [];
   if (!/-\d+$/.test(card.codigo)) avisos.push('código ilegível');
+  if (origem === 'demandas')
+  {
+    if (!card.statusCard) avisos.push('sem status');
+    if (!card.responsaveis.length) avisos.push('sem pessoa');
+    return avisos;
+  }
   if (origem === 'cronograma')
   {
     if (!card.vencimento) avisos.push('sem vencimento');

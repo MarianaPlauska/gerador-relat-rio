@@ -3,6 +3,7 @@ import { pessoasExemplo, fotoVazia } from '../exemplo';
 import { detectarOrigem, lerCards } from './cards';
 import { lerTotais } from './totais';
 import { mesclarNaFoto } from './mesclar';
+import { lerOndas } from './ondas';
 
 // textos transcritos dos prints de 09/11/26; trocar pelo ctrl+c real quando chegar
 
@@ -321,5 +322,102 @@ describe('lista do cronograma (imagem)', () =>
     expect(card('DEV-016').avisosLeitura).toContain('data corrigida, confira');
     expect(card('DEV-948').avisosLeitura).toContain('código estranho, confira');
     expect(card('DEV-136').avisosLeitura).toEqual([]);
+  });
+});
+
+const demandasImagem = `29 registros filtrados de 228 - clique na linha para abrir
+MM Aguardando Time Comercial 9 OD Resotvido 48 M Cancelado O Marcar todas
+ID SOLICITANTE TIPO DESCRIÇÃO RESPONSÁVEL TEMPO STATUS SAT.
+DEV-079 = Kitu Sistema SLA Controlar ações pendentes da equipe Mariana O min * Planejado - começa 22/03/27 = 2 O
+22/03/27 técnica para ajustes, aprovações dos... Coutinho
+DEV-113 — Kitu Sistema Solicitação de criação de função pelo cliente Mariana O min e Novo - 2 O
+15/03/27 Coutinho
+DEV -077 = Kitu Sistema Relatório DE-PARA Toda vez que emitimos um Mariana O min * Planejado - começa 09/03/27 = 2 OB
+09/03/27 novo PCMSO e houver alteração no protocolo ... Coutinho
+DEV-005 = Kitu Sistema Alterar a Fonte total dos documentos emitidos Mariana O min e Novo A valedestacar OQ
+10/02/27 Baixa pelo sistema para Roboto. Coutinho`;
+
+describe('lista de demandas (imagem)', () =>
+{
+  const cards = lerCards(demandasImagem, opcoes);
+  const card = (codigo: string) => cards.find((c) => c.codigo === codigo)!;
+
+  it('reconhece a tela e junta o código separado', () =>
+  {
+    expect(detectarOrigem(demandasImagem)).toBe('demandas');
+    expect(cards.map((c) => c.codigo)).toEqual(['DEV-079', 'DEV-113', 'DEV-077', 'DEV-005']);
+  });
+
+  it('lê abertura, tipo, descrição, pessoa e status', () =>
+  {
+    expect(card('DEV-079')).toMatchObject({
+      abertura: '2027-03-22', sistema: 'Kitu Sistema', titulo: 'SLA Controlar ações pendentes da equipe técnica para ajustes, aprovações dos...',
+      responsaveis: ['mariana-coutinho'], statusCard: 'Planejado', planejadoPara: '2027-03-22', avisosLeitura: [],
+    });
+    expect(card('DEV-113')).toMatchObject({ statusCard: 'Novo', titulo: 'Solicitação de criação de função pelo cliente', abertura: '2027-03-15' });
+    expect(card('DEV-005')).toMatchObject({ statusCard: 'Novo', titulo: 'Alterar a Fonte total dos documentos emitidos pelo sistema para Roboto.' });
+  });
+
+  it('não confunde "novo" da descrição com o status', () =>
+  {
+    expect(card('DEV-077').statusCard).toBe('Planejado');
+  });
+
+  it('lê a versão com tabulação', () =>
+  {
+    const [c] = lerCards('ID\tSOLICITANTE\tTIPO\tDESCRIÇÃO\nDEV-079\n22/03/27\t—\tKitu Sistema\tSLA Controlar ações\tMariana Coutinho\t0 min\tPlanejado · começa 22/03/27\t—', opcoes);
+    expect(c).toMatchObject({ abertura: '2027-03-22', titulo: 'SLA Controlar ações', statusCard: 'Planejado', responsaveis: ['mariana-coutinho'] });
+  });
+});
+
+describe('números novos da operação do time', () =>
+{
+  it('lê etapas concluídas, tempo mediano, ocioso e tempo limpo', () =>
+  {
+    const texto = `ETAPAS CONCLUÍDAS
+599
+▲ 210 vs 30 dias anteriores
+tempo mediano por etapa: 0 min (= estável)
+OCIOSO ENTRE ETAPAS
+1%
+23,9 h úteis parados
+TEMPO LIMPO · MEDIANA
+19,4 h
+▼ 13 h vs 30 dias anteriores
+média 2,5 d · média muito acima da mediana`;
+    expect(lerTotais(texto)).toMatchObject({
+      etapasConcluidas: 599, etapasConcluidasVariacao: 210, tempoMedianoEtapaMin: 0, ociosoPct: 1, ociosoHoras: 23.9,
+      tempoLimpoMedianaH: 19.4, tempoLimpoVariacaoH: -13, tempoLimpoMediaDias: 2.5,
+    });
+  });
+
+  it('não lê o "etapas concluídas 0%" do card aberto', () =>
+  {
+    expect(lerTotais('Etapas concluídas 0% · prazo consumido 0%').etapasConcluidas).toBeUndefined();
+  });
+});
+
+describe('resumo por onda', () =>
+{
+  it('lê a imagem, mesmo com 0 lido como letra', () =>
+  {
+    const ondas = lerOndas(`ONDA INÍCIO FIM ITENS CONCL.  *%CONCLUÍDO  PRÓX.VENC. SITUAÇÃO ITEM VENC. CARD ONDA SITUAÇÃO
+M Prioridade 1 01/11/26 — 30/01/27 86 51 —— 10/11/26 * Em curso Continuar plano de staging e modo 10/11/26 poços 1 io E EE
+e Prioridade 2 01/02/27 30/04/27 23 [o] o% 04/02/27 e Não iniciada
+mM Prioridade3 — 01/05/27 31/07/27 18 o x 03/05/27 * Não iniciada Kitu Sistema
+W Prioridade 5'=—=01/11/27 31/01/28 2 (e) 0% 07/01/28 e Não iniciada`);
+    expect(ondas).toEqual([
+      { nome: 'Prioridade 1', inicio: '2026-11-01', fim: '2027-01-30', itens: 86, concluidos: 51, pct: undefined, proximoVencimento: '2026-11-10', situacao: 'Em curso' },
+      { nome: 'Prioridade 2', inicio: '2027-02-01', fim: '2027-04-30', itens: 23, concluidos: 0, pct: 0, proximoVencimento: '2027-02-04', situacao: 'Não iniciada' },
+      { nome: 'Prioridade 3', inicio: '2027-05-01', fim: '2027-07-31', itens: 18, concluidos: 0, pct: undefined, proximoVencimento: '2027-05-03', situacao: 'Não iniciada' },
+      { nome: 'Prioridade 5', inicio: '2027-11-01', fim: '2028-01-31', itens: 2, concluidos: 0, pct: 0, proximoVencimento: '2028-01-07', situacao: 'Não iniciada' },
+    ]);
+  });
+
+  it('lê a versão com tabulação e guarda na foto', () =>
+  {
+    const ondas = lerOndas('Prioridade 1\t01/11/26\t30/01/27\t86\t51\t59%\t10/11/26\tEm curso');
+    expect(ondas[0]).toMatchObject({ itens: 86, concluidos: 51, pct: 59, situacao: 'Em curso' });
+    expect(mesclarNaFoto(fotoVazia('2026-11-10'), {}, [], ondas).ondas).toHaveLength(1);
   });
 });

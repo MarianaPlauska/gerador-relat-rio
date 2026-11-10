@@ -416,6 +416,19 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
       'ritmoEmRisco', 'ritmoAtrasadas', 'atrasadosVencimento', 'vencem15Dias', 'previsaoVencida', 'eficiencia', 'eficienciaPrazo', 'eficienciaVazao', 'eficienciaQualidade',
     ]);
     if (comparativo) conteudo.push(comparativo);
+    const operacao = tabelaIndicadores(`Operação do time: ${rotuloAntes} x ${rotuloAgora}`, [
+      'etapasConcluidas', 'tempoMedianoEtapaMin', 'ociosoPct', 'ociosoHoras', 'tempoLimpoMedianaH', 'tempoLimpoMediaDias', 'emAbertoAgora', 'foraDoPrazo',
+    ]);
+    if (operacao)
+    {
+      conteudo.push(h2('Operação do time'));
+      conteudo.push(operacao);
+      const vs30 = [
+        t.etapasConcluidasVariacao !== undefined && `etapas concluídas ${sinal(t.etapasConcluidasVariacao)}`,
+        t.tempoLimpoVariacaoH !== undefined && `tempo limpo ${sinal(t.tempoLimpoVariacaoH, ' h')}`,
+      ].filter(Boolean);
+      if (vs30.length) conteudo.push(p(`Contra os 30 dias anteriores, segundo o painel: ${vs30.join('; ')}.`));
+    }
 
     const prazo = graficoIndicador('dentroDoPrazoPct', 'Dentro do prazo (%) por semana, com a meta do painel', true);
     const concl = graficoIndicador('concluidos', 'Itens concluídos no cronograma por semana', false, 150);
@@ -438,6 +451,23 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
         [{ text: 'Total', bold: true }, direita(num(totalRitmo), { bold: true }), direita('100%', { bold: true })],
       ], ['*', 90, 90]));
     }
+  },
+
+  ondas: () =>
+  {
+    const ondas = atual.foto?.ondas;
+    if (!ondas?.length) return;
+    conteudo.push(h1(nomesSecoes.ondas));
+    conteudo.push(tabela(`Resumo por onda em ${dataMedia(atual.foto!.data)}`, ['Onda', 'Início', 'Fim', 'Itens', 'Concl.', '% concl.', 'Próx. venc.', 'Situação'], ondas.map((o) => [
+      { text: o.nome, bold: true },
+      { text: dataMedia(o.inicio), font: 'Maquina' },
+      { text: dataMedia(o.fim), font: 'Maquina' },
+      direita(num(o.itens)),
+      direita(num(o.concluidos)),
+      direita(num(o.pct, '%'), { bold: true }),
+      { text: dataMedia(o.proximoVencimento), font: 'Maquina' },
+      marcador(o.situacao ?? '-', o.situacao === 'Em curso' ? cores.verde : cores.suave),
+    ]), ['*', 52, 52, 36, 36, 46, 56, 70], 'painel do gestor'));
   },
 
   estatistica: () =>

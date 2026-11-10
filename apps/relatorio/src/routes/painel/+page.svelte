@@ -1,13 +1,14 @@
 <script lang="ts">
   import
   {
-    detectarOrigem, fotoVazia, lerCards, lerTotais, mesclarNaFoto, nomesTotais,
-    type CardSnapshot, type OrigemLeitura, type Ritmo, type TotaisPainel,
+    detectarOrigem, fotoVazia, lerCards, lerOndas, lerTotais, mesclarNaFoto, nomesTotais,
+    type CardSnapshot, type Onda, type OrigemLeitura, type Ritmo, type TotaisPainel,
   } from '@supervisao/core';
   import { carregar, exportarJson, importarJson, salvar, type Dados } from '#lib/armazenamento.ts';
   import { lerColagem } from '#lib/colagem.ts';
   import { lerImagem } from '#lib/ocr.ts';
   import TabelaCards from '#lib/TabelaCards.svelte';
+  import { dataMedia } from '#lib/semana.ts';
 
   type ChaveTotal = keyof TotaisPainel;
 
@@ -16,6 +17,7 @@
     { titulo: 'Cronograma', chaves: ['itensCronograma', 'concluidos', 'concluidosPct', 'vencem15Dias', 'atrasadosVencimento'] },
     { titulo: 'Em andamento e ritmo', chaves: ['demandasEmAndamento', 'etapaRodando', 'ritmoNoRitmo', 'ritmoEmRisco', 'ritmoAtrasadas'] },
     { titulo: 'Prazo e eficiência', chaves: ['dentroDoPrazoPct', 'metaPct', 'concluidasNoPeriodo', 'eficiencia', 'eficienciaPrazo', 'eficienciaVazao', 'eficienciaQualidade'] },
+    { titulo: 'Etapas e tempo', chaves: ['etapasConcluidas', 'etapasConcluidasVariacao', 'tempoMedianoEtapaMin', 'ociosoPct', 'ociosoHoras', 'tempoLimpoMedianaH', 'tempoLimpoVariacaoH', 'tempoLimpoMediaDias'] },
     {
       titulo: 'Outros números (opcional)',
       secundario: true,
@@ -32,6 +34,7 @@
   let progresso = $state<number | null>(null);
   let totaisLidos = $state<TotaisPainel>({});
   let cardsLidos = $state<CardSnapshot[]>([]);
+  let ondasLidas = $state<Onda[]>([]);
   let leu = $state(false);
   let trechos = $state(0);
 
@@ -48,6 +51,7 @@
     em_execucao: 'Quem está cuidando de quê',
     fila: 'Fila - demandas a iniciar',
     cronograma: 'Lista do cronograma',
+    demandas: 'Lista de demandas',
   };
   const ritmos: Ritmo[] = ['no_ritmo', 'em_risco', 'atrasado'];
 
@@ -109,6 +113,8 @@
     const origem = origemEscolhida === 'auto' ? undefined : origemEscolhida;
     const totais = lerTotais(texto);
     const cards = lerCards(texto, { prefixo: dados.prefixo, pessoas: dados.pessoas, origem, hoje: dataFoto });
+    const ondas = lerOndas(texto);
+    if (ondas.length) ondasLidas = ondas;
     const acumulado = mesclarNaFoto({ data: dataFoto, totais: $state.snapshot(totaisLidos), cards: $state.snapshot(cardsLidos) }, totais, cards);
     totaisLidos = acumulado.totais;
     cardsLidos = acumulado.cards;
@@ -121,16 +127,17 @@
     texto = '';
     totaisLidos = {};
     cardsLidos = [];
+    ondasLidas = [];
     trechos = 0;
     leu = false;
   }
 
   function salvarNaFoto()
   {
-    const nova = mesclarNaFoto(foto, totaisLidos, $state.snapshot(cardsLidos));
+    const nova = mesclarNaFoto(foto, totaisLidos, $state.snapshot(cardsLidos), $state.snapshot(ondasLidas));
     dados.fotos = [...dados.fotos.filter((f) => f.data !== dataFoto), nova].sort((a, b) => a.data.localeCompare(b.data));
     salvar($state.snapshot(dados));
-    aviso = `Salvo na foto de ${dataFoto}: ${chavesLidas.length} totais e ${cardsLidos.length} cards.`;
+    aviso = `Salvo na foto de ${dataFoto}: ${chavesLidas.length} totais, ${cardsLidos.length} cards${ondasLidas.length ? ` e ${ondasLidas.length} ondas` : ''}.`;
     limparLeitura();
   }
 
@@ -157,6 +164,20 @@
     return foto.cards.filter((c) => c.responsavelEtapaAtual === pessoaId && c.ritmoPainel === ritmo).length;
   }
 </script>
+
+{#snippet tabelaOndas(ondas: Onda[])}
+  <table>
+    <thead><tr><th>Onda</th><th>Início</th><th>Fim</th><th>Itens</th><th>Concl.</th><th>%</th><th>Próx. venc.</th><th>Situação</th></tr></thead>
+    <tbody>
+      {#each ondas as o (o.nome)}
+        <tr>
+          <td>{o.nome}</td><td>{dataMedia(o.inicio)}</td><td>{dataMedia(o.fim)}</td><td>{o.itens ?? '-'}</td><td>{o.concluidos ?? '-'}</td>
+          <td>{o.pct === undefined ? '-' : `${o.pct}%`}</td><td>{dataMedia(o.proximoVencimento)}</td><td>{o.situacao ?? '-'}</td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+{/snippet}
 
 <main>
   <header>
@@ -215,6 +236,12 @@
         <p class="dica">Nenhum total neste trecho.</p>
       {/if}
 
+      {#if ondasLidas.length}
+        <h3>Resumo por onda ({ondasLidas.length})</h3>
+        {@render tabelaOndas(ondasLidas)}
+        <button class="link perigo" onclick={() => (ondasLidas = [])}>descartar ondas</button>
+      {/if}
+
       <h3>Cards encontrados ({cardsLidos.length})</h3>
       {#if cardsLidos.length}
         <TabelaCards bind:cards={cardsLidos} pessoas={dados.pessoas} />
@@ -234,6 +261,13 @@
       {Object.keys(foto.totais).length} totais e {foto.cards.length} cards salvos.
       {#if indiceFoto >= 0}<button class="link perigo" onclick={apagarFoto}>apagar esta foto</button>{/if}
     </p>
+    {#if indiceFoto >= 0 && foto.ondas?.length}
+      <details>
+        <summary>Resumo por onda ({foto.ondas.length})</summary>
+        {@render tabelaOndas(foto.ondas)}
+        <button class="link perigo" onclick={() => (dados.fotos[indiceFoto]!.ondas = undefined)}>remover ondas desta foto</button>
+      </details>
+    {/if}
     {#if indiceFoto >= 0 && foto.cards.length}
       <details>
         <summary>Cards desta foto (corrigir ou remover)</summary>

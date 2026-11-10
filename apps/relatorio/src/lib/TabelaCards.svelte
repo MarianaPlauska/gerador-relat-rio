@@ -12,7 +12,7 @@
     <thead>
       <tr>
         <th>Card</th><th>Título</th><th>Pessoa (etapa atual)</th><th>Etapa</th><th>Etapas</th>
-        <th>Início</th><th>Previsão</th><th>Vencimento</th><th>Ritmo</th><th>Situação</th><th>Conferir</th><th></th>
+        <th>Início</th><th>Previsão</th><th>Vencimento</th><th>Ritmo</th><th>Situação</th><th>Status do card</th><th>Conferir</th><th></th>
       </tr>
     </thead>
     <tbody>
@@ -49,6 +49,18 @@
               {#each situacoes as s (s)}<option value={s}>{s.replaceAll('_', ' ')}</option>{/each}
             </select>
           </td>
+          <td>
+            <input class="curto" bind:value={card.statusCard} />
+            {#if card.abertura || card.planejadoPara || (!card.responsavelEtapaAtual && card.responsaveis.length)}
+              <small>
+                {[
+                  card.abertura && `aberto ${card.abertura.split('-').reverse().join('/')}`,
+                  card.planejadoPara && `começa ${card.planejadoPara.split('-').reverse().join('/')}`,
+                  !card.responsavelEtapaAtual && card.responsaveis.map((id) => pessoas.find((p) => p.id === id)?.nome ?? id).join(', '),
+                ].filter(Boolean).join(' - ')}
+              </small>
+            {/if}
+          </td>
           <td class="avisos">{card.avisosLeitura?.join(', ')}</td>
           <td><button onclick={() => cards.splice(i, 1)}>remover</button></td>
         </tr>
@@ -81,6 +93,13 @@
   .conferir
   {
     background: var(--vermelho-fundo);
+  }
+  small
+  {
+    display: block;
+    color: var(--suave);
+    font-size: 0.75rem;
+    white-space: nowrap;
   }
   .avisos
   {

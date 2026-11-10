@@ -5,6 +5,7 @@ export const nomesSecoes = {
   resumo: 'Sumário executivo',
   apresentacao: 'Apresentação e metodologia',
   comparativo: 'Indicadores do painel',
+  ondas: 'Projetos por onda',
   estatistica: 'Análise estatística',
   execucao: 'Execução do plano',
   time: 'Desempenho por pessoa',
@@ -24,7 +25,8 @@ export type SecaoPadrao = keyof typeof nomesSecoes;
 export const descricoesSecoes: Record<SecaoPadrao, string> = {
   resumo: 'semáforo, resumo escrito, quadro-resumo dos indicadores-chave e principais constatações',
   apresentacao: 'objetivo, fontes de dados e metodologia',
-  comparativo: 'tabela de todos os indicadores do painel (anterior x atual), gráficos de evolução e distribuição do ritmo',
+  comparativo: 'tabela de todos os indicadores do painel (anterior x atual), operação do time (etapas, ocioso, tempo limpo), gráficos de evolução e distribuição do ritmo',
+  ondas: 'resumo por onda do cronograma (prioridade 1, 2...): janela, itens, concluídos e próximo vencimento',
   estatistica: 'média, mediana, desvio-padrão, mínimo, máximo e tendência de cada indicador, com leitura dos resultados',
   execucao: 'itens do plano por situação, prazo das entregas, capacidade, Pareto das causas e itens não concluídos',
   time: 'resultado por pessoa, gráfico do plano por pessoa, ritmo das demandas por responsável e dificuldades',
@@ -73,7 +75,7 @@ export const modelosProntos: Modelo[] = [
     periodo: 'semana',
     capa: 'completa',
     sumario: true,
-    blocos: secoes('resumo', 'apresentacao', 'comparativo', 'estatistica', 'execucao', 'time', 'analise', 'frentes', 'atencao', 'riscos', 'compromissos', 'notas', 'plano', 'movimento', 'glossario'),
+    blocos: secoes('resumo', 'apresentacao', 'comparativo', 'ondas', 'estatistica', 'execucao', 'time', 'analise', 'frentes', 'atencao', 'riscos', 'compromissos', 'notas', 'plano', 'movimento', 'glossario'),
   },
   {
     id: 'executivo',
@@ -99,7 +101,7 @@ export const modelosProntos: Modelo[] = [
     periodo: 'livre',
     capa: 'completa',
     sumario: true,
-    blocos: secoes('resumo', 'apresentacao', 'comparativo', 'estatistica', 'execucao', 'time', 'analise', 'riscos', 'compromissos', 'notas', 'glossario'),
+    blocos: secoes('resumo', 'apresentacao', 'comparativo', 'ondas', 'estatistica', 'execucao', 'time', 'analise', 'riscos', 'compromissos', 'notas', 'glossario'),
   },
 ];
 

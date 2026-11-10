@@ -5,7 +5,7 @@ export type CorSemaforo = 'verde' | 'amarelo' | 'vermelho';
 // situação da lista do cronograma (cada item cai em uma só)
 export type Situacao = 'concluido' | 'atrasado' | 'vence_15_dias' | 'a_iniciar' | 'em_execucao' | 'sem_data';
 
-export type OrigemLeitura = 'em_execucao' | 'fila' | 'cronograma';
+export type OrigemLeitura = 'em_execucao' | 'fila' | 'cronograma' | 'demandas';
 
 export interface Pessoa
 {
@@ -38,6 +38,10 @@ export interface CardSnapshot
   ritmoPainel?: Ritmo;
   situacao?: Situacao;
   comQuem?: 'com_a_gente' | 'com_o_cliente' | 'com_times_internos';
+  // lista de Demandas: abertura do card, status do card ("Planejado", "Novo"...) e quando o planejado começa
+  abertura?: string;
+  statusCard?: string;
+  planejadoPara?: string;
   origens: OrigemLeitura[];
   avisosLeitura?: string[];
 }
@@ -76,6 +80,28 @@ export interface TotaisPainel
   idade3a7Dias?: number;
   idade7a15Dias?: number;
   idadeMais15Dias?: number;
+  etapasConcluidas?: number;
+  // variações que o painel mostra contra os 30 dias anteriores
+  etapasConcluidasVariacao?: number;
+  tempoMedianoEtapaMin?: number;
+  ociosoPct?: number;
+  ociosoHoras?: number;
+  tempoLimpoMedianaH?: number;
+  tempoLimpoVariacaoH?: number;
+  tempoLimpoMediaDias?: number;
+}
+
+// linha do "Resumo por onda" do painel de projetos
+export interface Onda
+{
+  nome: string;
+  inicio?: string | undefined;
+  fim?: string | undefined;
+  itens?: number | undefined;
+  concluidos?: number | undefined;
+  pct?: number | undefined;
+  proximoVencimento?: string | undefined;
+  situacao?: string | undefined;
 }
 
 export interface Snapshot
@@ -83,6 +109,7 @@ export interface Snapshot
   data: string;
   totais: TotaisPainel;
   cards: CardSnapshot[];
+  ondas?: Onda[] | undefined;
 }
 
 export interface ItemPlano

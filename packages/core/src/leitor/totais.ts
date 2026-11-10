@@ -1,10 +1,19 @@
 import type { TotaisPainel } from '../tipos';
-import { achatar } from './normalizar';
+import { achatar, numeroBr } from './normalizar';
 
 type Chave = keyof TotaisPainel;
 
-// cada padrão lê um ou mais números; o primeiro que achar vence
-const padroes: { re: RegExp; chaves: Chave[] }[] = [
+// cada padrão lê um ou mais números; o primeiro que achar vence.
+// sinal: o primeiro grupo é a seta do painel (▲ soma, ▼ subtrai) e o segundo é o número
+const padroes: { re: RegExp; chaves: Chave[]; sinal?: true }[] = [
+  { re: /etapas concluidas (\d+)(?![\d%])/, chaves: ['etapasConcluidas'] },
+  { re: /etapas concluidas \d+ ([▲▼]) ?(\d+)/, chaves: ['etapasConcluidasVariacao'], sinal: true },
+  { re: /tempo mediano por etapa:? ([\d,]+) ?min/, chaves: ['tempoMedianoEtapaMin'] },
+  { re: /ocioso entre etapas ([\d,]+)%/, chaves: ['ociosoPct'] },
+  { re: /([\d,]+) ?h uteis parados/, chaves: ['ociosoHoras'] },
+  { re: /tempo limpo:? mediana ([\d,]+) ?h/, chaves: ['tempoLimpoMedianaH'] },
+  { re: /tempo limpo:? mediana [\d,]+ ?h ([▲▼]) ?([\d,]+) ?h/, chaves: ['tempoLimpoVariacaoH'], sinal: true },
+  { re: /\bmedia ([\d,]+) ?d\b/, chaves: ['tempoLimpoMediaDias'] },
   { re: /itens no cronograma (\d+)/, chaves: ['itensCronograma'] },
   { re: /(\d+) ainda em planejado/, chaves: ['aindaPlanejado'] },
   { re: /em execucao (\d+)/, chaves: ['emExecucao'] },
@@ -38,14 +47,19 @@ export function lerTotais(texto: string): TotaisPainel
 {
   const plano = achatar(texto);
   const totais: TotaisPainel = {};
-  for (const { re, chaves } of padroes)
+  for (const { re, chaves, sinal } of padroes)
   {
     if (chaves.every((c) => totais[c] !== undefined)) continue;
     const m = plano.match(re);
     if (!m) continue;
+    if (sinal)
+    {
+      totais[chaves[0]!] = (m[1] === '▼' ? -1 : 1) * numeroBr(m[2]!);
+      continue;
+    }
     chaves.forEach((c, i) =>
     {
-      if (totais[c] === undefined) totais[c] = Number(m[i + 1]);
+      if (totais[c] === undefined) totais[c] = numeroBr(m[i + 1]!);
     });
   }
   return totais;
@@ -83,4 +97,12 @@ export const nomesTotais: Record<Chave, string> = {
   idade3a7Dias: 'Parada há 3 a 7 dias',
   idade7a15Dias: 'Parada há 7 a 15 dias',
   idadeMais15Dias: 'Parada há mais de 15 dias',
+  etapasConcluidas: 'Etapas concluídas',
+  etapasConcluidasVariacao: 'Etapas concluídas: variação vs 30 dias',
+  tempoMedianoEtapaMin: 'Tempo mediano por etapa (min)',
+  ociosoPct: 'Ocioso entre etapas (%)',
+  ociosoHoras: 'Ocioso entre etapas (h úteis)',
+  tempoLimpoMedianaH: 'Tempo limpo: mediana (h)',
+  tempoLimpoVariacaoH: 'Tempo limpo: variação vs 30 dias (h)',
+  tempoLimpoMediaDias: 'Tempo limpo: média (dias)',
 };
