@@ -1,7 +1,7 @@
 <script lang="ts">
   import
   {
-    acoesDeHoje, aplicarControle, historico, linhaDoTempo, ritmoPorPessoa, segundaDaSemana, somarDias,
+    acoesDeHoje, aplicarControle, historico, linhaDoTempo, resumoDoFluxo, ritmoPorPessoa, segundaDaSemana, serieSemanal, somarDias, textoProjecao,
     type Destino, type Evento, type TotaisPainel,
   } from '@supervisao/core';
   import { carregar, exportarJson, importarJson, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
@@ -36,6 +36,8 @@
     promessasDaSemana,
     promessasAnteriores: ctx.promessasAnteriores,
   }));
+  const fluxo = $derived(resumoDoFluxo(ctx.atual.foto?.cards ?? [], ctx.atual.foto?.data ?? dia, serieSemanal(fotosAteSemana, 'dentroDoPrazoPct', semana), ctx.meta));
+  const nomePessoa = (id: string) => dados.pessoas.find((p) => p.id === id)?.nome.split(' ')[0] ?? id;
   const eventos = $derived(linhaDoTempo(dados.fotos, ctx.atual.plano, dados.riscos, dados.pessoas, semana));
   const eventosPorDia = $derived(Object.entries(eventos.reduce<Record<string, Evento[]>>((m, e) => ((m[e.data] ??= []).push(e), m), {})));
 
@@ -258,6 +260,37 @@
       </section>
     </div>
   </div>
+
+  <section class="cartao fluxo">
+    <h2>Fluxo</h2>
+    <div class="colunas-fluxo">
+      <div>
+        <h3>Meta de prazo no fim do mês</h3>
+        {#if fluxo.projecao}
+          <p class="veredito {fluxo.projecao.veredito}">{fluxo.projecao.veredito === 'bate' ? 'deve bater' : fluxo.projecao.veredito === 'perto' ? 'perto da meta' : 'não deve bater'}: {fluxo.projecao.projetado.toLocaleString('pt-BR')}% para {fluxo.projecao.meta}%</p>
+          <p class="dica">{textoProjecao(fluxo.projecao)}</p>
+        {:else}
+          <p class="dica">Precisa de 3 semanas com "dentro do prazo" e a meta do painel.</p>
+        {/if}
+      </div>
+      <div>
+        <h3>Parados além do normal ({fluxo.parados.length})</h3>
+        {#each fluxo.parados.slice(0, 6) as x (x.card.codigo)}
+          <p class="linha-fluxo"><b class="maquina">{x.card.codigo}</b> {x.card.titulo} <span class="dica">{x.idadeDias.toLocaleString('pt-BR')} d aberto, normal até {x.limiteDias.toLocaleString('pt-BR')} d ({x.base}){x.card.responsaveis.length ? ` - ${x.card.responsaveis.map(nomePessoa).join(', ')}` : ''}</span></p>
+        {:else}
+          <p class="dica">{fluxo.tempos.geral ? 'Nenhuma demanda aberta além do normal.' : 'Importe o CSV da lista de Demandas na tela Colar painel para medir o normal.'}</p>
+        {/each}
+      </div>
+      <div>
+        <h3>Onde as demandas se acumulam</h3>
+        {#each fluxo.gargalos.slice(0, 5) as g (g.etapa)}
+          <p class="linha-fluxo"><b>{g.etapa}</b> <span class="dica">{g.quantidade} {g.quantidade === 1 ? 'demanda' : 'demandas'}{g.esperando ? `, ${g.esperando} esperando começar` : ''}{g.maiorRodandoDias !== undefined ? `, maior tempo rodando ${g.maiorRodandoDias.toLocaleString('pt-BR')} d` : ''}</span></p>
+        {:else}
+          <p class="dica">Cole o "Quem está cuidando de quê" ou um card aberto para ver as etapas.</p>
+        {/each}
+      </div>
+    </div>
+  </section>
 
   {#if serie('dentroDoPrazoPct').length >= 2}
     <section class="cartao">
@@ -689,6 +722,55 @@
     flex-wrap: wrap;
     gap: 12px;
     margin-top: 4px;
+  }
+  .fluxo
+  {
+    margin-top: 20px;
+  }
+  .colunas-fluxo
+  {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr 1fr;
+    gap: 24px;
+  }
+  .colunas-fluxo h3
+  {
+    font-size: 0.85rem;
+    margin: 0 0 8px;
+  }
+  .linha-fluxo
+  {
+    font-size: 0.86rem;
+    margin: 0 0 6px;
+  }
+  .linha-fluxo .dica
+  {
+    display: block;
+    font-size: 0.78rem;
+  }
+  .veredito
+  {
+    font-weight: 700;
+    margin: 0 0 4px;
+  }
+  .veredito.bate
+  {
+    color: var(--verde);
+  }
+  .veredito.perto
+  {
+    color: var(--amarelo);
+  }
+  .veredito.nao_bate
+  {
+    color: var(--vermelho);
+  }
+  @media (max-width: 900px)
+  {
+    .colunas-fluxo
+    {
+      grid-template-columns: 1fr;
+    }
   }
   .nuvem .estado
   {

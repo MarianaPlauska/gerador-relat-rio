@@ -5,7 +5,7 @@ export type CorSemaforo = 'verde' | 'amarelo' | 'vermelho';
 // situação da lista do cronograma (cada item cai em uma só)
 export type Situacao = 'concluido' | 'atrasado' | 'vence_15_dias' | 'a_iniciar' | 'em_execucao' | 'sem_data';
 
-export type OrigemLeitura = 'em_execucao' | 'fila' | 'cronograma' | 'demandas';
+export type OrigemLeitura = 'em_execucao' | 'fila' | 'cronograma' | 'demandas' | 'card';
 
 export interface Pessoa
 {
@@ -42,8 +42,21 @@ export interface CardSnapshot
   abertura?: string;
   statusCard?: string;
   planejadoPara?: string;
+  // do CSV exportado da lista de Demandas: prioridade e horas da abertura até a conclusão, como o painel calcula
+  prioridadeCard?: string;
+  horasAteConcluir?: number;
+  // do card aberto: a lista de etapas
+  etapas?: EtapaCard[];
   origens: OrigemLeitura[];
   avisosLeitura?: string[];
+}
+
+export interface EtapaCard
+{
+  ordem: number;
+  nome: string;
+  pessoa?: string | undefined;
+  situacao: 'nao_iniciada' | 'rodando' | 'concluida' | 'outra';
 }
 
 // números exatamente como aparecem no painel do gestor

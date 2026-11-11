@@ -3,7 +3,7 @@ import type { Content, CustomTableLayout, TableCell, TDocumentDefinitions } from
 import
 {
   aplicarControle, estatisticasDoPlano, kpisDosItens, lerDicionario, mapaDeDores, mapaDeFrentes, nomesSecoes, nomesTotais, posicaoNaFaixa,
-  resumirSerie, ritmoPorPessoa, segundaDaSemana, semanaDoAno, serieSemanal, somarDias,
+  resumirSerie, resumoDoFluxo, ritmoPorPessoa, segundaDaSemana, semanaDoAno, serieSemanal, somarDias, textoProjecao,
   type Bloco, type CorSemaforo, type ItemPlano, type Modelo, type ResumoSerie, type Ritmo, type SecaoPadrao, type Tendencia, type TotaisPainel,
 } from '@supervisao/core';
 import maquina400 from '@fontsource/courier-prime/files/courier-prime-latin-400-normal.woff?url';
@@ -468,6 +468,50 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
       { text: dataMedia(o.proximoVencimento), font: 'Maquina' },
       marcador(o.situacao ?? '-', o.situacao === 'Em curso' ? cores.verde : cores.suave),
     ]), ['*', 52, 52, 36, 36, 46, 56, 70], 'painel do gestor'));
+  },
+
+  fluxo: () =>
+  {
+    const f = resumoDoFluxo(cards, atual.foto?.data ?? ctx.fim, serieSemanal(fotosAte, 'dentroDoPrazoPct', segundaDaSemana(ctx.fim)), ctx.meta);
+    const prioridades = Object.entries(f.tempos.porPrioridade).sort(([, a], [, b]) => b.n - a.n);
+    if (!f.projecao && !prioridades.length && !f.gargalos.length) return;
+    conteudo.push(h1(nomesSecoes.fluxo));
+    if (f.projecao)
+    {
+      conteudo.push(h2('Projeção da meta de prazo'));
+      conteudo.push(p(textoProjecao(f.projecao)));
+    }
+    if (prioridades.length)
+    {
+      conteudo.push(h2('Tempo de entrega'));
+      conteudo.push(p('Dias corridos da abertura à conclusão, como o painel registra. p50: metade das entregas leva até esse tempo; p85: 85 de cada 100 entregas levam até esse tempo. O p85 é a referência de "normal" para cada prioridade.'));
+      conteudo.push(tabela('Tempo de entrega por prioridade', ['Prioridade', 'Entregas', 'p50 (dias)', 'p85 (dias)'], [
+        ...prioridades.map(([nome, r]) => [nome, direita(num(r.n)), direita(num(r.p50)), direita(num(r.p85), { bold: true })]),
+        ...(f.tempos.geral ? [[{ text: 'Geral', bold: true }, direita(num(f.tempos.geral.n), { bold: true }), direita(num(f.tempos.geral.p50)), direita(num(f.tempos.geral.p85), { bold: true })]] : []),
+      ], ['*', 70, 70, 70], 'lista de demandas do painel (CSV exportado)'));
+    }
+    if (f.parados.length)
+    {
+      conteudo.push(h2('Parados além do normal'));
+      conteudo.push(tabela(`Demandas abertas há mais tempo que o p85 da prioridade (${f.parados.length})`, ['Card', 'Demanda', 'Status', 'Aberto há', 'Normal até'], f.parados.slice(0, 15).map((x) => [
+        { text: x.card.codigo, font: 'Maquina' },
+        { stack: [x.card.titulo ?? '-', pequeno([x.card.prioridadeCard, x.card.responsaveis.map(nomePessoa).join(', ')].filter(Boolean).join(' - '))] },
+        x.card.statusCard ?? '-',
+        direita(`${num(x.idadeDias)} d`, { bold: true, color: cores.vermelho }),
+        direita(`${num(x.limiteDias)} d`),
+      ]), [52, '*', 70, 52, 52], 'lista de demandas do painel'));
+    }
+    if (f.gargalos.length)
+    {
+      conteudo.push(h2('Onde as demandas se acumulam'));
+      conteudo.push(tabela('Demandas em aberto por etapa atual', ['Etapa', 'Demandas', 'Esperando começar', 'Maior tempo rodando', 'Cards'], f.gargalos.slice(0, 8).map((g) => [
+        { text: g.etapa, bold: true },
+        direita(num(g.quantidade)),
+        direita(num(g.esperando), g.esperando ? { color: cores.amarelo, bold: true } : {}),
+        direita(g.maiorRodandoDias === undefined ? '-' : `${num(g.maiorRodandoDias)} d`),
+        pequeno(g.codigos.slice(0, 6).join(', ') + (g.codigos.length > 6 ? '...' : '')),
+      ]), ['*', 52, 62, 62, 120], 'painel do gestor'));
+    }
   },
 
   estatistica: () =>

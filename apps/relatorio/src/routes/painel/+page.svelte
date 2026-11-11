@@ -1,7 +1,7 @@
 <script lang="ts">
   import
   {
-    detectarOrigem, fotoVazia, lerCards, lerOndas, lerTotais, mesclarNaFoto, nomesTotais,
+    detectarOrigem, ehCsvDeDemandas, fotoVazia, lerCards, lerCsvDemandas, lerOndas, lerTotais, mesclarNaFoto, nomesTotais,
     type CardSnapshot, type Onda, type OrigemLeitura, type Ritmo, type TotaisPainel,
   } from '@supervisao/core';
   import { carregar, exportarJson, importarJson, salvar, type Dados } from '#lib/armazenamento.ts';
@@ -52,6 +52,7 @@
     fila: 'Fila - demandas a iniciar',
     cronograma: 'Lista do cronograma',
     demandas: 'Lista de demandas',
+    card: 'Card aberto (etapas)',
   };
   const ritmos: Ritmo[] = ['no_ritmo', 'em_risco', 'atrasado'];
 
@@ -111,8 +112,11 @@
   function ler()
   {
     const origem = origemEscolhida === 'auto' ? undefined : origemEscolhida;
-    const totais = lerTotais(texto);
-    const cards = lerCards(texto, { prefixo: dados.prefixo, pessoas: dados.pessoas, origem, hoje: dataFoto });
+    // CSV exportado da lista de Demandas: lista completa, sem totais
+    const csv = ehCsvDeDemandas(texto) ? lerCsvDemandas(texto, { prefixo: dados.prefixo, pessoas: dados.pessoas }) : undefined;
+    if (csv) aviso = `CSV lido: ${csv.cards.length} demandas.${csv.repetidos.length ? ` IDs repetidos no painel (ficou a linha mais recente): ${csv.repetidos.join(', ')}.` : ''}`;
+    const totais = csv ? {} : lerTotais(texto);
+    const cards = csv ? csv.cards : lerCards(texto, { prefixo: dados.prefixo, pessoas: dados.pessoas, origem, hoje: dataFoto });
     const ondas = lerOndas(texto);
     if (ondas.length) ondasLidas = ondas;
     const acumulado = mesclarNaFoto({ data: dataFoto, totais: $state.snapshot(totaisLidos), cards: $state.snapshot(cardsLidos) }, totais, cards);
@@ -191,7 +195,7 @@
   <section class="cartao">
     <h2>1. Cole aqui (Ctrl+V)</h2>
     <p class="dica">
-      Selecione um trecho do painel e copie (Ctrl+C), ou tire um print (Win+Shift+S). Depois clique na caixa e cole.
+      Selecione um trecho do painel e copie (Ctrl+C), ou tire um print (Win+Shift+S). Depois clique na caixa e cole. Da lista de Demandas, prefira o "Exportar CSV" do painel e use "Escolher CSV".
       Pode colar vários prints seguidos: cada um soma no que já foi lido. Também dá para arrastar várias imagens para a caixa.
     </p>
     <textarea rows="8" bind:value={texto} onpaste={aoColar} ondrop={aoSoltar} ondragover={(e) => e.preventDefault()} placeholder="Cole o texto ou o print do painel"></textarea>
@@ -205,6 +209,9 @@
         </select>
       </label>
       <button onclick={ler} disabled={!texto}>Ler este texto</button>
+      <label class="botao">Escolher CSV
+        <input type="file" accept=".csv,text/csv" hidden onchange={async (e) => { const arquivo = e.currentTarget.files?.[0]; if (arquivo) { texto = await arquivo.text(); ler(); } e.currentTarget.value = ''; }} />
+      </label>
       <label class="botao">Escolher imagens
         <input type="file" accept="image/*" multiple hidden onchange={(e) => lerImagens([...(e.currentTarget.files ?? [])])} />
       </label>

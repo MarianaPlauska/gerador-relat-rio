@@ -1,4 +1,4 @@
-import type { CardSnapshot, OrigemLeitura, Pessoa, Ritmo, Situacao } from '../tipos';
+import type { CardSnapshot, EtapaCard, OrigemLeitura, Pessoa, Ritmo, Situacao } from '../tipos';
 import { dataBrParaIso, numeroBr, semAcento } from './normalizar';
 
 const RE_DATA = /(\d{2})\/(\d{2})\/(\d{4}|\d{2})/g;
@@ -40,6 +40,7 @@ export interface OpcoesLeitura
 export function detectarOrigem(texto: string): OrigemLeitura
 {
   const t = semAcento(texto);
+  if (/o que foi pedido|\+ o que vai fazer|adicionar etapa/.test(t)) return 'card';
   if (/registros filtrados|solicitante\s+tipo/.test(t)) return 'demandas';
   // listas do cronograma têm a coluna de vencimento; os chips de filtro ("A iniciar") não mudam isso
   if (/\bvenc\b/.test(t) && /situacao/.test(t)) return 'cronograma';
@@ -54,6 +55,7 @@ export function lerCards(textoLido: string, opcoes: OpcoesLeitura): CardSnapshot
   // a imagem às vezes separa o código: "DEV -077"
   const texto = textoLido.replace(new RegExp(`\\b${opcoes.prefixo} ?- ?(?=[0-9A-Z]{2,4}\\b)`, 'g'), `${opcoes.prefixo}-`);
   const origem = opcoes.origem ?? detectarOrigem(texto);
+  if (origem === 'card') return lerCardAberto(texto, opcoes);
   if (origem === 'cronograma' && /item\s+venc\.?\s+card\s+onda/.test(semAcento(texto))) return lerVencimentos(texto, opcoes);
   // aceita letras depois do prefixo para não perder card que a imagem leu errado (ex.: DEV-NS)
   const re = new RegExp(`\\b${opcoes.prefixo}-[0-9A-Z]{2,4}\\b`, 'g');
@@ -132,6 +134,73 @@ function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[]): CardSnap
   }
   card.titulo = `${comeco.trim()} ${resto.trim()}`.trim() || undefined;
   return card;
+}
+
+const situacaoEtapa = (texto: string): EtapaCard['situacao'] | undefined =>
+{
+  const t = semAcento(texto);
+  if (/nao iniciada/.test(t)) return 'nao_iniciada';
+  if (/\bconcluid[ao]\b|\bfeita\b/.test(t)) return 'concluida';
+  if (/rodando|em andamento|iniciada/.test(t)) return 'rodando';
+  return undefined;
+};
+
+// card aberto no painel: cabeçalho (código, abertura, tipo, prazo de resposta, ritmo) e a lista de etapas.
+// Imagem: "1 - , não iniciada" numa linha e "Nome da etapa — ninguém — v Start" na seguinte.
+function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
+{
+  const lido = texto.match(new RegExp(`\\b${opcoes.prefixo}-[0-9A-Z]{2,4}\\b`))?.[0];
+  if (!lido) return [];
+  const card: CardSnapshot = { codigo: corrigirCodigo(lido, opcoes.prefixo).codigo, responsaveis: [], origens: ['card'] };
+  const abertura = texto.match(/abertura[\s\S]*?(\d{2}\/\d{2}\/\d{4})/i);
+  if (abertura) card.abertura = lerDatas(abertura[1]!).datas[0]!;
+  const prazo = texto.match(/prazo de resposta[\s\S]*?(\d{2}\/\d{2}\/\d{4})/i);
+  if (prazo) card.vencimento = lerDatas(prazo[1]!).datas[0]!;
+  const tipo = texto.match(RE_TIPO)?.[0];
+  if (tipo) card.sistema = tipo;
+  const ritmo = ritmos.find(([r]) => r.test(texto.slice(texto.search(/prazo consumido/i))))?.[1];
+  if (ritmo && /prazo consumido/i.test(texto)) card.ritmoPainel = ritmo;
+
+  const etapas: EtapaCard[] = [];
+  let pendente = '';
+  for (const linha of texto.split(/\r?\n/))
+  {
+    const celulas = linha.split('\t').map((c) => c.trim());
+    // texto com tabulação: "1  Nome  pessoa  situação"
+    if (celulas.length >= 3 && /^\d+$/.test(celulas[0]!))
+    {
+      const pessoa = opcoes.pessoas.find((p) => semAcento(celulas[2]!).includes(semAcento(p.nome)));
+      etapas.push({ ordem: etapas.length + 1, nome: celulas[1]!, pessoa: pessoa?.id, situacao: situacaoEtapa(celulas.slice(2).join(' ')) ?? 'outra' });
+      continue;
+    }
+    const m = linha.match(/^\s*(.+?)\s+(?:[—–-]+\s*ningu[eé]m\s*[—–-]+|(\p{Lu}\p{Ll}+(?: \p{Lu}\p{Ll}+)+))\s+v\b/u);
+    if (m && !/^(etapa|responsavel)/i.test(semAcento(m[1]!)))
+    {
+      const pessoa = m[2] ? opcoes.pessoas.find((p) => semAcento(p.nome) === semAcento(m[2]!)) : undefined;
+      etapas.push({ ordem: etapas.length + 1, nome: m[1]!.trim(), pessoa: pessoa?.id ?? m[2], situacao: situacaoEtapa(pendente) ?? situacaoEtapa(linha) ?? 'outra' });
+      pendente = '';
+    }
+    else pendente += ` ${linha}`;
+  }
+  if (etapas.length)
+  {
+    card.etapas = etapas;
+    card.etapasTotal = etapas.length;
+    card.etapasConcluidas = etapas.filter((e) => e.situacao === 'concluida').length;
+    const atual = etapas.find((e) => e.situacao === 'rodando') ?? etapas.find((e) => e.situacao !== 'concluida');
+    if (atual)
+    {
+      card.etapaAtual = atual.nome;
+      card.etapaAtualStatus = atual.situacao === 'rodando' ? 'rodando' : 'aguardando_start';
+      if (atual.pessoa)
+      {
+        card.responsavelEtapaAtual = atual.pessoa;
+        card.responsaveis = [atual.pessoa];
+      }
+    }
+  }
+  card.avisosLeitura = etapas.length ? [] : ['sem etapas'];
+  return [card];
 }
 
 // a imagem lê 0 como O: DEV-O080 -> DEV-080
