@@ -1,6 +1,6 @@
 import
 {
-  dicionarioPadrao, pessoasExemplo, type Bloco, type ControleCard, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type Risco, type Snapshot,
+  dicionarioPadrao, pessoasExemplo, type Bloco, type ControleCard, type Lista, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type Risco, type Snapshot,
 } from '@supervisao/core';
 import { agendarEnvio, iniciarNuvem, marcarLocal } from './nuvem.svelte.ts';
 
@@ -46,11 +46,13 @@ export interface Dados
   // modelos criados pela supervisora; os prontos ficam no core
   modelos: Modelo[];
   ultimoModelo: string;
+  // listas de checagem (ex.: teste de agendamentos por empresa)
+  listas: Lista[];
 }
 
 function padrao(): Dados
 {
-  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal' };
+  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [] };
 }
 
 function lerLocal(): Dados

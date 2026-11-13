@@ -1,7 +1,7 @@
 <script lang="ts">
   import
   {
-    acoesDeHoje, aplicarControle, historico, linhaDoTempo, resumoDoFluxo, ritmoPorPessoa, segundaDaSemana, serieSemanal, somarDias, textoProjecao,
+    acoesDeHoje, aplicarControle, historico, linhaDoTempo, progressoDaLista, resumoDoFluxo, ritmoPorPessoa, segundaDaSemana, serieSemanal, somarDias, textoProjecao,
     type Destino, type Evento, type TotaisPainel,
   } from '@supervisao/core';
   import { carregar, exportarJson, importarJson, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
@@ -257,6 +257,17 @@
           <p class="dica">{promessasDaSemana.length ? 'Todos os compromissos da semana têm situação.' : 'Nenhum compromisso registrado nesta semana.'}</p>
         {/each}
         <a class="link-secao" href="/semana">ver na semana</a>
+      </section>
+
+      <section class="cartao">
+        <h2>Listas</h2>
+        {#each dados.listas as l (l.id)}
+          {@const pr = progressoDaLista(l)}
+          <p class="compromisso">{l.nome} <span class="dica">{pr.concluidos} de {pr.total} concluídos ({pr.pct}%)</span></p>
+        {:else}
+          <p class="dica">Checklists suas, como o teste de agendamentos por empresa.</p>
+        {/each}
+        <a class="link-secao" href="/listas">{dados.listas.length ? 'abrir listas' : 'criar uma lista'}</a>
       </section>
     </div>
   </div>
