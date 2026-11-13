@@ -2,7 +2,7 @@
   import { nomesSecoes, nomesTotais, type Bloco, type SecaoPadrao, type TotaisPainel } from '@supervisao/core';
   import { rotuloBloco } from './modelos.ts';
 
-  let { blocos, onmudar }: { blocos: Bloco[]; onmudar: (novos: Bloco[]) => void } = $props();
+  let { blocos, onmudar, listas = [] }: { blocos: Bloco[]; onmudar: (novos: Bloco[]) => void; listas?: { id: string; nome: string }[] } = $props();
 
   const indicadores = Object.entries(nomesTotais) as [keyof TotaisPainel, string][];
   const secoesFora = $derived((Object.keys(nomesSecoes) as SecaoPadrao[]).filter((s) => !blocos.some((b) => b.tipo === 'secao' && b.secao === s)));
@@ -48,7 +48,7 @@
     <li class={b.tipo}>
       <div class="linha">
         <span class="n">{i + 1}</span>
-        {#if b.tipo === 'texto' || b.tipo === 'grafico' || b.tipo === 'tabela'}
+        {#if b.tipo === 'texto' || b.tipo === 'grafico' || b.tipo === 'tabela' || b.tipo === 'lista'}
           <button class="nome editavel" onclick={() => (aberto = aberto === i ? undefined : i)}>{rotuloBloco(b)} <small>{aberto === i ? 'fechar' : 'editar'}</small></button>
         {:else}
           <span class="nome">{rotuloBloco(b)}</span>
@@ -70,6 +70,15 @@
             </label>
             <label>Legenda (opcional) <input value={b.titulo ?? ''} oninput={(e) => mudar(i, { ...b, titulo: e.currentTarget.value || undefined })} /></label>
             <label class="marca"><input type="checkbox" checked={!!b.comMeta} onchange={(e) => mudar(i, { ...b, comMeta: e.currentTarget.checked })} /> mostrar a meta do painel</label>
+          {:else if b.tipo === 'lista'}
+            <label>Lista
+              <select value={b.listaId ?? ''} onchange={(e) => mudar(i, { ...b, listaId: e.currentTarget.value || undefined })}>
+                <option value="">Todas as listas</option>
+                {#each listas as l (l.id)}<option value={l.id}>{l.nome}</option>{/each}
+              </select>
+            </label>
+            <label>Título (opcional) <input value={b.titulo ?? ''} oninput={(e) => mudar(i, { ...b, titulo: e.currentTarget.value || undefined })} /></label>
+            <label class="marca"><input type="checkbox" checked={b.comDiario !== false} onchange={(e) => mudar(i, { ...b, comDiario: e.currentTarget.checked })} /> incluir o diário do período</label>
           {:else if b.tipo === 'tabela'}
             <label>Legenda (opcional) <input value={b.titulo ?? ''} oninput={(e) => mudar(i, { ...b, titulo: e.currentTarget.value || undefined })} /></label>
             <div class="indicadores">
@@ -91,6 +100,7 @@
   <button onclick={() => adicionar({ tipo: 'grafico', indicador: 'dentroDoPrazoPct', comMeta: true })}>+ Gráfico</button>
   <button onclick={() => adicionar({ tipo: 'tabela', indicadores: ['dentroDoPrazoPct', 'concluidos'] })}>+ Tabela</button>
   <button onclick={() => adicionar({ tipo: 'quebra' })}>+ Quebra de página</button>
+  <button onclick={() => adicionar({ tipo: 'lista', comDiario: true })}>+ Lista de checagem</button>
   {#if secoesFora.length}
     <select value="" onchange={(e) => { const s = e.currentTarget.value as SecaoPadrao; e.currentTarget.value = ''; if (s) adicionar({ tipo: 'secao', secao: s }); }}>
       <option value="">+ Seção pronta...</option>

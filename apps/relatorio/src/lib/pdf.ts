@@ -2,7 +2,7 @@ import pdfMake from 'pdfmake/build/pdfmake';
 import type { Content, CustomTableLayout, TableCell, TDocumentDefinitions } from 'pdfmake/interfaces';
 import
 {
-  aplicarControle, estatisticasDoPlano, kpisDosItens, lerDicionario, mapaDeDores, mapaDeFrentes, nomesSecoes, nomesTotais, posicaoNaFaixa,
+  aplicarControle, diarioDoPeriodo, estatisticasDoPlano, itensDaFase, kpisDosItens, pendenciasPorEtapa, progressoDosItens, situacaoDaFase, lerDicionario, mapaDeDores, mapaDeFrentes, nomesSecoes, nomesTotais, posicaoNaFaixa,
   resumirSerie, resumoDoFluxo, ritmoPorPessoa, segundaDaSemana, semanaDoAno, serieSemanal, somarDias, textoProjecao,
   type Bloco, type CorSemaforo, type ItemPlano, type Modelo, type ResumoSerie, type Ritmo, type SecaoPadrao, type Tendencia, type TotaisPainel,
 } from '@supervisao/core';
@@ -873,9 +873,94 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
   },
   };
 
+  // bloco de lista de checagem: andamento por fase, pendências, travados e o diário do período do relatório
+  function desenharLista(b: Extract<Bloco, { tipo: 'lista' }>)
+  {
+    const listas = dados.listas.filter((l) => !b.listaId || l.id === b.listaId);
+    if (!listas.length)
+    {
+      conteudo.push(h1(b.titulo || 'Listas de checagem'));
+      conteudo.push(p('Nenhuma lista de checagem registrada.'));
+      return;
+    }
+    const nomesSituacaoFase = { concluida: 'concluída', em_execucao: 'em execução', prevista: 'prevista', atrasada: 'atrasada' } as const;
+    const corSituacaoFase = { concluida: cores.verde, em_execucao: cores.amarelo, prevista: cores.suave, atrasada: cores.vermelho } as const;
+    for (const l of listas)
+    {
+      const pr = progressoDosItens(l, l.itens);
+      conteudo.push(h1(b.titulo && listas.length === 1 ? b.titulo : l.nome));
+      if (l.descricao) conteudo.push(p(l.descricao));
+      conteudo.push(p(`${pr.concluidos} de ${pr.total} itens concluídos (${pr.pct}%)${pr.cnpjs ? `, ${pr.cnpjsConcluidos} de ${pr.cnpjs} CNPJs` : ''}; ${pr.emAndamento} em andamento, ${pr.travados} ${pr.travados === 1 ? 'travado' : 'travados'} e ${pr.naoIniciados} ${pr.naoIniciados === 1 ? 'não iniciado' : 'não iniciados'}. Etapas que não se aplicam ficam fora da conta.`));
+
+      const grupos = [...l.fases.map((f) => ({ fase: f, itens: itensDaFase(l, f.id) })), { fase: undefined, itens: itensDaFase(l, undefined) }].filter((g) => g.fase || g.itens.length);
+      if (l.fases.length)
+      {
+        conteudo.push(h2('Andamento por fase'));
+        conteudo.push(tabela('Itens e CNPJs concluídos por fase', ['Fase', 'Data', 'Situação', 'Itens', 'CNPJs', '%'], grupos.map(({ fase, itens }) =>
+        {
+          const pf = progressoDosItens(l, itens);
+          const sf = fase ? situacaoDaFase(l, fase, ctx.fim) : undefined;
+          return [
+            { text: fase?.nome ?? 'Sem fase', bold: true },
+            { text: dataMedia(fase?.data), font: 'Maquina' },
+            sf ? marcador(nomesSituacaoFase[sf], corSituacaoFase[sf]) : '-',
+            direita(`${pf.concluidos}/${pf.total}`),
+            direita(pf.cnpjs ? `${pf.cnpjsConcluidos}/${pf.cnpjs}` : '-'),
+            direita(`${pf.pct}%`, { bold: true }),
+          ];
+        }), ['*', 60, 80, 50, 50, 40], 'listas de checagem da supervisão'));
+      }
+
+      const pendencias = pendenciasPorEtapa(l).filter((x) => x.pendentes.length || x.travados.length);
+      if (pendencias.length)
+      {
+        conteudo.push(h2('Pendências por etapa'));
+        conteudo.push(tabela('Itens que ainda faltam em cada etapa', ['Etapa', 'Faltam', 'Travados', 'Quem falta'], pendencias.map((x) => [
+          { text: x.etapa.nome, bold: true },
+          direita(num(x.pendentes.length)),
+          direita(num(x.travados.length), x.travados.length ? { color: cores.vermelho, bold: true } : {}),
+          pequeno(x.pendentes.slice(0, 8).map((i) => i.nome).join(', ') + (x.pendentes.length > 8 ? ` e mais ${x.pendentes.length - 8}` : '')),
+        ]), [90, 40, 46, '*'], 'listas de checagem da supervisão'));
+      }
+
+      const travados = l.itens.flatMap((i) => l.etapas.filter((e) => i.marcas[e.id]?.estado === 'travado').map((e) => ({ i, e, m: i.marcas[e.id]! })));
+      if (travados.length)
+      {
+        conteudo.push(h2('O que está travado'));
+        conteudo.push(tabela('Etapas travadas e o motivo', ['Item', 'Etapa', 'Motivo', 'Desde'], travados.map(({ i, e, m }) => [
+          { text: i.nome, bold: true },
+          e.nome,
+          m.motivo ?? '-',
+          { text: dataMedia(m.em), font: 'Maquina' },
+        ]), [130, 70, '*', 50], 'listas de checagem da supervisão'));
+      }
+
+      if (b.comDiario !== false)
+      {
+        const diario = diarioDoPeriodo([l], atual.inicio, ctx.fim).reverse();
+        const feitas = diario.filter((r) => r.tipo === 'feito').length;
+        conteudo.push(h2(livre ? 'Diário do período' : 'Diário da semana'));
+        conteudo.push(p(diario.length ? `${diario.length} registros de ${dataMedia(atual.inicio)} a ${dataMedia(ctx.fim)}, com ${feitas} ${feitas === 1 ? 'etapa concluída' : 'etapas concluídas'}.` : 'Nenhum registro no período.'));
+        if (diario.length)
+        {
+          const nomesTipo = { nota: 'anotação', feito: 'feito', nao_se_aplica: 'não se aplica', travado: 'travado', desfeito: 'desmarcado', moveu: 'mudou de fase' } as const;
+          const corTipo = { nota: cores.tinta, feito: cores.verde, nao_se_aplica: cores.suave, travado: cores.vermelho, desfeito: cores.suave, moveu: cores.amarelo } as const;
+          conteudo.push(tabela('Registros do diário', ['Quando', 'Item / etapa', 'O que', 'Anotação'], diario.slice(0, 120).map((r) => [
+            { text: `${dataCurta(r.quando)} ${r.quando.slice(11, 16)}`, font: 'Maquina' },
+            { stack: [r.item ?? 'geral', pequeno(r.etapa)] },
+            marcador(nomesTipo[r.tipo], corTipo[r.tipo]),
+            r.tipo === 'moveu' ? `para ${r.texto.replace(/^para /, '')}` : r.texto || '-',
+          ]), [62, 120, 70, '*'], 'diário da supervisão'));
+          if (diario.length > 120) conteudo.push(p(`Mais ${diario.length - 120} registros ficaram fora da tabela.`));
+        }
+      }
+    }
+  }
+
   for (const b of blocos)
   {
     if (b.tipo === 'secao') desenhar[b.secao]();
+    else if (b.tipo === 'lista') desenharLista(b);
     else if (b.tipo === 'quebra') conteudo.push({ text: '', pageBreak: 'before' });
     else if (b.tipo === 'texto')
     {

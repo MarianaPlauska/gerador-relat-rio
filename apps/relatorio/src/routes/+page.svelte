@@ -37,6 +37,7 @@
     riscos: dados.riscos,
     promessasDaSemana,
     promessasAnteriores: ctx.promessasAnteriores,
+    listas: dados.listas,
   }));
   const fluxo = $derived(resumoDoFluxo(ctx.atual.foto?.cards ?? [], ctx.atual.foto?.data ?? dia, serieSemanal(fotosAteSemana, 'dentroDoPrazoPct', semana), ctx.meta));
   const nomePessoa = (id: string) => dados.pessoas.find((p) => p.id === id)?.nome.split(' ')[0] ?? id;
@@ -59,7 +60,7 @@
     return { nome, data, rotina: rotinaDia[i]!, hoje: data === dia, passou: data < dia, foto: dados.fotos.some((f) => f.data === data) };
   }));
 
-  const rotas: Record<Destino, string> = { painel: '/painel', semana: '/semana', cards: '/cards', relatorio: '/relatorio' };
+  const rotas: Record<Destino, string> = { painel: '/painel', semana: '/semana', cards: '/cards', relatorio: '/relatorio', listas: '/listas' };
   const iconeEvento: Record<Evento['tipo'], string> = {
     foto: '[foto]', etapa: '[etapa]', previsao: '[previsão]', ritmo: '[ritmo]', entrou: '[entrou]', saiu: '[saiu]', plano: '[plano]', entrega: '[entrega]', risco: '[risco]',
   };

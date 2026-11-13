@@ -1,13 +1,13 @@
 <script lang="ts">
   import
   {
-    alertasDoPlano, confirmarPlano, horasPlanejadas, kpisDosItens, pendenciasDaSemana, segundaDaSemana, somarDias, sugerirItens,
+    agoraLocal, alertasDoPlano, confirmarPlano, horasPlanejadas, kpisDosItens, pendenciasDaSemana, segundaDaSemana, somarDias, sugerirItens,
     type Alerta, type CardSnapshot, type ItemPlano, type PlanoPessoa, type PlanoSemana, type Ritmo, type Risco,
   } from '@supervisao/core';
   import { carregar, salvar, type Dados } from '#lib/armazenamento.ts';
 
   let dados = $state<Dados>(carregar());
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = agoraLocal().slice(0, 10);
   let semana = $state(segundaDaSemana(hoje));
 
   $effect(() => salvar($state.snapshot(dados)));

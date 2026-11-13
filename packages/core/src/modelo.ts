@@ -48,7 +48,9 @@ export type Bloco =
   | { tipo: 'texto'; titulo: string; texto: string }
   | { tipo: 'grafico'; indicador: keyof TotaisPainel; titulo?: string | undefined; comMeta?: boolean | undefined }
   | { tipo: 'tabela'; indicadores: (keyof TotaisPainel)[]; titulo?: string | undefined }
-  | { tipo: 'quebra' };
+  | { tipo: 'quebra' }
+  // lista de checagem: progresso por fase, pendências, o que andou no período e o diário; sem listaId, todas as listas
+  | { tipo: 'lista'; listaId?: string | undefined; titulo?: string | undefined; comDiario?: boolean | undefined };
 
 export interface Modelo
 {
@@ -105,6 +107,17 @@ export const modelosProntos: Modelo[] = [
     sumario: true,
     blocos: secoes('resumo', 'apresentacao', 'comparativo', 'ondas', 'fluxo', 'estatistica', 'execucao', 'time', 'analise', 'riscos', 'compromissos', 'notas', 'glossario'),
   },
+  {
+    id: 'diario',
+    nome: 'Diário de implantação',
+    descricao: 'Do dia X ao dia Y: andamento das listas de checagem por fase, o que foi feito, o que travou e as anotações do período.',
+    titulo: 'Diário de Implantação',
+    sigla: 'RD',
+    periodo: 'livre',
+    capa: 'curta',
+    sumario: false,
+    blocos: [{ tipo: 'lista', comDiario: true }],
+  },
 ];
 
 const ehTexto = (v: unknown): v is string => typeof v === 'string';
@@ -138,6 +151,8 @@ function lerBloco(b: unknown, posicao: number, erros: string[]): Bloco | undefin
     }
     case 'quebra':
       return { tipo: 'quebra' };
+    case 'lista':
+      return { tipo: 'lista', listaId: ehTexto(o.listaId) ? o.listaId : undefined, titulo: ehTexto(o.titulo) ? o.titulo : undefined, comDiario: o.comDiario !== false };
     default:
       erros.push(`${onde}: tipo "${String(o.tipo)}" não existe.`);
       return undefined;
@@ -203,6 +218,7 @@ export function pedidoDeModelo(descricao: string): string
     '- {"tipo": "grafico", "indicador": "<indicador>", "titulo": "...", "comMeta": true}: gráfico de linha do indicador semana a semana; comMeta mostra a meta do painel',
     '- {"tipo": "tabela", "indicadores": ["<indicador>", ...], "titulo": "..."}: tabela anterior x atual x variação',
     '- {"tipo": "quebra"}: começa uma página nova',
+    '- {"tipo": "lista", "titulo": "...", "comDiario": true}: listas de checagem da supervisora (implantação por empresa): progresso por fase, pendências por etapa, o que andou no período e o diário de anotações',
     '',
     '## Seções prontas',
     ...(Object.keys(nomesSecoes) as SecaoPadrao[]).map((s) => `- ${s}: ${nomesSecoes[s]} (${descricoesSecoes[s]})`),

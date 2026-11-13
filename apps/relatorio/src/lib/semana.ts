@@ -1,11 +1,12 @@
 import
 {
-  alertasDoPlano, analisarSemana, compararSemanas, definicoesPadrao, fotoDaSemana, planoDoPeriodo, segundaDaSemana, semaforoPrazo, somarDias,
+  agoraLocal, alertasDoPlano, analisarSemana, compararSemanas, definicoesPadrao, fotoDaSemana, planoDoPeriodo, segundaDaSemana, semaforoPrazo, somarDias,
   type CorSemaforo, type DadosSemana,
 } from '@supervisao/core';
 import type { Dados, NotasRelatorio } from './armazenamento.ts';
 
-export const hoje = () => new Date().toISOString().slice(0, 10);
+// data local: em UTC, depois das 21h o app já achava que era o dia seguinte
+export const hoje = () => agoraLocal().slice(0, 10);
 
 export function semanasDisponiveis(dados: Dados): string[]
 {

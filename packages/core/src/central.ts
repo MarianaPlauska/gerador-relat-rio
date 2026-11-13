@@ -1,13 +1,14 @@
 import { diasUteisEntre, somarDias } from './datas';
 import type { Frase } from './analise';
 import { vencendoEm48h } from './fluxo';
+import { avisosDeFase, type Lista } from './checklist';
 import type { Alerta, KpisSemana } from './plano';
 import type { CorSemaforo, Pessoa, PlanoSemana, Promessa, Risco, Snapshot, TotaisPainel } from './tipos';
 
 const dataCurta = (iso?: string) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : '-');
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
-export type Destino = 'painel' | 'semana' | 'cards' | 'relatorio';
+export type Destino = 'painel' | 'semana' | 'cards' | 'relatorio' | 'listas';
 
 export interface AcaoHoje
 {
@@ -27,6 +28,7 @@ export interface EntradaHoje
   promessasDaSemana: Promessa[];
   promessasAnteriores: Promessa[];
   feriados?: string[];
+  listas?: Lista[];
 }
 
 // o que a supervisora precisa fazer agora, por regras simples
@@ -54,6 +56,12 @@ export function acoesDeHoje(e: EntradaHoje): AcaoHoje[]
   {
     const lista = vencendo.slice(0, 4).map((v) => `${v.card.codigo} (${dataCurta(v.data)})`).join(', ');
     acoes.push({ nivel: 'alto', texto: `${plural(vencendo.length, 'card vence', 'cards vencem')} em até 2 dias úteis: ${lista}${vencendo.length > 4 ? ' e mais ' + (vencendo.length - 4) : ''}.`, destino: 'cards' });
+  }
+
+  // fase de lista de checagem na data (ou perto dela) com empresas pendentes
+  for (const a of avisosDeFase(e.listas ?? [], e.hoje, feriados))
+  {
+    acoes.push({ nivel: a.nivel, texto: `${a.lista}, ${a.fase}: ${plural(a.pendentes, 'item pendente', 'itens pendentes')} ${a.nivel === 'alto' ? `e a data era ${dataCurta(a.data)}` : `para ${dataCurta(a.data)}`}.`, destino: 'listas' });
   }
 
   if (!e.plano)

@@ -138,7 +138,7 @@
             <label class="marca"><input type="checkbox" checked={atual.sumario} onchange={(e) => mudar('sumario', e.currentTarget.checked)} /> com sumário</label>
           </div>
           <h3>Blocos</h3>
-          <ListaDeBlocos blocos={atual.blocos} onmudar={(novos: Bloco[]) => mudar('blocos', novos)} />
+          <ListaDeBlocos listas={dados.listas} blocos={atual.blocos} onmudar={(novos: Bloco[]) => mudar('blocos', novos)} />
           <p class="dica resumo">{atual.blocos.map(rotuloBloco).join(' > ')}</p>
         </div>
       {/if}

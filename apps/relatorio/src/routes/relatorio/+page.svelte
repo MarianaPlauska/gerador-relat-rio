@@ -195,7 +195,7 @@
         {#if mexido}<button class="link" onclick={voltarAoModelo}>voltar ao modelo</button>{/if}
       </div>
       <p class="dica">O PDF segue esta ordem. Adicione texto, gráfico ou tabela em qualquer ponto e suba ou desça. Mexer aqui não muda o modelo.</p>
-      <ListaDeBlocos {blocos} onmudar={mudarBlocos} />
+      <ListaDeBlocos listas={dados.listas} {blocos} onmudar={mudarBlocos} />
       <button class="link salvar-modelo" onclick={salvarComoModelo}>salvar estes blocos como modelo novo</button>
     </div>
 

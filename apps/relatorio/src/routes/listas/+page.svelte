@@ -1,65 +1,161 @@
 <script lang="ts">
-  import { idCurto, itensDoTexto, modelosDeLista, novaLista, progressoDaLista, situacaoDoItem, type ItemLista, type Lista, type SituacaoItem } from '@supervisao/core';
+  import
+  {
+    anotar, diarioDoPeriodo, idCurto, importarPlanilha, itensDaFase, itensDoTexto, linhasDoTexto, marcarEtapa, mensagemDoDia, modelosDeLista, moverParaFase,
+    nomeSituacao, novaLista, previaDaPlanilha, progressoDosItens, situacaoDaFase, situacaoDoItem, textoDaLinha,
+    type EstadoEtapa, type FaseLista, type ItemLista, type Lista, type SituacaoItem,
+  } from '@supervisao/core';
+  import { SvelteSet } from 'svelte/reactivity';
+  import { goto } from '$app/navigation';
   import { carregar, salvar, type Dados } from '#lib/armazenamento.ts';
   import { lerImagem } from '#lib/ocr.ts';
-  import { dataMedia, hoje } from '#lib/semana.ts';
+  import { baixarCsv, lerArquivoPlanilha } from '#lib/planilha.ts';
+  import { copiar } from '#lib/saidas.ts';
+  import { dataCurta, dataMedia, hoje } from '#lib/semana.ts';
 
   let dados = $state<Dados>(carregar());
   $effect(() => salvar($state.snapshot(dados)));
 
+  const dia = hoje();
   let atualId = $state(dados.listas[0]?.id);
+  let aba = $state<'lista' | 'diario'>('lista');
   let criando = $state(!dados.listas.length);
   let nomeNova = $state('');
   let etapasNova = $state('');
-  let colado = $state('');
-  let lendo = $state<number | null>(null);
+  let fasesNova = $state('');
+  let editando = $state(false);
+
   let busca = $state('');
   let filtro = $state<'todas' | 'pendentes' | SituacaoItem>('todas');
   let marcadorFiltro = $state('');
-  let aberto = $state<string | undefined>();
-  let editandoEtapas = $state(false);
+  let faltaEtapa = $state('');
+  const abertos = new SvelteSet<string>();
+  const recolhidas = new SvelteSet<string>();
+  const selecionados = new SvelteSet<string>();
+  let acaoEtapa = $state('');
+  let acaoEstado = $state<EstadoEtapa>('feito');
+  let acaoFase = $state('');
+
+  let menu = $state<{ itemId: string; etapaId: string } | undefined>();
+  let motivo = $state('');
+  let ultima = $state<{ registroId: string; rotulo: string } | undefined>();
+  let notaRapida = $state('');
+  let novaNotaItem = $state('');
+
+  let colado = $state('');
+  let faseDosNovos = $state('');
+  let lendo = $state<number | null>(null);
+  let planilha = $state<string[][] | undefined>();
+  let avisoImport = $state('');
+
+  let deDiario = $state(dia);
+  let ateDiario = $state(dia);
+  let todasNoDiario = $state(true);
+  let notaGeral = $state('');
+  let copiado = $state(false);
 
   const lista = $derived(dados.listas.find((l) => l.id === atualId));
-  const progresso = $derived(lista ? progressoDaLista(lista) : undefined);
+  const progresso = $derived(lista ? progressoDosItens(lista, lista.itens) : undefined);
   const marcadores = $derived(lista ? [...new Set(lista.itens.map((i) => i.marcador).filter((m): m is string => !!m))].sort() : []);
-  const visiveis = $derived(!lista ? [] : lista.itens.filter((i) =>
+  const previa = $derived(lista && planilha ? previaDaPlanilha(planilha, lista) : undefined);
+  const diario = $derived(diarioDoPeriodo(todasNoDiario || !lista ? dados.listas : [lista], deDiario, ateDiario));
+  const diarioPorDia = $derived(Object.entries(diario.reduce<Record<string, typeof diario>>((m, r) => ((m[r.quando.slice(0, 10)] ??= []).push(r), m), {})));
+
+  // fases na ordem, mais o grupo "sem fase" quando houver item sem fase
+  const grupos = $derived(!lista ? [] : [
+    ...lista.fases.map((f) => ({ fase: f as FaseLista | undefined, id: f.id })),
+    ...(lista.itens.some((i) => !i.faseId || !lista.fases.some((f) => f.id === i.faseId)) || !lista.fases.length ? [{ fase: undefined, id: 'sem-fase' }] : []),
+  ]);
+  const faseDeHoje = $derived(lista?.fases.find((f) => { const s = situacaoDaFase(lista, f, dia); return s === 'em_execucao' || s === 'atrasada' || s === 'prevista'; })?.id);
+
+  function itensDoGrupo(l: Lista, fase: FaseLista | undefined): ItemLista[]
   {
-    const s = situacaoDoItem(lista, i).situacao;
-    if (filtro === 'pendentes' ? s === 'concluido' : filtro !== 'todas' && s !== filtro) return false;
-    if (marcadorFiltro && i.marcador !== marcadorFiltro) return false;
-    return !busca || `${i.nome} ${i.notas}`.toLowerCase().includes(busca.toLowerCase());
-  }));
-  const nomesSituacao: Record<SituacaoItem, string> = { nao_iniciado: 'Não iniciado', em_andamento: 'Em andamento', concluido: 'Concluído' };
+    const base = fase ? itensDaFase(l, fase.id) : l.itens.filter((i) => !i.faseId || !l.fases.some((f) => f.id === i.faseId));
+    return base.filter((i) =>
+    {
+      const s = situacaoDoItem(l, i).situacao;
+      if (filtro === 'pendentes' ? s === 'concluido' : filtro !== 'todas' && s !== filtro) return false;
+      if (marcadorFiltro && i.marcador !== marcadorFiltro) return false;
+      if (faltaEtapa && i.marcas[faltaEtapa]) return false;
+      return !busca || `${i.nome} ${i.notas} ${i.responsavel ?? ''}`.toLowerCase().includes(busca.toLowerCase());
+    });
+  }
+
+  const nomesFase = { concluida: 'Concluída', em_execucao: 'Em execução', prevista: 'Prevista', atrasada: 'Atrasada' };
+  const nomesEstado: Record<EstadoEtapa, string> = { feito: 'Feito', nao_se_aplica: 'Não se aplica', travado: 'Travado' };
 
   function usarModelo(m: (typeof modelosDeLista)[number])
   {
     nomeNova = m.nome;
     etapasNova = m.etapas.join('\n');
+    fasesNova = (m.fases ?? []).join('\n');
   }
 
   function criar()
   {
-    const l = novaLista(nomeNova.trim() || 'Nova lista', etapasNova.split('\n'), modelosDeLista.find((m) => m.nome === nomeNova.trim())?.descricao ?? '', hoje());
+    const modelo = modelosDeLista.find((m) => m.nome === nomeNova.trim());
+    const l = novaLista(nomeNova.trim() || 'Nova lista', etapasNova.split('\n'), modelo?.descricao ?? '', dia, fasesNova.split('\n').map((f) => f.trim()).filter(Boolean));
     dados.listas.push(l);
     atualId = l.id;
     criando = false;
-    nomeNova = '';
-    etapasNova = '';
+    aba = 'lista';
+    nomeNova = etapasNova = fasesNova = '';
   }
 
   function excluirLista(l: Lista)
   {
-    if (!confirm(`Excluir a lista "${l.nome}" com ${l.itens.length} itens e as anotações?`)) return;
+    if (!confirm(`Excluir a lista "${l.nome}" com ${l.itens.length} itens, o diário e as anotações?`)) return;
     dados.listas = dados.listas.filter((x) => x.id !== l.id);
     atualId = dados.listas[0]?.id;
     criando = !dados.listas.length;
   }
 
-  function adicionar()
+  // clique: marca ou desmarca "feito"; botão direito: as outras situações
+  function clicar(l: Lista, item: ItemLista, etapaId: string)
   {
-    if (!lista) return;
-    lista.itens.push(...itensDoTexto(colado, lista.itens.map((i) => i.nome), hoje()));
+    const feito = item.marcas[etapaId]?.estado === 'feito';
+    const r = marcarEtapa(l, item, etapaId, feito ? undefined : 'feito');
+    if (feito) return;
+    ultima = { registroId: r.id, rotulo: `${item.nome} / ${l.etapas.find((e) => e.id === etapaId)?.nome}` };
+    notaRapida = '';
+  }
+
+  function abrirMenu(e: MouseEvent, item: ItemLista, etapaId: string)
+  {
+    e.preventDefault();
+    menu = { itemId: item.id, etapaId };
+    motivo = item.marcas[etapaId]?.motivo ?? '';
+  }
+
+  function escolher(l: Lista, item: ItemLista, etapaId: string, estado: EstadoEtapa | undefined)
+  {
+    marcarEtapa(l, item, etapaId, estado, motivo.trim());
+    menu = undefined;
+  }
+
+  function salvarNotaRapida()
+  {
+    const r = lista?.diario.find((x) => x.id === ultima?.registroId);
+    if (r && notaRapida.trim()) r.texto = notaRapida.trim();
+    ultima = undefined;
+  }
+
+  function aplicarEmMassa(l: Lista)
+  {
+    const itens = l.itens.filter((i) => selecionados.has(i.id));
+    if (acaoEtapa) for (const i of itens) marcarEtapa(l, i, acaoEtapa, acaoEstado);
+    if (acaoFase) moverParaFase(l, itens, acaoFase === 'sem-fase' ? undefined : acaoFase);
+    selecionados.clear();
+    acaoEtapa = acaoFase = '';
+  }
+
+  function adicionar(l: Lista)
+  {
+    const novos = itensDoTexto(colado, l.itens.map((i) => i.nome), dia);
+    for (const i of novos) i.faseId = faseDosNovos || undefined;
+    l.itens.push(...novos);
     colado = '';
+    avisoImport = `${novos.length} itens adicionados.`;
   }
 
   async function lerPrint(e: Event & { currentTarget: HTMLInputElement })
@@ -78,200 +174,480 @@
     }
   }
 
-  function marcar(item: ItemLista, etapaId: string)
+  async function lerArquivo(e: Event & { currentTarget: HTMLInputElement })
   {
-    if (item.feitas[etapaId]) delete item.feitas[etapaId];
-    else item.feitas[etapaId] = hoje();
-    item.atualizadoEm = hoje();
+    const arquivo = e.currentTarget.files?.[0];
+    e.currentTarget.value = '';
+    if (!arquivo) return;
+    try
+    {
+      planilha = await lerArquivoPlanilha(arquivo);
+    }
+    catch (erro)
+    {
+      avisoImport = `Não consegui ler o arquivo: ${erro}`;
+    }
   }
 
-  function marcarTodas(item: ItemLista)
+  function importar(l: Lista)
   {
-    if (!lista) return;
-    const tudo = situacaoDoItem(lista, item).situacao === 'concluido';
-    item.feitas = tudo ? {} : Object.fromEntries(lista.etapas.map((e) => [e.id, item.feitas[e.id] ?? hoje()]));
-    item.atualizadoEm = hoje();
+    if (!planilha) return;
+    const r = importarPlanilha(planilha, l);
+    avisoImport = `Importado: ${r.novos} novos, ${r.atualizados} atualizados${r.etapasNovas.length ? `, etapas novas: ${r.etapasNovas.join(', ')}` : ''}${r.fasesNovas.length ? `, fases novas: ${r.fasesNovas.join(', ')}` : ''}.`;
+    planilha = undefined;
   }
 
-  function removerItem(item: ItemLista)
-  {
-    if (!lista || !confirm(`Remover "${item.nome}" da lista?`)) return;
-    lista.itens = lista.itens.filter((i) => i.id !== item.id);
-  }
+  const rotuloCampo = (c: ReturnType<typeof previaDaPlanilha>['campos'][number]) =>
+    typeof c === 'object' ? `etapa ${c.etapa}` : { nome: 'nome', cnpjs: 'CNPJs', fase: 'fase', marcador: 'etiqueta', responsavel: 'responsável', notas: 'anotações', ignorar: 'ignorada' }[c];
 
-  function removerEtapa(id: string)
+  function moverEtapa(l: Lista, i: number, passo: number)
   {
-    if (!lista || !confirm('Remover esta etapa? As marcações dela somem de todos os itens.')) return;
-    lista.etapas = lista.etapas.filter((e) => e.id !== id);
-    for (const i of lista.itens) delete i.feitas[id];
-  }
-
-  function moverEtapa(i: number, passo: number)
-  {
-    if (!lista) return;
     const j = i + passo;
-    if (j < 0 || j >= lista.etapas.length) return;
-    [lista.etapas[i], lista.etapas[j]] = [lista.etapas[j]!, lista.etapas[i]!];
+    if (j < 0 || j >= l.etapas.length) return;
+    [l.etapas[i], l.etapas[j]] = [l.etapas[j]!, l.etapas[i]!];
+  }
+
+  function moverFase(l: Lista, i: number, passo: number)
+  {
+    const j = i + passo;
+    if (j < 0 || j >= l.fases.length) return;
+    [l.fases[i], l.fases[j]] = [l.fases[j]!, l.fases[i]!];
+  }
+
+  function removerEtapa(l: Lista, id: string)
+  {
+    if (!confirm('Remover esta etapa? As marcações dela somem de todos os itens.')) return;
+    l.etapas = l.etapas.filter((e) => e.id !== id);
+    for (const i of l.itens) delete i.marcas[id];
+  }
+
+  function removerFase(l: Lista, id: string)
+  {
+    if (!confirm('Remover esta fase? Os itens dela ficam sem fase.')) return;
+    l.fases = l.fases.filter((f) => f.id !== id);
+    for (const i of l.itens) if (i.faseId === id) i.faseId = undefined;
+  }
+
+  function removerItem(l: Lista, item: ItemLista)
+  {
+    if (!confirm(`Remover "${item.nome}" da lista?`)) return;
+    l.itens = l.itens.filter((i) => i.id !== item.id);
+    abertos.delete(item.id);
+  }
+
+  async function copiarTeams()
+  {
+    await copiar(mensagemDoDia(dados.listas, ateDiario));
+    copiado = true;
+    setTimeout(() => (copiado = false), 2000);
+  }
+
+  function pdfDoDiario()
+  {
+    dados.ultimoModelo = 'diario';
+    salvar($state.snapshot(dados));
+    goto('/relatorio');
   }
 </script>
 
+<svelte:window onclick={() => (menu = undefined)} onkeydown={(e) => e.key === 'Escape' && (menu = undefined)} />
+
 <main>
-  <span class="etiqueta">listas</span>
+  <span class="prompt">&gt; listas</span>
   <h1>Listas de checagem<span class="cursor">_</span></h1>
-  <p class="dica">Cada lista tem as suas etapas; cada linha (uma empresa, por exemplo) marca o que já foi feito e guarda o que você fez e por quê.</p>
+  <p class="dica">Fases com data, etapas suas, uma linha por empresa e um diário com tudo o que você marcou e anotou.</p>
 
   <nav class="abas">
     {#each dados.listas as l (l.id)}
-      <button class:ativa={l.id === atualId && !criando} onclick={() => { atualId = l.id; criando = false; aberto = undefined; }}>
-        {l.nome} <small>{progressoDaLista(l).concluidos}/{l.itens.length}</small>
+      {@const p = progressoDosItens(l, l.itens)}
+      <button class:ativa={l.id === atualId && !criando && aba === 'lista'} onclick={() => { atualId = l.id; criando = false; aba = 'lista'; }}>
+        {l.nome} <small>{p.concluidos}/{p.total}</small>
       </button>
     {/each}
     <button class="nova" class:ativa={criando} onclick={() => (criando = true)}>+ nova lista</button>
+    <button class="diario-aba" class:ativa={aba === 'diario' && !criando} onclick={() => { aba = 'diario'; criando = false; }}>diário</button>
   </nav>
 
   {#if criando}
     <section class="cartao">
       <h2>Nova lista</h2>
-      <div class="modelos">
+      <div class="linha">
         <span class="dica">Começar de um modelo:</span>
         {#each modelosDeLista as m (m.nome)}<button onclick={() => usarModelo(m)}>{m.nome}</button>{/each}
       </div>
-      <label>Nome <input bind:value={nomeNova} placeholder="Ex.: Teste de agendamentos" /></label>
-      <label>Etapas, uma por linha <textarea rows="5" bind:value={etapasNova} placeholder={'Verificar se há agendamentos\nBaixar a planilha\n...'}></textarea></label>
-      <button class="principal" disabled={!etapasNova.trim()} onclick={criar}>Criar lista</button>
+      <label>Nome <input bind:value={nomeNova} placeholder="Ex.: Implantação" /></label>
+      <div class="duas">
+        <label>Etapas, uma por linha <textarea rows="6" bind:value={etapasNova}></textarea></label>
+        <label>Fases, uma por linha (opcional) <textarea rows="6" bind:value={fasesNova} placeholder={'Fase 1\nFase 2'}></textarea></label>
+      </div>
+      <p class="dica">Também dá para criar só com o nome e importar a planilha depois: as colunas viram etapas e a coluna Fase cria as fases.</p>
+      <button class="principal" disabled={!nomeNova.trim()} onclick={criar}>Criar lista</button>
+    </section>
+  {:else if aba === 'diario'}
+    <section class="cartao">
+      <div class="cabeca">
+        <h2>Diário</h2>
+        <div class="linha">
+          <label class="inline">De <input type="date" bind:value={deDiario} /></label>
+          <label class="inline">Até <input type="date" bind:value={ateDiario} /></label>
+          {#if lista}<label class="marca"><input type="checkbox" bind:checked={todasNoDiario} /> todas as listas</label>{/if}
+        </div>
+      </div>
+      <div class="linha acoes-diario">
+        <button onclick={copiarTeams}>{copiado ? 'Copiado!' : `Copiar mensagem de ${dataCurta(ateDiario)} para o Teams`}</button>
+        <button onclick={pdfDoDiario}>Gerar PDF do diário</button>
+      </div>
+      {#if lista}
+        <div class="linha nota-geral">
+          <input bind:value={notaGeral} placeholder={`Anotação geral em ${lista.nome}`} onkeydown={(e) => { if (e.key === 'Enter' && notaGeral.trim()) { anotar(lista, notaGeral.trim()); notaGeral = ''; } }} />
+          <button disabled={!notaGeral.trim()} onclick={() => { anotar(lista, notaGeral.trim()); notaGeral = ''; }}>anotar</button>
+        </div>
+      {/if}
+      {#each diarioPorDia as [data, registros] (data)}
+        <div class="dia">
+          <span class="data maquina">{dataMedia(data)}</span>
+          <ul>
+            {#each registros as r (r.id)}
+              <li class={r.tipo}>
+                <span class="hora maquina">{r.quando.slice(11, 16)}</span>
+                {#if todasNoDiario && dados.listas.length > 1}<span class="de-lista">{r.lista}</span>{/if}
+                <span>{textoDaLinha(r)}</span>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {:else}
+        <p class="dica">Nada registrado no período. Marcar uma etapa ou anotar numa empresa já entra aqui.</p>
+      {/each}
     </section>
   {:else if lista && progresso}
     <section class="cartao">
       <div class="cabeca">
         <input class="titulo" bind:value={lista.nome} aria-label="Nome da lista" />
-        <div class="acoes">
-          <button class="link" onclick={() => (editandoEtapas = !editandoEtapas)}>{editandoEtapas ? 'fechar etapas' : 'editar etapas'}</button>
+        <div class="linha">
+          <button class="link" onclick={() => baixarCsv(lista)}>baixar Excel (.csv)</button>
+          <button class="link" onclick={() => (editando = !editando)}>{editando ? 'fechar edição' : 'etapas e fases'}</button>
           <button class="link perigo" onclick={() => excluirLista(lista)}>excluir lista</button>
         </div>
       </div>
       <input class="descricao" bind:value={lista.descricao} placeholder="Para que serve esta lista" aria-label="Descrição" />
-      <div class="progresso">
-        <div class="barra"><span style="width: {progresso.pct}%"></span></div>
-        <span><b>{progresso.concluidos}</b> de {progresso.total} concluídos ({progresso.pct}%) - {progresso.emAndamento} em andamento - {progresso.naoIniciados} não iniciados</span>
+      <div class="resumo maquina">
+        <span><b>{progresso.concluidos}</b>/{progresso.total} concluídos</span>
+        <span><b>{progresso.emAndamento}</b> em andamento</span>
+        <span class:alerta={progresso.travados > 0}><b>{progresso.travados}</b> travados</span>
+        <span><b>{progresso.naoIniciados}</b> não iniciados</span>
+        {#if progresso.cnpjs}<span><b>{progresso.cnpjsConcluidos}</b>/{progresso.cnpjs} CNPJs</span>{/if}
+        <div class="barra"><span style:width="{progresso.pct}%"></span></div>
+        <b>{progresso.pct}%</b>
       </div>
 
-      {#if editandoEtapas}
-        <div class="etapas-edicao">
-          {#each lista.etapas as e, i (e.id)}
-            <div class="linha">
-              <span class="n">{i + 1}</span>
-              <input bind:value={e.nome} />
-              <button class="mini" disabled={i === 0} onclick={() => moverEtapa(i, -1)}>&uarr;</button>
-              <button class="mini" disabled={i === lista.etapas.length - 1} onclick={() => moverEtapa(i, 1)}>&darr;</button>
-              <button class="mini" onclick={() => removerEtapa(e.id)}>&times;</button>
-            </div>
+      {#if lista.fases.length}
+        <ol class="cronograma">
+          {#each lista.fases as f (f.id)}
+            {@const s = situacaoDaFase(lista, f, dia)}
+            {@const pf = progressoDosItens(lista, itensDaFase(lista, f.id))}
+            <li class={s}>
+              {#if f.id === faseDeHoje}<span class="hoje maquina">hoje {dataCurta(dia)}</span>{/if}
+              <span class="no"></span>
+              <b>{f.nome}</b>
+              <span class="dica">{f.data ? dataMedia(f.data) : 'sem data'}</span>
+              <span class="situacao-fase">{nomesFase[s]}</span>
+              <span class="mini-barra"><span style:width="{pf.pct}%"></span></span>
+              <span class="dica maquina">{pf.concluidos}/{pf.total}{pf.cnpjs ? ` · ${pf.cnpjsConcluidos}/${pf.cnpjs} CNPJs` : ''}</span>
+            </li>
           {/each}
-          <button onclick={() => lista.etapas.push({ id: idCurto(), nome: 'Nova etapa' })}>+ etapa</button>
+        </ol>
+      {/if}
+
+      {#if editando}
+        <div class="duas edicao">
+          <div>
+            <h3>Etapas</h3>
+            {#each lista.etapas as e, i (e.id)}
+              <div class="linha">
+                <span class="n">{i + 1}</span>
+                <input bind:value={e.nome} />
+                <button class="mini" disabled={i === 0} onclick={() => moverEtapa(lista, i, -1)}>&uarr;</button>
+                <button class="mini" disabled={i === lista.etapas.length - 1} onclick={() => moverEtapa(lista, i, 1)}>&darr;</button>
+                <button class="mini" onclick={() => removerEtapa(lista, e.id)}>&times;</button>
+              </div>
+            {/each}
+            <button onclick={() => lista.etapas.push({ id: idCurto(), nome: 'Nova etapa' })}>+ etapa</button>
+          </div>
+          <div>
+            <h3>Fases</h3>
+            {#each lista.fases as f, i (f.id)}
+              <div class="linha">
+                <input bind:value={f.nome} />
+                <input type="date" bind:value={f.data} />
+                <button class="mini" disabled={i === 0} onclick={() => moverFase(lista, i, -1)}>&uarr;</button>
+                <button class="mini" disabled={i === lista.fases.length - 1} onclick={() => moverFase(lista, i, 1)}>&darr;</button>
+                <button class="mini" onclick={() => removerFase(lista, f.id)}>&times;</button>
+              </div>
+            {/each}
+            <button onclick={() => lista.fases.push({ id: idCurto(), nome: `Fase ${lista.fases.length + 1}` })}>+ fase</button>
+          </div>
         </div>
       {/if}
     </section>
 
     <section class="cartao">
       <details open={!lista.itens.length}>
-        <summary>Adicionar itens</summary>
-        <p class="dica">Cole do Excel (nome numa coluna e etiqueta na outra) ou escreva um nome por linha. De um print, o texto lido aparece aqui para você conferir antes de adicionar. Nomes repetidos ficam de fora.</p>
-        <textarea rows="5" bind:value={colado} placeholder={'AAXIS AI BRASIL SERVICOS EM TECNOLOGIA\tSó escritório\nCLÍNICA COPACABANA\tRisco médio'}></textarea>
-        <div class="linha">
-          <button class="principal" disabled={!colado.trim()} onclick={adicionar}>Adicionar {itensDoTexto(colado, lista.itens.map((i) => i.nome)).length || ''} itens</button>
-          <label class="botao">Ler print <input type="file" accept="image/*" hidden onchange={lerPrint} /></label>
-          {#if lendo !== null}<progress value={lendo}></progress> <span class="dica">lendo a imagem...</span>{/if}
+        <summary>Adicionar e importar</summary>
+        <div class="duas">
+          <div>
+            <h3>Planilha (Excel ou CSV)</h3>
+            <p class="dica">A primeira linha é o cabeçalho. Empresa, CNPJs, Fase, Etiqueta e Responsável viram campos; as outras colunas viram etapas. Na célula: x, sim ou ok = feito; N/A = não se aplica; "travado: motivo" = travado. Quem já existe é atualizado pelo nome.</p>
+            <div class="linha">
+              <label class="botao">Escolher arquivo (.xlsx ou .csv) <input type="file" accept=".xlsx,.csv,.txt" hidden onchange={lerArquivo} /></label>
+            </div>
+            <textarea rows="4" placeholder="Ou copie as células no Excel (com o cabeçalho) e cole aqui" oninput={(e) => (planilha = e.currentTarget.value.trim() ? linhasDoTexto(e.currentTarget.value) : undefined)}></textarea>
+          </div>
+          <div>
+            <h3>Só nomes ou print</h3>
+            <p class="dica">Um nome por linha (ou nome e etiqueta separados por tabulação). O print vira texto aqui para você conferir.</p>
+            <textarea rows="4" bind:value={colado}></textarea>
+            <div class="linha">
+              {#if lista.fases.length}
+                <select bind:value={faseDosNovos} aria-label="Fase dos novos">
+                  <option value="">sem fase</option>
+                  {#each lista.fases as f (f.id)}<option value={f.id}>{f.nome}</option>{/each}
+                </select>
+              {/if}
+              <button class="principal" disabled={!colado.trim()} onclick={() => adicionar(lista)}>Adicionar {itensDoTexto(colado, lista.itens.map((i) => i.nome)).length || ''}</button>
+              <label class="botao">Ler print <input type="file" accept="image/*" hidden onchange={lerPrint} /></label>
+              {#if lendo !== null}<progress value={lendo}></progress>{/if}
+            </div>
+          </div>
         </div>
+        {#if previa}
+          <div class="previa">
+            <b>Prévia da planilha</b>
+            <p>{previa.novos} novos, {previa.atualizados} atualizados{previa.ignoradas ? `, ${previa.ignoradas} linhas sem nome ficam de fora` : ''}.</p>
+            {#if previa.etapasNovas.length}<p>Etapas novas: {previa.etapasNovas.join(', ')}</p>{/if}
+            {#if previa.fasesNovas.length}<p>Fases novas: {previa.fasesNovas.join(', ')}</p>{/if}
+            <div class="colunas-previa">
+              {#each planilha?.[0] ?? [] as titulo, k (k)}<span><b>{titulo || '(vazia)'}</b> &rarr; {rotuloCampo(previa.campos[k]!)}</span>{/each}
+            </div>
+            <div class="linha">
+              <button class="principal" onclick={() => importar(lista)}>Importar</button>
+              <button onclick={() => (planilha = undefined)}>Cancelar</button>
+            </div>
+          </div>
+        {/if}
+        {#if avisoImport}<p class="ok">{avisoImport}</p>{/if}
       </details>
     </section>
 
     {#if lista.itens.length}
-      <section class="cartao">
-        <div class="filtros">
-          <input type="search" bind:value={busca} placeholder="Buscar nome ou anotação" />
-          <select bind:value={filtro}>
-            <option value="todas">Todas</option>
-            <option value="pendentes">Pendentes</option>
-            <option value="nao_iniciado">Não iniciadas</option>
-            <option value="em_andamento">Em andamento</option>
-            <option value="concluido">Concluídas</option>
+      <section class="filtros">
+        <input type="search" bind:value={busca} placeholder="Buscar empresa, anotação ou responsável" />
+        <select bind:value={filtro} aria-label="Situação">
+          <option value="todas">Todas</option>
+          <option value="pendentes">Pendentes</option>
+          <option value="nao_iniciado">Não iniciadas</option>
+          <option value="em_andamento">Em andamento</option>
+          <option value="travado">Travadas</option>
+          <option value="concluido">Concluídas</option>
+        </select>
+        <select bind:value={faltaEtapa} aria-label="Falta na etapa">
+          <option value="">Falta em qualquer etapa</option>
+          {#each lista.etapas as e (e.id)}<option value={e.id}>Falta: {e.nome}</option>{/each}
+        </select>
+        {#if marcadores.length}
+          <select bind:value={marcadorFiltro} aria-label="Etiqueta">
+            <option value="">Todas as etiquetas</option>
+            {#each marcadores as m (m)}<option value={m}>{m}</option>{/each}
           </select>
-          {#if marcadores.length}
-            <select bind:value={marcadorFiltro}>
-              <option value="">Todas as etiquetas</option>
-              {#each marcadores as m (m)}<option value={m}>{m}</option>{/each}
-            </select>
-          {/if}
-          <span class="dica">{visiveis.length} de {lista.itens.length}</span>
-        </div>
-
-        <div class="rolagem">
-          <table>
-            <thead>
-              <tr>
-                <th class="n">#</th>
-                <th>Item</th>
-                {#each lista.etapas as e (e.id)}<th class="etapa">{e.nome}</th>{/each}
-                <th>Situação</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each visiveis as item (item.id)}
-                {@const s = situacaoDoItem(lista, item)}
-                <tr class:feito={s.situacao === 'concluido'}>
-                  <td class="n">{lista.itens.indexOf(item) + 1}</td>
-                  <td>
-                    <button class="nome" onclick={() => (aberto = aberto === item.id ? undefined : item.id)}>
-                      {item.nome}
-                      {#if item.notas}<span class="tem-nota" title={item.notas}>nota</span>{/if}
-                    </button>
-                    {#if item.marcador}<span class="marcador">{item.marcador}</span>{/if}
-                  </td>
-                  {#each lista.etapas as e (e.id)}
-                    <td class="caixa">
-                      <input type="checkbox" checked={!!item.feitas[e.id]} title={item.feitas[e.id] ? `feito em ${dataMedia(item.feitas[e.id])}` : e.nome} aria-label={e.nome} onchange={() => marcar(item, e.id)} />
-                    </td>
-                  {/each}
-                  <td>
-                    <button class="situacao {s.situacao}" title="marcar ou desmarcar todas" onclick={() => marcarTodas(item)}>{nomesSituacao[s.situacao]}</button>
-                    <small>{s.feitas}/{s.total} etapas</small>
-                  </td>
-                </tr>
-                {#if aberto === item.id}
-                  <tr class="detalhe">
-                    <td></td>
-                    <td colspan={lista.etapas.length + 2}>
-                      <div class="detalhe-grade">
-                        <label>O que fiz e por quê
-                          <textarea rows="3" value={item.notas} oninput={(ev) => { item.notas = ev.currentTarget.value; item.atualizadoEm = hoje(); }} placeholder="Ex.: sem agendamentos novos; planilha subiu com 3 linhas a menos porque o CPF começava com 0."></textarea>
-                        </label>
-                        <div>
-                          <label>Etiqueta <input bind:value={item.marcador} placeholder="Só escritório, Risco baixo..." /></label>
-                          <label>Nome <input bind:value={item.nome} /></label>
-                          <p class="dica">
-                            {#each lista.etapas.filter((e) => item.feitas[e.id]) as e (e.id)}{e.nome}: {dataMedia(item.feitas[e.id])}<br />{/each}
-                            Atualizado em {dataMedia(item.atualizadoEm)}
-                          </p>
-                          <button class="link perigo" onclick={() => removerItem(item)}>remover da lista</button>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                {/if}
-              {/each}
-            </tbody>
-          </table>
-        </div>
+        {/if}
+        <button class="link" onclick={() => recolhidas.clear()}>expandir tudo</button>
+        <button class="link" onclick={() => grupos.forEach((g) => recolhidas.add(g.id))}>recolher</button>
       </section>
+      <p class="dica legenda">Clique na caixa: feito. Botão direito: não se aplica, travado (com motivo) ou limpar. Clique no nome: ficha da empresa e o diário dela.</p>
+
+      {#each grupos as g (g.id)}
+        {@const itens = itensDoGrupo(lista, g.fase)}
+        {@const todos = g.fase ? itensDaFase(lista, g.fase.id) : lista.itens.filter((i) => !i.faseId || !lista.fases.some((f) => f.id === i.faseId))}
+        {@const pf = progressoDosItens(lista, todos)}
+        <section class="fase">
+          <button class="cabeca-fase" onclick={() => (recolhidas.has(g.id) ? recolhidas.delete(g.id) : recolhidas.add(g.id))}>
+            <span class="seta" class:fechada={recolhidas.has(g.id)}>&#9662;</span>
+            <b>{g.fase?.nome ?? 'Sem fase'}</b>
+            {#if g.fase?.data}<span class="chip">{dataMedia(g.fase.data)}</span>{/if}
+            {#if g.fase}<span class="chip {situacaoDaFase(lista, g.fase, dia)}">{nomesFase[situacaoDaFase(lista, g.fase, dia)]}</span>{/if}
+            <span class="dica maquina contagem">{pf.concluidos}/{pf.total} itens{pf.cnpjs ? ` · ${pf.cnpjsConcluidos}/${pf.cnpjs} CNPJs` : ''}</span>
+            <span class="mini-barra larga"><span style:width="{pf.pct}%"></span></span>
+          </button>
+          {#if !recolhidas.has(g.id)}
+            <div class="rolagem">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="sel">
+                      <input type="checkbox" aria-label="Selecionar a fase" checked={itens.length > 0 && itens.every((i) => selecionados.has(i.id))}
+                        onchange={(e) => itens.forEach((i) => (e.currentTarget.checked ? selecionados.add(i.id) : selecionados.delete(i.id)))} />
+                    </th>
+                    <th>Empresa</th>
+                    <th class="num">CNPJs</th>
+                    {#each lista.etapas as e (e.id)}<th class="etapa">{e.nome}</th>{/each}
+                    <th>Situação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each itens as item (item.id)}
+                    {@const s = situacaoDoItem(lista, item)}
+                    <tr class={s.situacao}>
+                      <td class="sel"><input type="checkbox" aria-label="Selecionar" checked={selecionados.has(item.id)} onchange={() => (selecionados.has(item.id) ? selecionados.delete(item.id) : selecionados.add(item.id))} /></td>
+                      <td>
+                        <button class="nome" onclick={() => (abertos.has(item.id) ? abertos.delete(item.id) : abertos.add(item.id))}>{item.nome}</button>
+                        <div class="sub">
+                          {#if item.marcador}<span class="marcador">{item.marcador}</span>{/if}
+                          {#if item.responsavel}<span class="dica">{item.responsavel}</span>{/if}
+                          {#if lista.diario.some((r) => r.itemId === item.id && r.texto)}<span class="tem-nota">diário</span>{/if}
+                        </div>
+                      </td>
+                      <td class="num maquina">{item.cnpjs ?? '-'}</td>
+                      {#each lista.etapas as e (e.id)}
+                        {@const m = item.marcas[e.id]}
+                        <td class="celula-td">
+                          <button class="celula {m?.estado ?? 'vazia'}" aria-label="{e.nome}: {m ? nomesEstado[m.estado] : 'pendente'}"
+                            title="{e.nome}: {m ? `${nomesEstado[m.estado]} em ${dataMedia(m.em)}${m.motivo ? ` - ${m.motivo}` : ''}` : 'pendente'}"
+                            onclick={(ev) => { ev.stopPropagation(); clicar(lista, item, e.id); }}
+                            oncontextmenu={(ev) => { ev.stopPropagation(); abrirMenu(ev, item, e.id); }}>
+                            {#if m?.estado === 'feito'}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" /></svg>{:else if m?.estado === 'nao_se_aplica'}n/a{:else if m?.estado === 'travado'}!{/if}
+                          </button>
+                          {#if menu?.itemId === item.id && menu.etapaId === e.id}
+                            <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+                            <div class="menu" onclick={(ev) => ev.stopPropagation()}>
+                              <b>{e.nome}</b>
+                              <button onclick={() => escolher(lista, item, e.id, 'feito')}>Feito</button>
+                              <button onclick={() => escolher(lista, item, e.id, 'nao_se_aplica')}>Não se aplica</button>
+                              <input bind:value={motivo} placeholder="motivo ou anotação" />
+                              <button class="travar" onclick={() => escolher(lista, item, e.id, 'travado')}>Travado</button>
+                              <button class="link" onclick={() => escolher(lista, item, e.id, undefined)}>limpar</button>
+                            </div>
+                          {/if}
+                        </td>
+                      {/each}
+                      <td>
+                        <span class="situacao {s.situacao}">{nomeSituacao[s.situacao]}</span>
+                        <small>{s.feitas}/{s.total} etapas</small>
+                      </td>
+                    </tr>
+                    {#if abertos.has(item.id)}
+                      <tr class="detalhe">
+                        <td></td>
+                        <td colspan={lista.etapas.length + 3}>
+                          <div class="ficha">
+                            <div>
+                              <div class="campos">
+                                <label>Nome <input bind:value={item.nome} /></label>
+                                <label>Etiqueta <input bind:value={item.marcador} placeholder="Só escritório, Risco baixo..." /></label>
+                                <label>CNPJs <input type="number" min="0" bind:value={item.cnpjs} /></label>
+                                <label>Responsável <input bind:value={item.responsavel} /></label>
+                                <label>Fase
+                                  <select value={item.faseId ?? ''} onchange={(e) => moverParaFase(lista, [item], e.currentTarget.value || undefined)}>
+                                    <option value="">sem fase</option>
+                                    {#each lista.fases as f (f.id)}<option value={f.id}>{f.nome}</option>{/each}
+                                  </select>
+                                </label>
+                              </div>
+                              <label>Observação fixa <textarea rows="2" bind:value={item.notas}></textarea></label>
+                              <div class="etapas-ficha">
+                                {#each lista.etapas as e (e.id)}
+                                  {@const m = item.marcas[e.id]}
+                                  <div class="linha">
+                                    <span>{e.nome}</span>
+                                    <select value={m?.estado ?? ''} onchange={(ev) => marcarEtapa(lista, item, e.id, (ev.currentTarget.value || undefined) as EstadoEtapa | undefined)}>
+                                      <option value="">pendente</option>
+                                      <option value="feito">feito</option>
+                                      <option value="nao_se_aplica">não se aplica</option>
+                                      <option value="travado">travado</option>
+                                    </select>
+                                    {#if m?.estado === 'travado'}<input bind:value={m.motivo} placeholder="motivo" />{/if}
+                                    {#if m}<span class="dica maquina">{dataCurta(m.em)}</span>{/if}
+                                  </div>
+                                {/each}
+                              </div>
+                            </div>
+                            <div>
+                              <h3>Diário desta empresa</h3>
+                              <div class="linha">
+                                <input bind:value={novaNotaItem} placeholder="O que fez, por quê, o que falta" onkeydown={(e) => { if (e.key === 'Enter' && novaNotaItem.trim()) { anotar(lista, novaNotaItem.trim(), item.id); novaNotaItem = ''; } }} />
+                                <button disabled={!novaNotaItem.trim()} onclick={() => { anotar(lista, novaNotaItem.trim(), item.id); novaNotaItem = ''; }}>anotar</button>
+                              </div>
+                              <ul class="diario-item">
+                                {#each diarioDoPeriodo([lista], '0000-01-01', '9999-12-31').filter((r) => r.itemId === item.id) as r (r.id)}
+                                  <li class={r.tipo}><span class="hora maquina">{dataCurta(r.quando)} {r.quando.slice(11, 16)}</span> {textoDaLinha({ ...r, item: undefined })}</li>
+                                {:else}
+                                  <li class="dica">Nada registrado ainda.</li>
+                                {/each}
+                              </ul>
+                              <button class="link perigo" onclick={() => removerItem(lista, item)}>remover da lista</button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    {/if}
+                  {:else}
+                    <tr><td colspan={lista.etapas.length + 4} class="dica">Nenhum item com estes filtros.</td></tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          {/if}
+        </section>
+      {/each}
     {/if}
+  {/if}
+
+  {#if lista && selecionados.size && aba === 'lista' && !criando}
+    <div class="barra-massa">
+      <b>{selecionados.size} selecionados</b>
+      <select bind:value={acaoEtapa} aria-label="Etapa">
+        <option value="">etapa...</option>
+        {#each lista.etapas as e (e.id)}<option value={e.id}>{e.nome}</option>{/each}
+      </select>
+      <select bind:value={acaoEstado} aria-label="Situação">
+        <option value="feito">feito</option>
+        <option value="nao_se_aplica">não se aplica</option>
+        <option value="travado">travado</option>
+      </select>
+      {#if lista.fases.length}
+        <select bind:value={acaoFase} aria-label="Mover para">
+          <option value="">mover para...</option>
+          {#each lista.fases as f (f.id)}<option value={f.id}>{f.nome}</option>{/each}
+          <option value="sem-fase">sem fase</option>
+        </select>
+      {/if}
+      <button class="principal" disabled={!acaoEtapa && !acaoFase} onclick={() => aplicarEmMassa(lista)}>aplicar</button>
+      <button class="link" onclick={() => selecionados.clear()}>limpar seleção</button>
+    </div>
+  {/if}
+
+  {#if ultima}
+    <div class="nota-rapida">
+      <span><b>{ultima.rotulo}</b>: feito. O que foi feito?</span>
+      <!-- svelte-ignore a11y_autofocus -->
+      <input bind:value={notaRapida} autofocus placeholder="opcional, Enter para salvar" onkeydown={(e) => { if (e.key === 'Enter') salvarNotaRapida(); if (e.key === 'Escape') ultima = undefined; }} />
+      <button onclick={salvarNotaRapida}>ok</button>
+      <button class="link" onclick={() => (ultima = undefined)}>fechar</button>
+    </div>
   {/if}
 </main>
 
 <style>
   main
   {
-    padding: 24px 28px 48px;
-    max-width: 1240px;
+    padding: 24px 28px 96px;
+    max-width: 1320px;
     margin: 0 auto;
+  }
+  .prompt
+  {
+    font-family: var(--fonte-maquina);
+    font-size: 0.85rem;
+    color: var(--marca);
   }
   h1
   {
@@ -285,17 +661,26 @@
   h2
   {
     font-size: 1rem;
-    margin: 0 0 10px;
+    margin: 0;
+  }
+  h3
+  {
+    font-size: 0.85rem;
+    margin: 0 0 8px;
   }
   .cartao
   {
     margin-top: 14px;
   }
-  .abas
+  .abas, .linha, .cabeca, .filtros
   {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
+    align-items: center;
+  }
+  .abas
+  {
     margin-top: 14px;
   }
   .abas button
@@ -304,7 +689,7 @@
   }
   .abas .ativa
   {
-    background: var(--tinta, #111);
+    background: var(--marca-escura);
     color: #fff;
   }
   .abas small
@@ -317,16 +702,10 @@
   {
     border-style: dashed;
   }
-  .modelos, .linha, .filtros, .cabeca, .acoes
+  .diario-aba
   {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-  }
-  .modelos
-  {
-    margin-bottom: 10px;
+    margin-left: auto;
+    font-family: var(--fonte-maquina);
   }
   label
   {
@@ -336,10 +715,23 @@
     font-size: 0.84rem;
     margin-bottom: 8px;
   }
+  label.inline, label.marca
+  {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+  }
   textarea
   {
     width: 100%;
     resize: vertical;
+  }
+  .duas
+  {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
   }
   .cabeca
   {
@@ -365,36 +757,143 @@
     color: var(--suave);
     font-size: 0.86rem;
   }
-  .progresso
+  .resumo
   {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 12px;
-    margin-top: 10px;
-    font-size: 0.86rem;
+    gap: 6px 16px;
+    margin-top: 12px;
+    font-size: 0.8rem;
   }
-  .barra
+  .resumo .alerta b
   {
-    flex: 0 0 220px;
-    height: 8px;
+    color: var(--vermelho);
+  }
+  .barra, .mini-barra
+  {
+    flex: 1;
+    min-width: 120px;
+    height: 7px;
     background: var(--borda);
     border-radius: 4px;
     overflow: hidden;
   }
-  .barra span
+  .barra span, .mini-barra span
   {
     display: block;
     height: 100%;
     background: var(--verde);
   }
-  .etapas-edicao
+  .mini-barra
   {
-    margin-top: 12px;
-    display: grid;
-    gap: 6px;
-    max-width: 560px;
+    flex: none;
+    width: 90px;
+    min-width: 0;
+    height: 5px;
   }
-  .etapas-edicao input
+  .mini-barra.larga
+  {
+    width: 160px;
+  }
+
+  /* cronograma das fases: trilho com nós */
+  .cronograma
+  {
+    list-style: none;
+    display: flex;
+    padding: 34px 0 4px;
+    margin: 16px 0 0;
+    position: relative;
+    overflow-x: auto;
+  }
+  .cronograma::before
+  {
+    content: '';
+    position: absolute;
+    left: 40px;
+    right: 40px;
+    top: 45px;
+    height: 2px;
+    background: var(--borda);
+  }
+  .cronograma li
+  {
+    position: relative;
+    flex: 1 0 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    text-align: center;
+    font-size: 0.82rem;
+  }
+  .cronograma .no
+  {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 3px solid #b9c3cc;
+    background: var(--superficie);
+    position: relative;
+    z-index: 1;
+    margin-bottom: 6px;
+  }
+  .cronograma .concluida .no
+  {
+    background: var(--verde);
+    border-color: var(--verde);
+  }
+  .cronograma .em_execucao .no
+  {
+    background: #f0a35b;
+    border-color: #f6d3b3;
+    box-shadow: 0 0 0 4px rgb(240 163 91 / 20%);
+  }
+  .cronograma .atrasada .no
+  {
+    border-color: var(--vermelho);
+  }
+  .situacao-fase
+  {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--suave);
+  }
+  .concluida .situacao-fase
+  {
+    color: var(--verde);
+  }
+  .em_execucao .situacao-fase
+  {
+    color: #b8651c;
+  }
+  .atrasada .situacao-fase
+  {
+    color: var(--vermelho);
+  }
+  .cronograma .hoje
+  {
+    position: absolute;
+    top: -30px;
+    font-size: 0.66rem;
+    background: var(--marca-escura);
+    color: #fff;
+    border-radius: 10px;
+    padding: 2px 8px;
+    white-space: nowrap;
+  }
+  .edicao
+  {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--borda);
+  }
+  .edicao .linha
+  {
+    margin-bottom: 6px;
+  }
+  .edicao input:not([type='date'])
   {
     flex: 1;
   }
@@ -403,7 +902,7 @@
     font-family: var(--fonte-maquina);
     font-size: 0.75rem;
     color: var(--suave);
-    width: 28px;
+    width: 20px;
   }
   .mini
   {
@@ -428,18 +927,116 @@
     cursor: var(--cursor-clique);
     color: var(--marca);
     font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .previa
+  {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--marca);
+    border-radius: 10px;
+    background: var(--marca-clara);
+    font-size: 0.86rem;
+  }
+  .previa p
+  {
+    margin: 4px 0;
+  }
+  .colunas-previa
+  {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin: 8px 0;
+    font-size: 0.78rem;
+  }
+  .ok
+  {
+    background: var(--verde-fundo);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.86rem;
   }
   .filtros
   {
-    margin-bottom: 10px;
+    margin-top: 18px;
   }
   .filtros input
   {
-    min-width: 240px;
+    min-width: 260px;
+    flex: 1;
+  }
+  .legenda
+  {
+    font-size: 0.78rem;
+    margin: 6px 0 0;
+  }
+  .fase
+  {
+    margin-top: 12px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: var(--raio);
+    overflow: hidden;
+  }
+  .cabeca-fase
+  {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    border: none;
+    border-radius: 0;
+    background: none;
+    font: inherit;
+    text-align: left;
+    color: var(--texto);
+  }
+  .cabeca-fase b
+  {
+    font-size: 1.05rem;
+  }
+  .seta
+  {
+    color: var(--suave);
+    transition: transform 0.15s;
+  }
+  .seta.fechada
+  {
+    transform: rotate(-90deg);
+  }
+  .contagem
+  {
+    margin-left: auto;
+  }
+  .chip
+  {
+    font-size: 0.72rem;
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    padding: 1px 8px;
+    color: var(--suave);
+  }
+  .chip.concluida
+  {
+    color: var(--verde);
+    border-color: var(--verde);
+  }
+  .chip.em_execucao
+  {
+    color: #b8651c;
+    border-color: #f0a35b;
+  }
+  .chip.atrasada
+  {
+    color: var(--vermelho);
+    border-color: var(--vermelho);
   }
   .rolagem
   {
     overflow-x: auto;
+    border-top: 1px solid var(--borda);
   }
   table
   {
@@ -448,16 +1045,18 @@
   }
   th
   {
-    font-size: 0.72rem;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
     text-align: left;
-    vertical-align: bottom;
-    padding: 6px;
+    color: var(--suave);
+    padding: 8px 6px;
+    background: var(--fundo);
   }
   th.etapa
   {
-    width: 92px;
     text-align: center;
-    font-weight: 600;
+    min-width: 64px;
   }
   td
   {
@@ -465,20 +1064,23 @@
     padding: 8px 6px;
     vertical-align: middle;
   }
-  tr.feito td
+  .sel
+  {
+    width: 30px;
+    text-align: center;
+  }
+  .num
+  {
+    text-align: center;
+    width: 52px;
+  }
+  tr.concluido td
   {
     background: var(--verde-fundo);
   }
-  .caixa
+  tr.travado td
   {
-    text-align: center;
-  }
-  .caixa input
-  {
-    width: 22px;
-    height: 22px;
-    accent-color: var(--verde);
-    cursor: var(--cursor-clique);
+    background: var(--vermelho-fundo);
   }
   .nome
   {
@@ -490,43 +1092,133 @@
     text-align: left;
     color: var(--texto);
   }
-  .tem-nota
+  .sub
   {
-    font-size: 0.68rem;
-    font-weight: 400;
-    color: var(--marca);
-    border: 1px solid var(--marca);
-    border-radius: 4px;
-    padding: 0 4px;
-    margin-left: 4px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 3px;
   }
   .marcador
   {
-    display: inline-block;
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     font-weight: 600;
     text-transform: uppercase;
     border: 1px solid var(--borda);
     border-radius: 6px;
     padding: 0 6px;
-    margin-top: 3px;
+  }
+  .tem-nota
+  {
+    font-size: 0.66rem;
+    color: var(--marca);
+    border: 1px solid var(--marca);
+    border-radius: 4px;
+    padding: 0 4px;
+  }
+  .celula-td
+  {
+    text-align: center;
+    position: relative;
+  }
+  .celula
+  {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 7px;
+    border: 1.5px solid #c9d2da;
+    background: var(--superficie);
+    font-family: var(--fonte-maquina);
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--suave);
+    display: inline-grid;
+    place-items: center;
+    transition: transform 0.1s, background 0.15s;
+  }
+  .celula:hover
+  {
+    border-color: var(--marca);
+    transform: scale(1.06);
+  }
+  .celula.feito
+  {
+    background: var(--verde);
+    border-color: var(--verde);
+  }
+  .celula svg
+  {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: #fff;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .celula.nao_se_aplica
+  {
+    background: repeating-linear-gradient(135deg, #eef1f3, #eef1f3 4px, #e1e6ea 4px, #e1e6ea 8px);
+    border-color: #d5dce2;
+  }
+  .celula.travado
+  {
+    background: var(--vermelho-fundo);
+    border-color: var(--vermelho);
+    color: var(--vermelho);
+    font-size: 0.9rem;
+  }
+  .menu
+  {
+    position: absolute;
+    z-index: 20;
+    top: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200px;
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    box-shadow: var(--sombra);
+    text-align: left;
+    font-size: 0.8rem;
+  }
+  .menu button
+  {
+    font-size: 0.8rem;
+    padding: 5px 8px;
+  }
+  .menu .travar
+  {
+    border-color: var(--vermelho);
+    color: var(--vermelho);
   }
   .situacao
   {
-    font-size: 0.74rem;
+    display: inline-block;
+    font-size: 0.72rem;
     padding: 2px 8px;
     border-radius: 6px;
+    background: var(--fundo);
     white-space: nowrap;
   }
   .situacao.concluido
   {
     background: var(--verde);
     color: #fff;
-    border-color: var(--verde);
   }
   .situacao.em_andamento
   {
     background: var(--marca-clara);
+  }
+  .situacao.travado
+  {
+    background: var(--vermelho);
+    color: #fff;
   }
   td small
   {
@@ -537,17 +1229,128 @@
   .detalhe td
   {
     border-top: none;
-    background: var(--superficie);
+    background: var(--fundo);
   }
-  .detalhe-grade
+  .ficha
   {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
-    gap: 16px;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 20px;
+    padding: 6px 0;
   }
-  @media (max-width: 800px)
+  .campos
   {
-    .detalhe-grade
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0 10px;
+  }
+  .etapas-ficha .linha
+  {
+    font-size: 0.82rem;
+    margin-bottom: 4px;
+  }
+  .etapas-ficha .linha > span:first-child
+  {
+    width: 110px;
+  }
+  .diario-item, .dia ul
+  {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0;
+    font-size: 0.84rem;
+  }
+  .diario-item li, .dia li
+  {
+    padding: 5px 0 5px 10px;
+    border-left: 2px solid var(--borda);
+    margin-bottom: 2px;
+  }
+  li.feito
+  {
+    border-left-color: var(--verde);
+  }
+  li.travado
+  {
+    border-left-color: var(--vermelho);
+  }
+  li.nota
+  {
+    border-left-color: var(--marca);
+  }
+  .hora
+  {
+    color: var(--suave);
+    font-size: 0.75rem;
+    margin-right: 6px;
+  }
+  .de-lista
+  {
+    font-size: 0.7rem;
+    border: 1px solid var(--borda);
+    border-radius: 6px;
+    padding: 0 6px;
+    margin-right: 6px;
+  }
+  .acoes-diario, .nota-geral
+  {
+    margin: 12px 0;
+  }
+  .nota-geral input
+  {
+    flex: 1;
+  }
+  .dia
+  {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .dia .data
+  {
+    color: var(--marca);
+    font-weight: 700;
+    padding-top: 5px;
+  }
+  .barra-massa, .nota-rapida
+  {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    background: var(--marca-escura);
+    color: #fff;
+    box-shadow: 0 10px 30px rgb(0 0 0 / 25%);
+    font-size: 0.86rem;
+    max-width: calc(100vw - 32px);
+  }
+  .barra-massa
+  {
+    bottom: 18px;
+  }
+  .nota-rapida
+  {
+    bottom: 76px;
+    border: 1px solid var(--marca);
+  }
+  .nota-rapida input
+  {
+    min-width: 260px;
+  }
+  .barra-massa .link, .nota-rapida .link
+  {
+    color: #9fe3bd;
+  }
+  @media (max-width: 900px)
+  {
+    .duas, .ficha
     {
       grid-template-columns: 1fr;
     }

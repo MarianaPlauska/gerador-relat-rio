@@ -1,7 +1,7 @@
 <script lang="ts">
   import
   {
-    detectarOrigem, ehCsvDeDemandas, fotoVazia, lerCards, lerCsvDemandas, lerOndas, lerTotais, mesclarNaFoto, nomesTotais,
+    agoraLocal, detectarOrigem, ehCsvDeDemandas, fotoVazia, lerCards, lerCsvDemandas, lerOndas, lerTotais, mesclarNaFoto, nomesTotais,
     type CardSnapshot, type Onda, type OrigemLeitura, type Ritmo, type TotaisPainel,
   } from '@supervisao/core';
   import { carregar, exportarJson, importarJson, salvar, type Dados } from '#lib/armazenamento.ts';
@@ -27,7 +27,7 @@
   ];
 
   let dados = $state<Dados>(carregar());
-  let dataFoto = $state(new Date().toISOString().slice(0, 10));
+  let dataFoto = $state(agoraLocal().slice(0, 10));
   let texto = $state('');
   let origemEscolhida = $state<'auto' | OrigemLeitura>('auto');
   let aviso = $state('');

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { aplicarControle, type CardSnapshot, type ControleCard, type OrigemLeitura, type Ritmo } from '@supervisao/core';
+  import { agoraLocal, aplicarControle, type CardSnapshot, type ControleCard, type OrigemLeitura, type Ritmo } from '@supervisao/core';
   import { carregar, salvar, type Dados } from '#lib/armazenamento.ts';
 
   let dados = $state<Dados>(carregar());
@@ -8,7 +8,7 @@
   let origem = $state<'' | OrigemLeitura>('em_execucao');
   let ritmosVisiveis = $state<Ritmo[]>(['atrasado', 'em_risco', 'no_ritmo']);
 
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = agoraLocal().slice(0, 10);
   const nomesRitmo: Record<Ritmo, string> = { atrasado: 'atrasado', em_risco: 'em risco', no_ritmo: 'no ritmo' };
   const nomesStatus: Record<NonNullable<CardSnapshot['etapaAtualStatus']>, string> = {
     rodando: 'rodando',

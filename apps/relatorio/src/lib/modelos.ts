@@ -27,6 +27,7 @@ export function rotuloBloco(b: Bloco): string
     case 'grafico': return `Gráfico: ${nomesTotais[b.indicador]}`;
     case 'tabela': return `Tabela: ${b.indicadores.length} ${b.indicadores.length === 1 ? 'indicador' : 'indicadores'}`;
     case 'quebra': return 'Quebra de página';
+    case 'lista': return `Lista de checagem${b.titulo ? `: ${b.titulo}` : ''}`;
   }
 }
 

@@ -1,6 +1,6 @@
 import
 {
-  dicionarioPadrao, pessoasExemplo, type Bloco, type ControleCard, type Lista, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type Risco, type Snapshot,
+  agoraLocal, dicionarioPadrao, migrarLista, pessoasExemplo, type Bloco, type ControleCard, type Lista, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type Risco, type Snapshot,
 } from '@supervisao/core';
 import { agendarEnvio, iniciarNuvem, marcarLocal } from './nuvem.svelte.ts';
 
@@ -55,12 +55,19 @@ function padrao(): Dados
   return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [] };
 }
 
+// campos que faltam ganham o padrão; listas antigas ganham fases e diário
+function completar(bruto: Partial<Dados>): Dados
+{
+  const d = { ...padrao(), ...bruto };
+  return { ...d, listas: d.listas.map(migrarLista) };
+}
+
 function lerLocal(): Dados
 {
   try
   {
     const bruto = localStorage.getItem(CHAVE);
-    return bruto ? { ...padrao(), ...JSON.parse(bruto) } : padrao();
+    return bruto ? completar(JSON.parse(bruto) as Partial<Dados>) : padrao();
   }
   catch
   {
@@ -71,7 +78,7 @@ function lerLocal(): Dados
 // a versão mais nova da nuvem substitui a deste navegador e a tela recarrega com ela
 function receberDaNuvem(dados: Dados, quando: string, primeiraVez: boolean): void
 {
-  const json = JSON.stringify({ ...padrao(), ...dados });
+  const json = JSON.stringify(completar(dados));
   const mudou = json !== localStorage.getItem(CHAVE);
   // primeira vez nesta conta: o que havia só neste navegador vira um backup baixado antes de ser trocado
   const local = lerLocal();
@@ -101,12 +108,12 @@ export function exportarJson(dados: Dados): void
   const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `relatorio-semanal-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `relatorio-semanal-${agoraLocal().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
 
 export async function importarJson(arquivo: File): Promise<Dados>
 {
-  return { ...padrao(), ...JSON.parse(await arquivo.text()) };
+  return completar(JSON.parse(await arquivo.text()) as Partial<Dados>);
 }
