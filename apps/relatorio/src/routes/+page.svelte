@@ -1,7 +1,7 @@
 <script lang="ts">
   import
   {
-    acoesDeHoje, aplicarControle, historico, linhaDoTempo, progressoDaLista, resumoDoFluxo, ritmoPorPessoa, segundaDaSemana, serieSemanal, somarDias, textoProjecao,
+    acoesDeHoje, aplicarControle, definicoesPadrao, diasUteisEntre, historico, linhaDoTempo, progressoDaLista, resumoDoFluxo, ritmoPorPessoa, segundaDaSemana, semanaDoAno, serieSemanal, somarDias, textoProjecao,
     type Destino, type Evento, type TotaisPainel,
   } from '@supervisao/core';
   import { carregar, exportarJson, importarJson, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
@@ -9,6 +9,8 @@
   import { entrar, nuvem, sairDaNuvem } from '#lib/nuvem.svelte.ts';
   import { baixarTexto, copiar, textoPacote, textoTeams } from '#lib/saidas.ts';
   import { contextoDaSemana, dataCurta, dataMedia, hoje, semanasDisponiveis } from '#lib/semana.ts';
+  import { fecharSessao, lerSessao } from '#lib/sessao.ts';
+  import { goto } from '$app/navigation';
 
   let dados = $state<Dados>(carregar());
   const dia = hoje();
@@ -64,7 +66,21 @@
 
   const hora = new Date().getHours();
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
-  const primeiroNome = $derived(dados.identificacao.elaboradoPor.split(' ')[0]);
+  const primeiroNome = $derived((dados.identificacao.elaboradoPor || lerSessao()?.nome || '').split(' ')[0]);
+
+  const ultimaFoto = $derived([...dados.fotos].filter((f) => f.data <= dia).sort((a, b) => a.data.localeCompare(b.data)).at(-1));
+  const diasDesdeFoto = $derived(ultimaFoto ? diasUteisEntre(ultimaFoto.data, dia, definicoesPadrao.feriados) : 0);
+  const nomesNuvem: Record<typeof nuvem.estado, string> = { desligada: 'desligada', sem_login: 'sem login', sincronizando: 'sincronizando', ok: 'ok', erro: 'erro' };
+  // atenção primeiro: com a lista recolhida, o que importa aparece
+  const ordemTom = { atencao: 0, positivo: 1, neutro: 2 };
+  const frasesOrdenadas = $derived([...ctx.frases].sort((a, b) => ordemTom[a.tom] - ordemTom[b.tom]));
+  let todasFrases = $state(false);
+
+  function sair()
+  {
+    fecharSessao();
+    goto('/entrar');
+  }
 
   function variacao(chave: keyof TotaisPainel, sufixo = ''): string
   {
@@ -93,14 +109,25 @@
 <main>
   <section class="topo">
     <div>
-      <span class="etiqueta">{saudacao}{primeiroNome ? `, ${primeiroNome}` : ''} · semana de {dataMedia(semana)} a {dataMedia(ctx.fim)}</span>
-      <h1>OrbisOS<span class="cursor">_</span></h1>
+      <span class="prompt">&gt; {saudacao.toLowerCase()}{primeiroNome ? `, ${primeiroNome.toLowerCase()}` : ''}<span class="cursor">_</span></span>
+      <h1>OrbisOS</h1>
       <p class="lema">seu giro da semana: painel, plano, riscos e relatório num lugar só.</p>
     </div>
-    <select bind:value={semana} aria-label="Semana">
-      {#each semanasDisponiveis(dados) as s (s)}<option value={s}>{dataCurta(s)} a {dataCurta(somarDias(s, 4))}</option>{/each}
-    </select>
+    <div class="topo-direita">
+      <select bind:value={semana} aria-label="Semana">
+        {#each semanasDisponiveis(dados) as s (s)}<option value={s}>{dataCurta(s)} a {dataCurta(somarDias(s, 4))}</option>{/each}
+      </select>
+      <button class="link" onclick={sair}>sair</button>
+    </div>
   </section>
+
+  <ul class="status maquina">
+    <li><span>semana</span><b>S{semanaDoAno(semana)}</b></li>
+    <li class:aviso={!ultimaFoto || diasDesdeFoto >= 2}><span>última foto</span><b>{ultimaFoto ? `${dataCurta(ultimaFoto.data)}${diasDesdeFoto > 0 ? ` · há ${diasDesdeFoto} d úteis` : ' · hoje'}` : 'nenhuma'}</b></li>
+    <li class:aviso={ctx.alertas.length > 0}><span>alertas</span><b>{ctx.alertas.length}</b></li>
+    <li class:aviso={fluxo.parados.length > 0}><span>parados</span><b>{fluxo.parados.length}</b></li>
+    <li class:ok={nuvem.estado === 'ok'}><span>nuvem</span><b>{nomesNuvem[nuvem.estado]}</b></li>
+  </ul>
 
   <ol class="regua">
     {#each regua as d (d.data)}
@@ -159,61 +186,101 @@
     </a>
   </section>
 
-  <div class="colunas">
-    <section class="cartao">
-      <h2>O que o sistema percebeu</h2>
-      {#if ctx.frases.length}
-        <ul class="frases">
-          {#each ctx.frases as f, i (i)}<li class={f.tom}><i></i>{f.texto}</li>{/each}
-        </ul>
-      {:else}
-        <p class="dica">Cole o painel e monte o plano para o sistema comparar com a semana anterior.</p>
-      {/if}
-    </section>
-
-    <section class="cartao">
-      <h2>Time</h2>
-      {#each ctx.comp.pessoas as p (p.pessoa.id)}
-        {@const r = ritmo.get(p.pessoa.id)}
-        {@const dificuldade = ctx.atual.plano?.pessoas.find((x) => x.pessoaId === p.pessoa.id)?.dificuldade}
-        <div class="pessoa">
-          <div class="linha">
-            <b>{p.pessoa.nome}</b>
-            {#if p.alertas}<span class="pilula vermelho">{p.alertas} {p.alertas === 1 ? 'alerta' : 'alertas'}</span>{/if}
-          </div>
-          <span class="barra clara"><span style:width="{p.atual.pctFeitos ?? 0}%"></span></span>
-          <span class="dica maquina">
-            {p.atual.feitos}/{p.atual.planejados} feitos · <span class:estourou={p.horas > p.pessoa.capacidadeHorasSemana}>{p.horas}h de {p.pessoa.capacidadeHorasSemana}h</span>
-          </span>
-          {#if r && r.total}
-            <span class="barra-ritmo" title="demandas em execução por ritmo">
-              {#if r.no_ritmo}<span class="no_ritmo" style:flex={r.no_ritmo}>{r.no_ritmo}</span>{/if}
-              {#if r.em_risco}<span class="em_risco" style:flex={r.em_risco}>{r.em_risco}</span>{/if}
-              {#if r.atrasado}<span class="atrasado" style:flex={r.atrasado}>{r.atrasado}</span>{/if}
-            </span>
+  <div class="grade">
+    <div class="principal-col">
+      <section class="cartao fluxo">
+        <h2>Fluxo</h2>
+        <div class="projecao">
+          {#if fluxo.projecao}
+            <p class="veredito {fluxo.projecao.veredito}">meta de prazo no fim do mês: {fluxo.projecao.veredito === 'bate' ? 'deve bater' : fluxo.projecao.veredito === 'perto' ? 'perto da meta' : 'não deve bater'} ({fluxo.projecao.projetado.toLocaleString('pt-BR')}% para {fluxo.projecao.meta}%)</p>
+            <p class="dica">{textoProjecao(fluxo.projecao)}</p>
+          {:else}
+            <p class="dica">A projeção da meta precisa de 3 semanas com "dentro do prazo" e a meta do painel.</p>
           {/if}
-          {#if dificuldade}<span class="dificuldade">{dificuldade}</span>{/if}
         </div>
-      {/each}
-    </section>
-  </div>
+        <div class="colunas-fluxo">
+          <div>
+            <h3>Parados além do normal ({fluxo.parados.length})</h3>
+            {#each fluxo.parados.slice(0, 5) as x (x.card.codigo)}
+              <p class="linha-fluxo"><b class="maquina">{x.card.codigo}</b> {x.card.titulo} <span class="dica">{x.idadeDias.toLocaleString('pt-BR')} d aberto, normal até {x.limiteDias.toLocaleString('pt-BR')} d ({x.base}){x.card.responsaveis.length ? ` - ${x.card.responsaveis.map(nomePessoa).join(', ')}` : ''}</span></p>
+            {:else}
+              <p class="dica">{fluxo.tempos.geral ? 'Nenhuma demanda aberta além do normal.' : 'Importe o CSV da lista de Demandas em Colar painel para medir o normal.'}</p>
+            {/each}
+          </div>
+          <div>
+            <h3>Onde as demandas se acumulam</h3>
+            {#each fluxo.gargalos.slice(0, 5) as g (g.etapa)}
+              <p class="linha-fluxo"><b>{g.etapa}</b> <span class="dica">{g.quantidade} {g.quantidade === 1 ? 'demanda' : 'demandas'}{g.esperando ? `, ${g.esperando} esperando começar` : ''}{g.maiorRodandoDias !== undefined ? `, maior tempo rodando ${g.maiorRodandoDias.toLocaleString('pt-BR')} d` : ''}</span></p>
+            {:else}
+              <p class="dica">Cole o "Quem está cuidando de quê" ou um card aberto para ver as etapas.</p>
+            {/each}
+          </div>
+        </div>
+      </section>
 
-  <div class="colunas">
-    <section class="cartao">
-      <h2>Linha do tempo da semana</h2>
-      {#each eventosPorDia as [data, lista] (data)}
-        <div class="dia-tempo">
-          <span class="data maquina">{dataMedia(data)}</span>
-          <ul>
-            {#each lista as e, i (i)}<li class={e.tipo}><span class="tipo maquina">{iconeEvento[e.tipo]}</span> {e.texto}</li>{/each}
+      <section class="cartao">
+        <h2>O que o sistema percebeu</h2>
+        {#if ctx.frases.length}
+          <ul class="frases">
+            {#each todasFrases ? frasesOrdenadas : frasesOrdenadas.slice(0, 6) as f, i (i)}<li class={f.tom}><i></i>{f.texto}</li>{/each}
           </ul>
-        </div>
-      {:else}
-        <p class="dica">Nada registrado nesta semana ainda.</p>
-      {/each}
-    </section>
+          {#if frasesOrdenadas.length > 6}
+            <button class="link" onclick={() => (todasFrases = !todasFrases)}>{todasFrases ? 'mostrar menos' : `ver todas (${frasesOrdenadas.length})`}</button>
+          {/if}
+        {:else}
+          <p class="dica">Cole o painel e monte o plano para o sistema comparar com a semana anterior.</p>
+        {/if}
+      </section>
 
-    <div class="pilha">
+      <section class="cartao">
+        <h2>Linha do tempo da semana</h2>
+        {#each eventosPorDia as [data, lista] (data)}
+          <div class="dia-tempo">
+            <span class="data maquina">{dataMedia(data)}</span>
+            <ul>
+              {#each lista as e, i (i)}<li class={e.tipo}><span class="tipo maquina">{iconeEvento[e.tipo]}</span> {e.texto}</li>{/each}
+            </ul>
+          </div>
+        {:else}
+          <p class="dica">Nada registrado nesta semana ainda.</p>
+        {/each}
+      </section>
+
+      {#if serie('dentroDoPrazoPct').length >= 2}
+        <section class="cartao">
+          <h2>Evolução do prazo</h2>
+          <div class="grafico">{@html svgLinha(serie('dentroDoPrazoPct').map((p) => ({ rotulo: dataCurta(p.data), valor: p.valor })), { meta: ctx.meta, sufixo: '%', largura: 760 })}</div>
+        </section>
+      {/if}
+    </div>
+
+    <aside class="pilha">
+      <section class="cartao">
+        <h2>Time</h2>
+        {#each ctx.comp.pessoas as p (p.pessoa.id)}
+          {@const r = ritmo.get(p.pessoa.id)}
+          {@const dificuldade = ctx.atual.plano?.pessoas.find((x) => x.pessoaId === p.pessoa.id)?.dificuldade}
+          <div class="pessoa">
+            <div class="linha">
+              <b>{p.pessoa.nome}</b>
+              {#if p.alertas}<span class="pilula vermelho">{p.alertas} {p.alertas === 1 ? 'alerta' : 'alertas'}</span>{/if}
+            </div>
+            <span class="barra clara"><span style:width="{p.atual.pctFeitos ?? 0}%"></span></span>
+            <span class="dica maquina">
+              {p.atual.feitos}/{p.atual.planejados} feitos · <span class:estourou={p.horas > p.pessoa.capacidadeHorasSemana}>{p.horas}h de {p.pessoa.capacidadeHorasSemana}h</span>
+            </span>
+            {#if r && r.total}
+              <span class="barra-ritmo" title="demandas em execução por ritmo">
+                {#if r.no_ritmo}<span class="no_ritmo" style:flex={r.no_ritmo}>{r.no_ritmo}</span>{/if}
+                {#if r.em_risco}<span class="em_risco" style:flex={r.em_risco}>{r.em_risco}</span>{/if}
+                {#if r.atrasado}<span class="atrasado" style:flex={r.atrasado}>{r.atrasado}</span>{/if}
+              </span>
+            {/if}
+            {#if dificuldade}<span class="dificuldade">{dificuldade}</span>{/if}
+          </div>
+        {/each}
+      </section>
+
       <section class="cartao saidas">
         <h2>Saídas</h2>
         <a class="saida principal" href="/relatorio"><b>Gerar PDF</b><span>semanal, executivo, período ou seus modelos</span></a>
@@ -232,6 +299,30 @@
         </div>
       </section>
 
+      <section class="cartao">
+        <h2>Listas</h2>
+        {#each dados.listas as l (l.id)}
+          {@const pr = progressoDaLista(l)}
+          <div class="lista-resumo">
+            <div class="linha"><b>{l.nome}</b><span class="maquina dica">{pr.concluidos}/{pr.total}</span></div>
+            <span class="barra clara"><span style:width="{pr.pct}%"></span></span>
+          </div>
+        {:else}
+          <p class="dica">Checklists suas, como o teste de agendamentos por empresa.</p>
+        {/each}
+        <a class="link-secao" href="/listas">{dados.listas.length ? 'abrir listas' : 'criar uma lista'}</a>
+      </section>
+
+      <section class="cartao">
+        <h2>Compromissos com a gestão</h2>
+        {#each emAberto as p (p.id)}
+          <p class="compromisso">{p.texto}</p>
+        {:else}
+          <p class="dica">{promessasDaSemana.length ? 'Todos os compromissos da semana têm situação.' : 'Nenhum compromisso registrado nesta semana.'}</p>
+        {/each}
+        <a class="link-secao" href="/semana">ver na semana</a>
+      </section>
+
       <section class="cartao nuvem">
         <h2>Nuvem</h2>
         {#if nuvem.estado === 'desligada'}
@@ -245,70 +336,11 @@
           </p>
           <p class="dica">{nuvem.email}{nuvem.ultimoEnvio ? ` - último envio ${nuvem.ultimoEnvio.slice(11, 16)}` : ''}</p>
           {#if nuvem.erro}<p class="dica erro">{nuvem.erro}</p>{/if}
-          <button class="link" onclick={() => sairDaNuvem()}>sair</button>
+          <button class="link" onclick={() => sairDaNuvem()}>sair da nuvem</button>
         {/if}
       </section>
-
-      <section class="cartao">
-        <h2>Compromissos com a gestão</h2>
-        {#each emAberto as p (p.id)}
-          <p class="compromisso">{p.texto}</p>
-        {:else}
-          <p class="dica">{promessasDaSemana.length ? 'Todos os compromissos da semana têm situação.' : 'Nenhum compromisso registrado nesta semana.'}</p>
-        {/each}
-        <a class="link-secao" href="/semana">ver na semana</a>
-      </section>
-
-      <section class="cartao">
-        <h2>Listas</h2>
-        {#each dados.listas as l (l.id)}
-          {@const pr = progressoDaLista(l)}
-          <p class="compromisso">{l.nome} <span class="dica">{pr.concluidos} de {pr.total} concluídos ({pr.pct}%)</span></p>
-        {:else}
-          <p class="dica">Checklists suas, como o teste de agendamentos por empresa.</p>
-        {/each}
-        <a class="link-secao" href="/listas">{dados.listas.length ? 'abrir listas' : 'criar uma lista'}</a>
-      </section>
-    </div>
+    </aside>
   </div>
-
-  <section class="cartao fluxo">
-    <h2>Fluxo</h2>
-    <div class="colunas-fluxo">
-      <div>
-        <h3>Meta de prazo no fim do mês</h3>
-        {#if fluxo.projecao}
-          <p class="veredito {fluxo.projecao.veredito}">{fluxo.projecao.veredito === 'bate' ? 'deve bater' : fluxo.projecao.veredito === 'perto' ? 'perto da meta' : 'não deve bater'}: {fluxo.projecao.projetado.toLocaleString('pt-BR')}% para {fluxo.projecao.meta}%</p>
-          <p class="dica">{textoProjecao(fluxo.projecao)}</p>
-        {:else}
-          <p class="dica">Precisa de 3 semanas com "dentro do prazo" e a meta do painel.</p>
-        {/if}
-      </div>
-      <div>
-        <h3>Parados além do normal ({fluxo.parados.length})</h3>
-        {#each fluxo.parados.slice(0, 6) as x (x.card.codigo)}
-          <p class="linha-fluxo"><b class="maquina">{x.card.codigo}</b> {x.card.titulo} <span class="dica">{x.idadeDias.toLocaleString('pt-BR')} d aberto, normal até {x.limiteDias.toLocaleString('pt-BR')} d ({x.base}){x.card.responsaveis.length ? ` - ${x.card.responsaveis.map(nomePessoa).join(', ')}` : ''}</span></p>
-        {:else}
-          <p class="dica">{fluxo.tempos.geral ? 'Nenhuma demanda aberta além do normal.' : 'Importe o CSV da lista de Demandas na tela Colar painel para medir o normal.'}</p>
-        {/each}
-      </div>
-      <div>
-        <h3>Onde as demandas se acumulam</h3>
-        {#each fluxo.gargalos.slice(0, 5) as g (g.etapa)}
-          <p class="linha-fluxo"><b>{g.etapa}</b> <span class="dica">{g.quantidade} {g.quantidade === 1 ? 'demanda' : 'demandas'}{g.esperando ? `, ${g.esperando} esperando começar` : ''}{g.maiorRodandoDias !== undefined ? `, maior tempo rodando ${g.maiorRodandoDias.toLocaleString('pt-BR')} d` : ''}</span></p>
-        {:else}
-          <p class="dica">Cole o "Quem está cuidando de quê" ou um card aberto para ver as etapas.</p>
-        {/each}
-      </div>
-    </div>
-  </section>
-
-  {#if serie('dentroDoPrazoPct').length >= 2}
-    <section class="cartao">
-      <h2>Evolução do prazo</h2>
-      <div class="grafico">{@html svgLinha(serie('dentroDoPrazoPct').map((p) => ({ rotulo: dataCurta(p.data), valor: p.valor })), { meta: ctx.meta, sufixo: '%', largura: 1100 })}</div>
-    </section>
-  {/if}
 </main>
 
 <style>
@@ -734,14 +766,10 @@
     gap: 12px;
     margin-top: 4px;
   }
-  .fluxo
-  {
-    margin-top: 20px;
-  }
   .colunas-fluxo
   {
     display: grid;
-    grid-template-columns: 1fr 1.4fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 24px;
   }
   .colunas-fluxo h3
@@ -840,6 +868,136 @@
       overflow-x: auto;
     }
     .colunas, .hoje-painel
+    {
+      grid-template-columns: 1fr;
+    }
+  }
+  /* fundo de grade discreto, como papel quadriculado de terminal */
+  main
+  {
+    background-image: linear-gradient(rgb(14 19 17 / 3.5%) 1px, transparent 1px), linear-gradient(90deg, rgb(14 19 17 / 3.5%) 1px, transparent 1px);
+    background-size: 28px 28px;
+    background-position: -1px -1px;
+  }
+  .prompt
+  {
+    font-family: var(--fonte-maquina);
+    font-size: 0.85rem;
+    color: var(--marca);
+  }
+  .topo-direita
+  {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .status
+  {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0;
+    margin: 18px 0 0;
+  }
+  .status li
+  {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    padding: 6px 12px;
+    border: 1px solid var(--borda);
+    border-left: 3px solid var(--marca);
+    border-radius: 8px;
+    background: var(--superficie);
+    font-size: 0.8rem;
+  }
+  .status span
+  {
+    color: var(--suave);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.7rem;
+  }
+  .status li.aviso
+  {
+    border-left-color: #d4a017;
+  }
+  .status li.ok b
+  {
+    color: var(--verde);
+  }
+  /* coluna principal e lateral: sem buraco entre as duas */
+  .grade
+  {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+  }
+  /* títulos dos quadros como comentário de código */
+  .grade .cartao > h2::before
+  {
+    content: '// ';
+    color: var(--marca);
+  }
+  .grade .cartao
+  {
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .grade .cartao:hover
+  {
+    border-color: rgb(18 164 84 / 35%);
+    box-shadow: var(--sombra), 0 0 0 3px rgb(18 164 84 / 6%);
+  }
+  .kpi
+  {
+    position: relative;
+    overflow: hidden;
+    border-top: 2px solid var(--marca);
+  }
+  .kpi::after
+  {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 100% 0%, rgb(18 164 84 / 18%), transparent 55%);
+    pointer-events: none;
+  }
+  .kpi.alerta
+  {
+    border-top-color: #f5c542;
+  }
+  .projecao
+  {
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: var(--fundo);
+    margin-bottom: 16px;
+  }
+  .projecao p
+  {
+    margin: 0;
+  }
+  .projecao .dica
+  {
+    margin-top: 4px;
+  }
+  .lista-resumo
+  {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .lista-resumo .linha
+  {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  @media (max-width: 900px)
+  {
+    .grade
     {
       grid-template-columns: 1fr;
     }
