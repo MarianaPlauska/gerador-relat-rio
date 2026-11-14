@@ -1,6 +1,5 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { page } from '$app/state';
   import { carregar, salvar } from '#lib/armazenamento.ts';
   import { chuva } from '#lib/chuva.ts';
   import { entrar as entrarComGoogle, nuvem } from '#lib/nuvem.svelte.ts';
@@ -10,18 +9,14 @@
   let nome = $state(dados.identificacao.elaboradoPor);
   let manter = $state(true);
   let erro = $state('');
-  const destino = () =>
-  {
-    const volta = page.url.searchParams.get('volta') ?? '/';
-    return volta.startsWith('/') && !volta.startsWith('//') ? volta : '/';
-  };
 
   function concluir(nomeFinal: string, email?: string)
   {
     // o nome vai para "Elaborado por" do relatório e para a saudação da central
     if (!dados.identificacao.elaboradoPor) salvar({ ...dados, identificacao: { ...dados.identificacao, elaboradoPor: nomeFinal } });
     abrirSessao({ nome: nomeFinal, email, desde: new Date().toISOString() }, manter);
-    goto(destino(), { replaceState: true });
+    // depois de entrar, sempre a Início
+    goto('/', { replaceState: true });
   }
 
   async function google()
