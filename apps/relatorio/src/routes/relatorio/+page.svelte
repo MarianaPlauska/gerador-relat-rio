@@ -125,7 +125,7 @@
 
 <main>
   <aside>
-    <span class="etiqueta">relatório</span>
+    <span class="prompt">&gt; relatório</span>
     <h1>Gerador de PDF<span class="cursor">_</span></h1>
 
     <div class="grupo">
@@ -323,7 +323,7 @@
   }
   .marcavel:hover
   {
-    background: #faf8f5;
+    background: var(--superficie-2);
   }
   .marcavel.atencao
   {

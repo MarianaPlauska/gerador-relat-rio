@@ -57,8 +57,9 @@
 </script>
 
 <main>
+  <span class="prompt">&gt; cards</span>
   <header>
-    <h1>Quem está cuidando de quê</h1>
+    <h1>Quem está cuidando de quê<span class="cursor">_</span></h1>
     <label>Foto de
       <select bind:value={dataFoto}>
         {#each dados.fotos as f (f.data)}<option value={f.data}>{dataCurta(f.data)}</option>{/each}
@@ -187,8 +188,8 @@
   .chip
   {
     border-radius: 999px;
-    border: 1px solid #c9d1d9;
-    background: #fff;
+    border: 1px solid var(--borda-forte);
+    background: var(--superficie);
     padding: 4px 12px;
     cursor: var(--cursor-clique);
   }
@@ -200,8 +201,8 @@
   .rolagem
   {
     overflow-x: auto;
-    background: #fff;
-    border: 1px solid #dde1e5;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
     border-radius: 8px;
   }
   table
@@ -215,12 +216,12 @@
     text-transform: uppercase;
     font-size: 0.72rem;
     letter-spacing: 0.05em;
-    color: #5c6670;
+    color: var(--suave);
     text-align: left;
   }
   th, td
   {
-    border-bottom: 1px solid #eceff1;
+    border-bottom: 1px solid var(--superficie-2);
     padding: 10px 8px;
     vertical-align: top;
   }
@@ -231,7 +232,7 @@
   .codigo
   {
     display: inline-block;
-    border: 1px solid #c9d1d9;
+    border: 1px solid var(--borda-forte);
     border-radius: 6px;
     padding: 4px 8px;
     font-weight: 600;
@@ -244,7 +245,7 @@
   .demanda small, .painel
   {
     display: block;
-    color: #5c6670;
+    color: var(--suave);
   }
   .etapa input
   {
@@ -256,12 +257,12 @@
   }
   .etapa input:hover, .etapa input:focus
   {
-    border-color: #c9d1d9;
-    background: #fff;
+    border-color: var(--borda-forte);
+    background: var(--superficie);
   }
   .quem
   {
-    color: #5c6670;
+    color: var(--suave);
     white-space: nowrap;
   }
   .quem select
@@ -294,25 +295,25 @@
   }
   .no_ritmo
   {
-    background: #e6f6ec;
-    color: #1a7f43;
-    border-color: #1a7f43;
+    background: var(--verde-fundo);
+    color: var(--verde);
+    border-color: var(--verde);
   }
   .em_risco
   {
-    background: #fff6d9;
-    color: #9a6700;
-    border-color: #9a6700;
+    background: var(--amarelo-fundo);
+    color: var(--amarelo);
+    border-color: var(--amarelo);
   }
   .atrasado
   {
-    background: #fdecec;
-    color: #b42318;
-    border-color: #b42318;
+    background: var(--vermelho-fundo);
+    color: var(--vermelho);
+    border-color: var(--vermelho);
   }
   .mexido
   {
-    background: #fffbea;
+    background: var(--amarelo-fundo);
   }
   .painel
   {
@@ -323,13 +324,13 @@
   {
     border: none;
     background: none;
-    color: #175cd3;
+    color: var(--azul);
     text-decoration: underline;
     cursor: var(--cursor-clique);
   }
   .dica
   {
-    color: #5c6670;
+    color: var(--suave);
     font-size: 0.9rem;
   }
 </style>

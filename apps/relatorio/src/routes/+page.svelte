@@ -412,7 +412,7 @@
   .regua li.hoje
   {
     background: var(--marca-escura);
-    border-color: var(--marca-escura);
+    border-color: var(--marca);
     color: #fff;
     opacity: 1;
   }
@@ -525,6 +525,7 @@
     gap: 4px;
     background: var(--marca-escura);
     color: #fff;
+    border: 1px solid var(--borda);
     border-radius: var(--raio);
     padding: 18px;
     text-decoration: none;
@@ -607,7 +608,7 @@
     flex: 0 0 9px;
     height: 9px;
     border-radius: 50%;
-    background: #b8b4ad;
+    background: var(--borda-forte);
   }
   .frases .positivo i
   {
@@ -658,7 +659,7 @@
   }
   .barra-ritmo .em_risco
   {
-    background: #d99a00;
+    background: var(--amarelo);
   }
   .barra-ritmo .atrasado
   {
@@ -749,16 +750,16 @@
   {
     background: var(--marca);
     border-color: var(--marca);
-    color: #fff;
+    color: var(--sobre-marca);
   }
   .saida.principal span
   {
-    color: #e3f6ea;
+    color: var(--sobre-marca);
   }
   .saida.principal:hover
   {
-    background: #0b7d40;
-    color: #fff;
+    filter: brightness(1.1);
+    color: var(--sobre-marca);
   }
   .backup
   {
@@ -876,7 +877,7 @@
   /* fundo de grade discreto, como papel quadriculado de terminal */
   main
   {
-    background-image: linear-gradient(rgb(14 19 17 / 3.5%) 1px, transparent 1px), linear-gradient(90deg, rgb(14 19 17 / 3.5%) 1px, transparent 1px);
+    background-image: linear-gradient(var(--grade-fundo) 1px, transparent 1px), linear-gradient(90deg, var(--grade-fundo) 1px, transparent 1px);
     background-size: 28px 28px;
     background-position: -1px -1px;
   }
@@ -922,7 +923,7 @@
   }
   .status li.aviso
   {
-    border-left-color: #d4a017;
+    border-left-color: var(--amarelo);
   }
   .status li.ok b
   {

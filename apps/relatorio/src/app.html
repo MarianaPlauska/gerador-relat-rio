@@ -3,7 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Relatório semanal</title>
+    <meta name="color-scheme" content="dark light" />
+    <title>OrbisOS</title>
+    <script>
+      // tema antes de pintar a tela: escuro é o padrão
+      try { if (localStorage.getItem('orbisos-tema') === 'claro') document.documentElement.dataset.tema = 'claro'; } catch {}
+    </script>
     %sveltekit.head%
   </head>
   <body>

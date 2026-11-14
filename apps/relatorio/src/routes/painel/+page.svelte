@@ -184,8 +184,9 @@
 {/snippet}
 
 <main>
+  <span class="prompt">&gt; colar painel</span>
   <header>
-    <h1>Colar o painel</h1>
+    <h1>Colar o painel<span class="cursor">_</span></h1>
     <label>Foto de <input type="date" bind:value={dataFoto} /></label>
     <label>Prefixo dos cards <input class="curto" bind:value={dados.prefixo} /></label>
     <button onclick={() => exportarJson($state.snapshot(dados))}>Exportar JSON</button>
@@ -340,7 +341,7 @@
     font-family: ui-monospace, Consolas, monospace;
     font-size: 0.82rem;
     margin: 8px 0;
-    background: #fafbfc;
+    background: var(--superficie-2);
   }
   .grade
   {
@@ -364,7 +365,7 @@
   }
   .secundario
   {
-    background: #faf9f7;
+    background: var(--superficie-2);
   }
   .grade label
   {

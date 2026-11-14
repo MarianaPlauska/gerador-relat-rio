@@ -122,8 +122,9 @@
 <datalist id="dores">{#each dores as d (d)}<option value={d}></option>{/each}</datalist>
 
 <main>
+  <span class="prompt">&gt; semana</span>
   <header>
-    <h1>Plano da semana</h1>
+    <h1>Plano da semana<span class="cursor">_</span></h1>
     <label>Semana de
       <select bind:value={semana}>
         {#each semanas as s (s)}<option value={s}>{dataCurta(s)} a {dataCurta(somarDias(s, 4))}</option>{/each}
@@ -377,7 +378,7 @@
   .numeros b
   {
     font-size: 1.5rem;
-    color: var(--marca-escura);
+    color: var(--texto);
   }
   .numeros span
   {
@@ -450,7 +451,7 @@
   .item.feito
   {
     border-left-color: var(--verde);
-    background: #fbfdfb;
+    background: var(--superficie-2);
   }
   .item.risco
   {
@@ -486,8 +487,8 @@
   }
   .alterado
   {
-    background: #eef2ff;
-    color: #3538cd;
+    background: var(--azul-fundo);
+    color: var(--azul);
   }
   .status.feito
   {
@@ -507,7 +508,7 @@
   {
     border: none;
     background: none;
-    color: #175cd3;
+    color: var(--azul);
     text-decoration: underline;
     padding: 2px 4px;
   }

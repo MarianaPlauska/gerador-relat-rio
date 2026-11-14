@@ -71,7 +71,7 @@
 </script>
 
 <main>
-  <span class="etiqueta">modelos</span>
+  <span class="prompt">&gt; modelos</span>
   <h1>Modelos de relatório<span class="cursor">_</span></h1>
   <p class="dica">Um modelo é a lista de blocos do PDF, em ordem. Escolha o modelo na tela <a href="/relatorio">Relatório</a>; lá você ainda pode inserir blocos só naquele relatório.</p>
   {#if aviso}<p class="ok">{aviso}</p>{/if}

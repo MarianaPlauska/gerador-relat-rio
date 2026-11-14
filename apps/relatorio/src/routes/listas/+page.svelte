@@ -689,8 +689,8 @@
   }
   .abas .ativa
   {
-    background: var(--marca-escura);
-    color: #fff;
+    background: var(--marca);
+    color: var(--sobre-marca);
   }
   .abas small
   {
@@ -833,7 +833,7 @@
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    border: 3px solid #b9c3cc;
+    border: 3px solid var(--borda-forte);
     background: var(--superficie);
     position: relative;
     z-index: 1;
@@ -846,9 +846,9 @@
   }
   .cronograma .em_execucao .no
   {
-    background: #f0a35b;
-    border-color: #f6d3b3;
-    box-shadow: 0 0 0 4px rgb(240 163 91 / 20%);
+    background: var(--laranja);
+    border-color: var(--laranja-fundo);
+    box-shadow: 0 0 0 4px var(--laranja-fundo);
   }
   .cronograma .atrasada .no
   {
@@ -866,7 +866,7 @@
   }
   .em_execucao .situacao-fase
   {
-    color: #b8651c;
+    color: var(--laranja);
   }
   .atrasada .situacao-fase
   {
@@ -1025,8 +1025,8 @@
   }
   .chip.em_execucao
   {
-    color: #b8651c;
-    border-color: #f0a35b;
+    color: var(--laranja);
+    border-color: var(--laranja);
   }
   .chip.atrasada
   {
@@ -1127,7 +1127,7 @@
     height: 30px;
     padding: 0;
     border-radius: 7px;
-    border: 1.5px solid #c9d2da;
+    border: 1.5px solid var(--borda-forte);
     background: var(--superficie);
     font-family: var(--fonte-maquina);
     font-size: 0.68rem;
@@ -1152,15 +1152,15 @@
     width: 16px;
     height: 16px;
     fill: none;
-    stroke: #fff;
+    stroke: var(--sobre-marca);
     stroke-width: 2.4;
     stroke-linecap: round;
     stroke-linejoin: round;
   }
   .celula.nao_se_aplica
   {
-    background: repeating-linear-gradient(135deg, #eef1f3, #eef1f3 4px, #e1e6ea 4px, #e1e6ea 8px);
-    border-color: #d5dce2;
+    background: repeating-linear-gradient(135deg, var(--superficie-2), var(--superficie-2) 4px, var(--borda) 4px, var(--borda) 8px);
+    border-color: var(--borda);
   }
   .celula.travado
   {
@@ -1209,7 +1209,7 @@
   .situacao.concluido
   {
     background: var(--verde);
-    color: #fff;
+    color: var(--sobre-marca);
   }
   .situacao.em_andamento
   {
@@ -1218,7 +1218,7 @@
   .situacao.travado
   {
     background: var(--vermelho);
-    color: #fff;
+    color: var(--sobre-marca);
   }
   td small
   {
