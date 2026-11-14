@@ -639,9 +639,7 @@
 <style>
   main
   {
-    padding: 24px 28px 96px;
-    max-width: 1320px;
-    margin: 0 auto;
+    padding-bottom: 96px;
   }
   .prompt
   {

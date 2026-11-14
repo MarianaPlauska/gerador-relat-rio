@@ -2,34 +2,81 @@
   import { goto } from '$app/navigation';
   import { carregar, salvar } from '#lib/armazenamento.ts';
   import { chuva } from '#lib/chuva.ts';
-  import { entrar as entrarComGoogle, nuvem } from '#lib/nuvem.svelte.ts';
+  import { criarConta, entrarComEmail, nuvem, recuperarSenha, textoDoErro } from '#lib/nuvem.svelte.ts';
   import { abrirSessao } from '#lib/sessao.ts';
 
   const dados = carregar();
+  const comConta = nuvem.estado !== 'desligada';
+  let modo = $state<'entrar' | 'criar' | 'esqueci'>('entrar');
+  let semConta = $state(!comConta);
   let nome = $state(dados.identificacao.elaboradoPor);
+  let email = $state('');
+  let senha = $state('');
   let manter = $state(true);
   let erro = $state('');
+  let aviso = $state('');
+  let ocupado = $state(false);
 
-  function concluir(nomeFinal: string, email?: string)
+  function concluir(nomeFinal: string, emailFinal?: string)
   {
     // o nome vai para "Elaborado por" do relatório e para a saudação da central
     if (!dados.identificacao.elaboradoPor) salvar({ ...dados, identificacao: { ...dados.identificacao, elaboradoPor: nomeFinal } });
-    abrirSessao({ nome: nomeFinal, email, desde: new Date().toISOString() }, manter);
+    abrirSessao({ nome: nomeFinal, email: emailFinal, desde: new Date().toISOString() }, manter);
     // depois de entrar, sempre a Início
     goto('/', { replaceState: true });
   }
 
-  async function google()
+  async function enviar(e: SubmitEvent)
   {
+    e.preventDefault();
+    erro = '';
+    aviso = '';
+    if (semConta)
+    {
+      if (nome.trim()) concluir(nome.trim());
+      return;
+    }
+    ocupado = true;
     try
     {
-      await entrarComGoogle();
-      concluir(nuvem.email?.split('@')[0] ?? nome.trim(), nuvem.email);
+      if (modo === 'esqueci')
+      {
+        await recuperarSenha(email.trim());
+        aviso = 'Enviei um e-mail para você criar uma senha nova. Olhe também o spam.';
+      }
+      else if (modo === 'criar')
+      {
+        await criarConta(nome.trim(), email.trim(), senha, manter);
+        concluir(nome.trim(), email.trim());
+      }
+      else
+      {
+        await entrarComEmail(email.trim(), senha, manter);
+        // o nome da conta vem do Firebase, que já avisou a nuvem; se faltar, usa o começo do e-mail
+        concluir(nuvem.nome || dados.identificacao.elaboradoPor || email.split('@')[0]!, email.trim());
+      }
     }
-    catch (e)
+    catch (e2)
     {
-      erro = `Não consegui entrar com Google: ${e}`;
+      erro = textoDoErro(e2);
     }
+    finally
+    {
+      ocupado = false;
+    }
+  }
+
+  const podeEnviar = $derived(
+    semConta ? !!nome.trim()
+      : modo === 'esqueci' ? !!email.trim()
+      : modo === 'criar' ? !!nome.trim() && !!email.trim() && senha.length >= 6
+      : !!email.trim() && !!senha,
+  );
+  function trocar(m: typeof modo)
+  {
+    modo = m;
+    erro = '';
+    aviso = '';
   }
 </script>
 
@@ -37,24 +84,59 @@
   <canvas use:chuva={{ fundo: 'rgba(7, 10, 9, 0.16)', cor: '#12a454', tamanho: 15, fps: 14 }}></canvas>
   <div class="vinheta"></div>
 
-  <form class="caixa" onsubmit={(e) => { e.preventDefault(); if (nome.trim()) concluir(nome.trim()); }}>
+  <form class="caixa" onsubmit={enviar}>
     <span class="prompt">&gt; supervisão_dev</span>
     <h1>OrbisOS<span class="cursor">_</span></h1>
     <p class="lema">painel, plano, riscos e relatório num lugar só.</p>
 
-    <label>
-      <span>nome</span>
-      <!-- svelte-ignore a11y_autofocus -->
-      <input bind:value={nome} autocomplete="name" placeholder="Como você quer ser chamada" autofocus />
-    </label>
-    <label class="manter"><input type="checkbox" bind:checked={manter} /> manter conectada neste navegador</label>
-    <button class="entrar" disabled={!nome.trim()}>entrar</button>
+    {#if !semConta}
+      <div class="abas" role="tablist">
+        <button type="button" role="tab" aria-selected={modo !== 'criar'} class:ativa={modo !== 'criar'} onclick={() => trocar('entrar')}>entrar</button>
+        <button type="button" role="tab" aria-selected={modo === 'criar'} class:ativa={modo === 'criar'} onclick={() => trocar('criar')}>criar conta</button>
+      </div>
+    {/if}
 
-    {#if nuvem.estado !== 'desligada'}
-      <button type="button" class="google" onclick={google}>entrar com Google e sincronizar</button>
+    {#if semConta || modo === 'criar'}
+      <label>
+        <span>nome</span>
+        <!-- svelte-ignore a11y_autofocus -->
+        <input bind:value={nome} autocomplete="name" placeholder="Como você quer ser chamada" autofocus />
+      </label>
+    {/if}
+    {#if !semConta}
+      <label>
+        <span>e-mail</span>
+        <input type="email" bind:value={email} autocomplete="email" placeholder="voce@empresa.com" />
+      </label>
+      {#if modo !== 'esqueci'}
+        <label>
+          <span>senha</span>
+          <input type="password" bind:value={senha} autocomplete={modo === 'criar' ? 'new-password' : 'current-password'} placeholder={modo === 'criar' ? 'pelo menos 6 caracteres' : ''} />
+        </label>
+      {/if}
+    {/if}
+    {#if modo !== 'esqueci'}
+      <label class="manter"><input type="checkbox" bind:checked={manter} /> manter conectada neste navegador</label>
+    {/if}
+    <button class="entrar" disabled={!podeEnviar || ocupado}>
+      {ocupado ? 'aguarde...' : semConta ? 'entrar' : modo === 'criar' ? 'criar conta' : modo === 'esqueci' ? 'enviar e-mail' : 'entrar'}
+    </button>
+
+    {#if !semConta}
+      {#if modo === 'esqueci'}
+        <button type="button" class="link" onclick={() => trocar('entrar')}>voltar</button>
+      {:else if modo === 'entrar'}
+        <button type="button" class="link" onclick={() => trocar('esqueci')}>esqueci a senha</button>
+      {/if}
     {/if}
     {#if erro}<p class="erro">{erro}</p>{/if}
-    <p class="rodape">seus dados ficam neste navegador{nuvem.estado !== 'desligada' ? ' e, com Google, no Firebase' : ''}.</p>
+    {#if aviso}<p class="ok">{aviso}</p>{/if}
+    {#if comConta}
+      <button type="button" class="link" onclick={() => { semConta = !semConta; erro = ''; aviso = ''; }}>
+        {semConta ? 'usar minha conta e sincronizar' : 'continuar sem conta, só neste navegador'}
+      </button>
+    {/if}
+    <p class="rodape">seus dados ficam neste navegador{comConta ? ' e, com conta, no Firebase' : ''}.</p>
   </form>
 </div>
 
@@ -164,7 +246,7 @@
   {
     accent-color: #12a454;
   }
-  .entrar, .google
+  .entrar
   {
     font-family: var(--fonte-maquina);
     font-weight: 700;
@@ -188,17 +270,6 @@
     background: #19c065;
     border-color: #19c065;
     color: #04130b;
-  }
-  .google:hover:not(:disabled)
-  {
-    border-color: #12a454;
-    color: #fff;
-  }
-  .google
-  {
-    background: transparent;
-    border: 1px solid #2f3d36;
-    color: #e8efe9;
   }
   .erro
   {
@@ -233,5 +304,47 @@
     {
       animation: none;
     }
+  }
+  .abas
+  {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .abas button
+  {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: #9aa39e;
+    padding: 8px;
+    font-family: var(--fonte-maquina);
+  }
+  .abas button.ativa
+  {
+    background: rgba(18, 164, 84, 0.18);
+    color: #e8efe9;
+  }
+  .link
+  {
+    border: none;
+    background: none;
+    padding: 0;
+    color: #9aa39e;
+    font-size: 0.82rem;
+    text-decoration: underline;
+    justify-self: start;
+  }
+  .link:hover:not(:disabled)
+  {
+    color: #e8efe9;
+  }
+  .ok
+  {
+    margin: 0;
+    font-size: 0.84rem;
+    color: #3ddc84;
   }
 </style>

@@ -33,3 +33,12 @@ export function fecharSessao(): void
   localStorage.removeItem(CHAVE);
   sessionStorage.removeItem(CHAVE);
 }
+
+// muda o nome (ou e-mail) da sessão no mesmo armazenamento em que ela já está
+export function atualizarSessao(campos: Partial<Sessao>): void
+{
+  const atual = lerSessao();
+  if (!atual) return;
+  const guardada = localStorage.getItem(CHAVE) !== null ? localStorage : sessionStorage;
+  guardada.setItem(CHAVE, JSON.stringify({ ...atual, ...campos }));
+}

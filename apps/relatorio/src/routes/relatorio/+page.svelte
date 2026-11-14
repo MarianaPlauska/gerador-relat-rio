@@ -1,7 +1,10 @@
 <script lang="ts">
   import { dicionarioPadrao, resumoSugerido, segundaDaSemana, somarDias, type Bloco, type CorSemaforo } from '@supervisao/core';
   import { carregar, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
+  import { montarInterativo } from '#lib/interativo.ts';
   import ListaDeBlocos from '#lib/ListaDeBlocos.svelte';
+  import { atualizarConteudo, linkDe, publicar } from '#lib/links.ts';
+  import { nuvem, textoDoErro } from '#lib/nuvem.svelte.ts';
   import { acharModelo, blocosDoRelatorio, chaveDoRelatorio, ehPronto, novoId, todosModelos } from '#lib/modelos.ts';
   import { baixarPdf, gerarPdf } from '#lib/pdf.ts';
   import { baixarTexto, copiar, textoPacote, textoTeams } from '#lib/saidas.ts';
@@ -95,6 +98,36 @@
     modelo: $state.snapshot(modelo),
     blocos: $state.snapshot(blocos) as Bloco[],
   });
+
+  // link interativo: o mesmo conteúdo do relatório, em página web com marcas e comentários
+  const logada = $derived(nuvem.estado === 'ok' || nuvem.estado === 'sincronizando' || nuvem.estado === 'erro');
+  const codigoLink = $derived(notas.links?.[modelo.id]);
+  let publicando = $state(false);
+  let erroLink = $state('');
+  let ignoradas = $state<string[]>([]);
+
+  async function publicarLink()
+  {
+    publicando = true;
+    erroLink = '';
+    try
+    {
+      const { relatorio, ignoradas: fora } = montarInterativo(entrada());
+      ignoradas = fora;
+      if (!relatorio.secoes.length) throw new Error('Este modelo não tem nenhum ponto que dê para publicar. Use o modelo Interativo.');
+      if (codigoLink) await atualizarConteudo(codigoLink, relatorio);
+      else anotar('links', { ...notas.links, [modelo.id]: await publicar(relatorio) });
+      await copiarSaida('link', linkDe((notas.links ?? {})[modelo.id] ?? codigoLink ?? ''));
+    }
+    catch (x)
+    {
+      erroLink = x instanceof Error && !('code' in x) ? x.message : textoDoErro(x);
+    }
+    finally
+    {
+      publicando = false;
+    }
+  }
 
   // refaz a prévia meio segundo depois da última mudança
   $effect(() =>
@@ -228,6 +261,27 @@
       <button class="link" onclick={() => (dados.dicionario = dicionarioPadrao)}>voltar ao texto inicial</button>
     </div>
 
+    <div class="bloco">
+      <h2>Enviar por link (interativo)</h2>
+      <p class="dica">Quem receber lê no navegador, marca Ciente, Concordo ou Dúvida em cada ponto e comenta. As respostas chegam em <a href="/retornos">Retornos</a>. Sem conta para quem recebe.</p>
+      {#if nuvem.estado === 'desligada'}
+        <p class="aviso">Precisa da nuvem ligada. Veja Meu perfil.</p>
+      {:else if !logada}
+        <p class="aviso">Entre na sua conta para publicar. <a href="/entrar">Entrar</a></p>
+      {:else}
+        <div class="saidas">
+          <button class="principal" disabled={publicando} onclick={publicarLink}>{publicando ? 'Publicando...' : codigoLink ? 'Atualizar o link' : 'Publicar link'}</button>
+          {#if codigoLink}
+            <button onclick={() => copiarSaida('link', linkDe(codigoLink))}>{copiado === 'link' ? 'Link copiado!' : 'Copiar link'}</button>
+            <a class="botao" href="/retornos?c={codigoLink}">Ver retornos</a>
+          {/if}
+        </div>
+        {#if codigoLink}<p class="dica">Atualizar troca o conteúdo e mantém o mesmo link e as respostas já recebidas.</p>{/if}
+        {#if ignoradas.length}<p class="dica">Só no PDF, fora do link: {ignoradas.join(', ')}.</p>{/if}
+        {#if erroLink}<p class="aviso">{erroLink}</p>{/if}
+      {/if}
+    </div>
+
     <button class="principal grande" onclick={() => baixarPdf(entrada())}>Baixar PDF</button>
     <div class="saidas">
       <button onclick={() => copiarSaida('teams', textoTeams(dados, ctx, notas))}>{copiado === 'teams' ? 'Copiado!' : 'Copiar mensagem do Teams'}</button>
@@ -252,9 +306,8 @@
   {
     display: grid;
     grid-template-columns: 440px 1fr;
-    gap: 24px;
-    padding: 24px 28px;
-    height: calc(100vh - 60px);
+    gap: var(--size-5);
+    height: calc(100vh - 58px);
   }
   aside
   {

@@ -6,7 +6,7 @@
   } from '@supervisao/core';
   import { carregar, exportarJson, importarJson, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
   import { svgLinha, svgSparkline } from '#lib/graficos.ts';
-  import { entrar, nuvem, sairDaNuvem } from '#lib/nuvem.svelte.ts';
+  import { nuvem, sairDaNuvem } from '#lib/nuvem.svelte.ts';
   import { baixarTexto, copiar, textoPacote, textoTeams } from '#lib/saidas.ts';
   import { contextoDaSemana, dataCurta, dataMedia, hoje, semanasDisponiveis } from '#lib/semana.ts';
   import { fecharSessao, lerSessao } from '#lib/sessao.ts';
@@ -80,6 +80,7 @@
   function sair()
   {
     fecharSessao();
+    sairDaNuvem().catch(() => {});
     goto('/entrar');
   }
 
@@ -329,13 +330,13 @@
         {#if nuvem.estado === 'desligada'}
           <p class="dica">Desligada: os dados ficam só neste navegador. Para ligar, preencha a configuração do Firebase (passo a passo no README).</p>
         {:else if nuvem.estado === 'sem_login'}
-          <p class="dica">Entre com a conta Google para guardar tudo no Firebase e abrir em outro computador.</p>
-          <button onclick={() => entrar().catch((e) => alert(`Não consegui entrar: ${e}`))}>Entrar com Google</button>
+          <p class="dica">Entre na sua conta para guardar tudo na nuvem e abrir em outro computador.</p>
+          <a class="botao" href="/entrar">Entrar ou criar conta</a>
         {:else}
           <p class="estado {nuvem.estado}">
             {nuvem.estado === 'sincronizando' ? 'sincronizando...' : nuvem.estado === 'erro' ? 'erro ao sincronizar' : 'tudo guardado na nuvem'}
           </p>
-          <p class="dica">{nuvem.email}{nuvem.ultimoEnvio ? ` - último envio ${nuvem.ultimoEnvio.slice(11, 16)}` : ''}</p>
+          <p class="dica">{nuvem.email} - <a href="/perfil">perfil</a>{nuvem.ultimoEnvio ? ` - último envio ${nuvem.ultimoEnvio.slice(11, 16)}` : ''}</p>
           {#if nuvem.erro}<p class="dica erro">{nuvem.erro}</p>{/if}
           <button class="link" onclick={() => sairDaNuvem()}>sair da nuvem</button>
         {/if}
@@ -345,12 +346,6 @@
 </main>
 
 <style>
-  main
-  {
-    max-width: 1180px;
-    margin: 0 auto;
-    padding: 32px 28px 48px;
-  }
   .topo
   {
     display: flex;

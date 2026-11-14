@@ -1,9 +1,32 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
     // cada pessoa só lê e grava os próprios dados
     match /usuarios/{uid}/{documento=**} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // relatórios publicados por link: quem tem o código (24 letras, impossível de adivinhar) lê enquanto estiver ativo
+    match /publicados/{codigo} {
+      allow get: if resource.data.ativo == true || (request.auth != null && resource.data.dono == request.auth.uid);
+      allow list: if request.auth != null && resource.data.dono == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.dono == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.dono == request.auth.uid && request.resource.data.dono == resource.data.dono;
+
+      // marcas e comentários: qualquer pessoa com o link cria (sem editar nem apagar); só a dona lê e apaga
+      match /respostas/{id} {
+        allow read, delete: if request.auth != null && get(/databases/$(database)/documents/publicados/$(codigo)).data.dono == request.auth.uid;
+        allow create: if get(/databases/$(database)/documents/publicados/$(codigo)).data.ativo == true
+          && request.resource.data.keys().hasOnly(['secaoId', 'itemId', 'marca', 'texto', 'nome', 'em'])
+          && request.resource.data.keys().hasAll(['secaoId', 'texto', 'nome', 'em'])
+          && request.resource.data.secaoId is string && request.resource.data.secaoId.size() <= 60
+          && (!('itemId' in request.resource.data) || (request.resource.data.itemId is string && request.resource.data.itemId.size() <= 60))
+          && (!('marca' in request.resource.data) || request.resource.data.marca in ['ciente', 'concordo', 'duvida'])
+          && request.resource.data.texto is string && request.resource.data.texto.size() <= 1000
+          && request.resource.data.nome is string && request.resource.data.nome.size() > 0 && request.resource.data.nome.size() <= 60
+          && request.resource.data.em is string && request.resource.data.em.size() <= 30;
+      }
     }
   }
 }

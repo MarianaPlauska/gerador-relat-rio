@@ -159,12 +159,6 @@
 </main>
 
 <style>
-  main
-  {
-    max-width: 1300px;
-    margin: 0 auto;
-    padding: 16px;
-  }
   header
   {
     display: flex;
@@ -175,7 +169,6 @@
   h1
   {
     margin-right: auto;
-    font-size: 1.4rem;
   }
   .chips
   {

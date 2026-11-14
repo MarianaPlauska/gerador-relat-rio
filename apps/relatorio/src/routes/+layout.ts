@@ -8,6 +8,6 @@ export const ssr = false;
 // sem sessão, toda tela abre pela entrada
 export function load({ url }: { url: URL })
 {
-  if (!browser || url.pathname === '/entrar' || lerSessao()) return;
+  if (!browser || url.pathname === '/entrar' || url.pathname === '/ler' || lerSessao()) return;
   redirect(307, '/entrar');
 }

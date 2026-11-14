@@ -6,7 +6,7 @@ import { firebaseConfig } from './firebaseConfig.ts';
 // para não bater no limite de 1 MB por documento. O navegador continua sendo a cópia de trabalho;
 // a nuvem recebe cada mudança 2 s depois e, ao abrir, a versão mais nova vence.
 
-export const nuvem = $state<{ estado: 'desligada' | 'sem_login' | 'sincronizando' | 'ok' | 'erro'; email?: string | undefined; ultimoEnvio?: string | undefined; erro?: string | undefined }>({
+export const nuvem = $state<{ estado: 'desligada' | 'sem_login' | 'sincronizando' | 'ok' | 'erro'; email?: string | undefined; nome?: string | undefined; ultimoEnvio?: string | undefined; erro?: string | undefined }>({
   estado: firebaseConfig.apiKey ? 'sem_login' : 'desligada',
 });
 
@@ -44,6 +44,7 @@ export function iniciarNuvem(aoReceber: (dados: Dados, quando: string, primeiraV
       uid = usuario?.uid;
       pronto = false;
       nuvem.email = usuario?.email ?? undefined;
+      nuvem.nome = usuario?.displayName ?? undefined;
       if (!uid)
       {
         nuvem.estado = 'sem_login';
@@ -118,14 +119,83 @@ export function agendarEnvio(dados: Dados): void
   espera = setTimeout(() => executar(() => enviar(dados)), 2000);
 }
 
-export async function entrar(): Promise<void>
+// o Firebase Auth traz o código do erro; aqui vira uma frase para a tela
+export function textoDoErro(e: unknown): string
+{
+  const codigo = String((e as { code?: string })?.code ?? e);
+  const frases: Record<string, string> = {
+    'auth/email-already-in-use': 'Já existe uma conta com esse e-mail. Use Entrar.',
+    'auth/invalid-email': 'E-mail inválido.',
+    'auth/weak-password': 'A senha precisa ter pelo menos 6 caracteres.',
+    'auth/invalid-credential': 'E-mail ou senha incorretos.',
+    'auth/user-not-found': 'E-mail ou senha incorretos.',
+    'auth/wrong-password': 'E-mail ou senha incorretos.',
+    'auth/too-many-requests': 'Muitas tentativas. Espere alguns minutos e tente de novo.',
+    'auth/network-request-failed': 'Sem conexão com a internet.',
+    'auth/requires-recent-login': 'Por segurança, saia e entre de novo antes de fazer isso.',
+    'auth/operation-not-allowed': 'Login por e-mail e senha ainda não foi ativado no Firebase.',
+  };
+  return frases[codigo] ?? `Não deu certo (${codigo}).`;
+}
+
+// manter = continua conectada depois de fechar o navegador
+async function persistencia(manter: boolean)
 {
   const { auth, autenticacao } = await servico();
-  await auth.signInWithPopup(autenticacao, new auth.GoogleAuthProvider());
+  await auth.setPersistence(autenticacao, manter ? auth.browserLocalPersistence : auth.browserSessionPersistence);
+  return { auth, autenticacao };
+}
+
+export async function criarConta(nome: string, email: string, senha: string, manter: boolean): Promise<void>
+{
+  const { auth, autenticacao } = await persistencia(manter);
+  const { user } = await auth.createUserWithEmailAndPassword(autenticacao, email, senha);
+  await auth.updateProfile(user, { displayName: nome });
+  nuvem.nome = nome;
+}
+
+export async function entrarComEmail(email: string, senha: string, manter: boolean): Promise<void>
+{
+  const { auth, autenticacao } = await persistencia(manter);
+  await auth.signInWithEmailAndPassword(autenticacao, email, senha);
+}
+
+export async function recuperarSenha(email: string): Promise<void>
+{
+  const { auth, autenticacao } = await servico();
+  await auth.sendPasswordResetEmail(autenticacao, email);
+}
+
+export async function trocarSenha(senhaAtual: string, nova: string): Promise<void>
+{
+  const { auth, autenticacao } = await servico();
+  const usuario = autenticacao.currentUser;
+  if (!usuario?.email) throw new Error('sem conta');
+  await auth.reauthenticateWithCredential(usuario, auth.EmailAuthProvider.credential(usuario.email, senhaAtual));
+  await auth.updatePassword(usuario, nova);
+}
+
+export async function trocarNomeDaConta(nome: string): Promise<void>
+{
+  const { auth, autenticacao } = await servico();
+  if (autenticacao.currentUser) await auth.updateProfile(autenticacao.currentUser, { displayName: nome });
+  nuvem.nome = nome;
 }
 
 export async function sairDaNuvem(): Promise<void>
 {
+  if (nuvem.estado === 'desligada') return;
   const { auth, autenticacao } = await servico();
   await auth.signOut(autenticacao);
+}
+
+// para quem precisa falar com o Firestore (links publicados): os mesmos serviços e o usuário atual
+export const firebaseServicos = servico;
+export const uidAtual = () => uid;
+// espera o Firebase dizer se há alguém conectado; devolve o uid ou undefined
+export async function esperarUsuario(): Promise<string | undefined>
+{
+  const { auth, autenticacao } = await servico();
+  await autenticacao.authStateReady();
+  return autenticacao.currentUser?.uid ?? undefined;
 }

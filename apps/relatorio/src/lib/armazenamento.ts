@@ -17,6 +17,8 @@ export interface NotasRelatorio
   frasesOcultas?: string[];
   // blocos mexidos neste relatório, por modelo; sem isso valem os do modelo
   blocos?: Record<string, Bloco[]>;
+  // código do link interativo já publicado, por modelo: publicar de novo atualiza o mesmo link
+  links?: Record<string, string>;
 }
 
 // dados fixos que aparecem na capa e no termo de aprovação

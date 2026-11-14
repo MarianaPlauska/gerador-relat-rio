@@ -9,6 +9,7 @@
   import { page } from '$app/state';
   import { carregar, exportarJson } from '#lib/armazenamento.ts';
   import { chuva } from '#lib/chuva.ts';
+  import { nuvem, sairDaNuvem } from '#lib/nuvem.svelte.ts';
   import { fecharSessao, lerSessao } from '#lib/sessao.ts';
 
   let { children } = $props();
@@ -24,6 +25,8 @@
   ];
 
   let escuro = $state(typeof document === 'undefined' || document.documentElement.dataset.tema !== 'claro');
+  // telas abertas sem conta: entrada e relatório recebido por link
+  const aberta = $derived(page.url.pathname === '/entrar' || page.url.pathname === '/ler');
   const nome = $derived(page.url.pathname && (lerSessao()?.nome ?? ''));
 
   function trocarTema()
@@ -44,13 +47,14 @@
   function sair()
   {
     fecharSessao();
+    sairDaNuvem().catch(() => {});
     goto('/entrar');
   }
 </script>
 
-{#if page.url.pathname !== '/entrar'}
+{#if !aberta}
   <nav>
-    <canvas class="chuva-nav" use:chuva={{ fundo: 'rgba(6, 9, 8, 0.2)', cor: '#12a454', tamanho: 12 }}></canvas>
+    <canvas class="chuva-nav" use:chuva={{ fundo: 'rgba(19, 25, 22, 0.2)', cor: '#12a454', tamanho: 12 }}></canvas>
     <a href="/" class="marca">OrbisOS<span>_</span></a>
     <div class="links">
       {#each links as l (l.href)}
@@ -73,6 +77,8 @@
         <DropdownMenu.Portal>
           <DropdownMenu.Content class="menu-conta" sideOffset={8} align="end">
             <div class="menu-titulo">{nome || 'sem nome'}</div>
+            <DropdownMenu.Item class="menu-item" onSelect={() => goto('/perfil')}>Meu perfil</DropdownMenu.Item>
+            <DropdownMenu.Item class="menu-item" onSelect={() => goto('/retornos')}>Retornos dos links</DropdownMenu.Item>
             <DropdownMenu.Item class="menu-item" onSelect={() => goto('/modelos')}>Modelos de relatório</DropdownMenu.Item>
             <DropdownMenu.Item class="menu-item" onSelect={() => exportarJson(carregar())}>Baixar backup</DropdownMenu.Item>
             <DropdownMenu.Item class="menu-item" onSelect={trocarTema}>Tema {escuro ? 'claro' : 'escuro'}</DropdownMenu.Item>
@@ -85,9 +91,111 @@
   </nav>
 {/if}
 
-{@render children()}
+<div class="conteudo">
+  {@render children()}
+</div>
+
+{#if !aberta}
+  <footer>
+    <div class="rodape">
+      <div class="rodape-marca">
+        <a href="/" class="nome-rodape">OrbisOS<span>_</span></a>
+        <p>Supervisão de desenvolvimento: do painel do gestor ao relatório.</p>
+      </div>
+      <div class="rodape-links">
+        <a href="/painel">Colar painel</a>
+        <a href="/listas">Listas</a>
+        <a href="/fluxos">Fluxos</a>
+        <a href="/modelos">Modelos</a>
+        <a href="/relatorio">Relatório</a>
+      </div>
+      <div class="rodape-info">
+        <span>Dados guardados neste navegador{nuvem.estado === 'ok' ? ' e na nuvem' : ''}.</span>
+        <span>Sem IA paga: tudo roda no seu computador.</span>
+      </div>
+    </div>
+    <div class="rodape-fim">OrbisOS &copy; {new Date().getFullYear()}</div>
+  </footer>
+{/if}
 
 <style>
+  .conteudo
+  {
+    min-height: calc(100vh - 58px - var(--altura-rodape, 150px));
+  }
+  footer
+  {
+    margin-top: var(--size-8);
+    background: var(--superficie);
+    border-top: 1px solid var(--borda);
+    color: var(--suave);
+    font-size: 0.84rem;
+  }
+  .rodape
+  {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: var(--size-6);
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1.2fr;
+    gap: var(--size-6);
+    align-items: start;
+  }
+  .nome-rodape
+  {
+    font-family: var(--fonte-maquina);
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--texto);
+    text-decoration: none;
+  }
+  .nome-rodape span
+  {
+    color: var(--suave);
+  }
+  .rodape-marca p
+  {
+    margin: var(--size-1) 0 0;
+    max-width: 34ch;
+  }
+  .rodape-links
+  {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-1) var(--size-4);
+  }
+  .rodape-links a
+  {
+    color: var(--suave);
+    text-decoration: none;
+  }
+  .rodape-links a:hover
+  {
+    color: var(--texto);
+    text-decoration: underline;
+  }
+  .rodape-info
+  {
+    display: grid;
+    gap: var(--size-1);
+  }
+  .rodape-fim
+  {
+    border-top: 1px solid var(--borda);
+    padding: var(--size-3) var(--size-6);
+    text-align: center;
+    font-family: var(--fonte-maquina);
+    font-size: 0.76rem;
+  }
+  @media (max-width: 760px)
+  {
+    .rodape
+    {
+      grid-template-columns: 1fr;
+      gap: var(--size-4);
+      padding: var(--size-4) var(--size-3);
+    }
+  }
   canvas
   {
     position: absolute;
@@ -98,7 +206,7 @@
   }
   .chuva-nav
   {
-    opacity: 0.4;
+    opacity: 0.3;
   }
   .marca, .links, .direita
   {
@@ -111,7 +219,7 @@
     gap: var(--size-5);
     padding: 0 var(--size-6);
     height: 58px;
-    background: #060908;
+    background: #131916;
     border-bottom: 1px solid rgb(30 196 107 / 18%);
     position: sticky;
     top: 0;

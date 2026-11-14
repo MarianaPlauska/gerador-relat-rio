@@ -323,12 +323,6 @@
 </main>
 
 <style>
-  main
-  {
-    max-width: 1240px;
-    margin: 0 auto;
-    padding: 24px;
-  }
   header, .topo, .linha1, .linha2, .linha3, .acoes, .promessa
   {
     display: flex;

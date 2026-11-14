@@ -16,7 +16,7 @@ No ar: https://orbisos-eta.vercel.app
 
 - O painel do gestor é a fonte da verdade. O OrbisOS só lê e compara os números; nunca recalcula o que o painel já mostra.
 - A entrada é um Ctrl+C da tela, um print (lido no navegador pelo tesseract.js) ou o CSV exportado da lista de Demandas.
-- Roda no navegador. Os dados ficam no localStorage, com backup em .json e sincronização opcional no Firebase. A tela de entrada só identifica quem usa; a proteção de verdade é o login Google do Firebase.
+- Roda no navegador. Os dados ficam no localStorage, com backup em .json e sincronização opcional no Firebase. Sem Firebase, a tela de entrada só identifica quem usa. Com ele, vira conta de verdade (e-mail e senha), e a proteção dos dados são as regras do Firestore.
 - Tudo gratuito: nenhuma API paga e nenhuma IA paga. A ponte com IA é opcional: copiar um texto e colar num chat gratuito.
 
 ## Como funciona
@@ -36,7 +36,9 @@ flowchart LR
   S --> IA[Pacote para IA gratuita]
 ```
 
-A semana segue o ciclo da central: segunda cola o painel e confirma o plano; terça a quinta acompanha; sexta cola de novo e fecha. A central também mostra o **fluxo**: tempo de entrega por prioridade (p50 e p85), demandas paradas além do normal, onde as demandas se acumulam, a projeção da meta de prazo no fim do mês e o que vence em até 2 dias úteis. O relatório sai de um **modelo**: uma lista de blocos (seções prontas, texto, gráfico, tabela, quebra de página). Os modelos prontos são Semanal completo, Executivo e Período (do dia X ao dia Y).
+A semana segue o ciclo da central: segunda cola o painel e confirma o plano; terça a quinta acompanha; sexta cola de novo e fecha. A central também mostra o **fluxo**: tempo de entrega por prioridade (p50 e p85), demandas paradas além do normal, onde as demandas se acumulam, a projeção da meta de prazo no fim do mês e o que vence em até 2 dias úteis. O relatório sai de um **modelo**: uma lista de blocos (seções prontas, texto, gráfico, tabela, quebra de página). Os modelos prontos são Semanal completo, Executivo, Período (do dia X ao dia Y), Fechamento do mês, Riscos e decisões, Fluxo e previsão, Diário de implantação, Implantação por fase, Processos (fluxogramas) e Interativo.
+
+A tela **Fluxos** desenha fluxogramas de processo: monte por passos em texto, cole um Mermaid de uma IA gratuita ou arraste as peças no editor. Os fluxos entram no PDF pelo bloco Fluxograma. O modelo **Interativo** pode ser publicado como **link**: quem recebe lê no navegador, marca Ciente, Concordo ou Dúvida em cada ponto e comenta, sem criar conta, e as respostas chegam na tela **Retornos**.
 
 ## Estrutura
 
@@ -47,7 +49,7 @@ packages/core      regras puras em TypeScript, sem DOM, com testes (vitest)
   src/checklist.ts listas de checagem
   src/modelo.ts    modelos de relatório prontos e validação de modelos importados
 apps/relatorio     SvelteKit (Svelte 5, adapter-static)
-  routes/          entrar, central, colar painel, cards, semana, relatório, modelos, listas
+  routes/          entrar, central, colar painel, cards, semana, relatório, modelos, listas, fluxos, perfil, retornos, ler (link recebido)
   lib/pdf.ts       monta o PDF com pdfmake, bloco por bloco
   lib/ocr.ts       prepara o print e roda o tesseract.js
 ```
@@ -71,10 +73,12 @@ Publicação: projeto **orbisos** na Vercel, ligado a este repositório. Cada en
 O navegador é a cópia de trabalho (localStorage). Com o Firebase ligado, cada mudança vai para o Firestore 2 s depois. Ao abrir o app, a versão mais nova vence; num navegador novo, a nuvem vence e o que havia ali é baixado como backup.
 
 1. Em console.firebase.google.com, crie um projeto (plano Spark, gratuito).
-2. Em Authentication, ative o provedor Google.
+2. Em Authentication, clique em Começar e ative o provedor E-mail/senha.
 3. Em Firestore Database, crie o banco e cole as regras de [firestore.rules](firestore.rules).
 4. Em Configurações do projeto > Seus apps, crie um app Web e copie a configuração para [apps/relatorio/src/lib/firebaseConfig.ts](apps/relatorio/src/lib/firebaseConfig.ts).
 5. Em Authentication > Configurações > Domínios autorizados, adicione `orbisos-eta.vercel.app`.
+
+Links interativos: `publicados/{codigo}` guarda o relatório publicado e `publicados/{codigo}/respostas/{id}` as marcas e comentários. O código do link tem 24 letras e números e é o segredo; desativar o link na tela Retornos tira o acesso na hora. As regras deixam qualquer pessoa com o link criar respostas (sem editar nem apagar) e só a dona ler tudo.
 
 Estrutura: `usuarios/{uid}/geral/dados` guarda tudo menos as fotos, e `usuarios/{uid}/fotos/{data}` guarda uma foto do painel por documento. A configuração do app web não é segredo; quem protege os dados são as regras.
 
