@@ -2,7 +2,7 @@
   import { nomesSecoes, nomesTotais, type Bloco, type SecaoPadrao, type TotaisPainel } from '@supervisao/core';
   import { rotuloBloco } from './modelos.ts';
 
-  let { blocos, onmudar, listas = [] }: { blocos: Bloco[]; onmudar: (novos: Bloco[]) => void; listas?: { id: string; nome: string }[] } = $props();
+  let { blocos, onmudar, listas = [], fluxos = [] }: { blocos: Bloco[]; onmudar: (novos: Bloco[]) => void; listas?: { id: string; nome: string }[]; fluxos?: { id: string; nome: string }[] } = $props();
 
   const indicadores = Object.entries(nomesTotais) as [keyof TotaisPainel, string][];
   const secoesFora = $derived((Object.keys(nomesSecoes) as SecaoPadrao[]).filter((s) => !blocos.some((b) => b.tipo === 'secao' && b.secao === s)));
@@ -48,7 +48,7 @@
     <li class={b.tipo}>
       <div class="linha">
         <span class="n">{i + 1}</span>
-        {#if b.tipo === 'texto' || b.tipo === 'grafico' || b.tipo === 'tabela' || b.tipo === 'lista'}
+        {#if b.tipo === 'texto' || b.tipo === 'grafico' || b.tipo === 'tabela' || b.tipo === 'lista' || b.tipo === 'fluxograma'}
           <button class="nome editavel" onclick={() => (aberto = aberto === i ? undefined : i)}>{rotuloBloco(b)} <small>{aberto === i ? 'fechar' : 'editar'}</small></button>
         {:else}
           <span class="nome">{rotuloBloco(b)}</span>
@@ -79,6 +79,14 @@
             </label>
             <label>Título (opcional) <input value={b.titulo ?? ''} oninput={(e) => mudar(i, { ...b, titulo: e.currentTarget.value || undefined })} /></label>
             <label class="marca"><input type="checkbox" checked={b.comDiario !== false} onchange={(e) => mudar(i, { ...b, comDiario: e.currentTarget.checked })} /> incluir o diário do período</label>
+          {:else if b.tipo === 'fluxograma'}
+            <label>Fluxo
+              <select value={b.fluxoId ?? ''} onchange={(e) => mudar(i, { ...b, fluxoId: e.currentTarget.value || undefined })}>
+                <option value="">Todos os fluxos</option>
+                {#each fluxos as f (f.id)}<option value={f.id}>{f.nome}</option>{/each}
+              </select>
+            </label>
+            <label>Título (opcional) <input value={b.titulo ?? ''} oninput={(e) => mudar(i, { ...b, titulo: e.currentTarget.value || undefined })} /></label>
           {:else if b.tipo === 'tabela'}
             <label>Legenda (opcional) <input value={b.titulo ?? ''} oninput={(e) => mudar(i, { ...b, titulo: e.currentTarget.value || undefined })} /></label>
             <div class="indicadores">
@@ -101,6 +109,7 @@
   <button onclick={() => adicionar({ tipo: 'tabela', indicadores: ['dentroDoPrazoPct', 'concluidos'] })}>+ Tabela</button>
   <button onclick={() => adicionar({ tipo: 'quebra' })}>+ Quebra de página</button>
   <button onclick={() => adicionar({ tipo: 'lista', comDiario: true })}>+ Lista de checagem</button>
+  <button onclick={() => adicionar({ tipo: 'fluxograma', fluxoId: fluxos[0]?.id })}>+ Fluxograma</button>
   {#if secoesFora.length}
     <select value="" onchange={(e) => { const s = e.currentTarget.value as SecaoPadrao; e.currentTarget.value = ''; if (s) adicionar({ tipo: 'secao', secao: s }); }}>
       <option value="">+ Seção pronta...</option>

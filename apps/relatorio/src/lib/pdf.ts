@@ -12,6 +12,7 @@ import texto400 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-no
 import texto400i from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-italic.woff?url';
 import texto600 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff?url';
 import type { Dados, NotasRelatorio } from './armazenamento.ts';
+import { svgDoFluxo } from './fluxograma.ts';
 import { cores, svgBarrasComparadas, svgBarrasEmpilhadas, svgLinha } from './graficos.ts';
 import { dataCurta, dataMedia, semaforoDoRelatorio, type Contexto } from './semana.ts';
 
@@ -957,10 +958,32 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
     }
   }
 
+  // fluxograma da tela Fluxos, reduzido para caber na largura e em uma página
+  function desenharFluxograma(b: Extract<Bloco, { tipo: 'fluxograma' }>)
+  {
+    const fluxos = dados.fluxos.filter((f) => !b.fluxoId || f.id === b.fluxoId);
+    if (!fluxos.length)
+    {
+      conteudo.push(h1(b.titulo || 'Fluxograma'));
+      conteudo.push(p('Nenhum fluxograma registrado.'));
+      return;
+    }
+    for (const f of fluxos)
+    {
+      // título, descrição e desenho na mesma página
+      const { svg } = svgDoFluxo(f, 'Texto');
+      conteudo.push({
+        stack: [h1(b.titulo && fluxos.length === 1 ? b.titulo : f.nome), ...(f.descricao ? [p(f.descricao)] : []), legendaFigura(f.nome), { svg, font: 'Texto', fit: [LARGURA, 540], alignment: 'center', margin: [0, 2, 0, 6] }, fonte('fluxograma da supervisão')],
+        unbreakable: true,
+      });
+    }
+  }
+
   for (const b of blocos)
   {
     if (b.tipo === 'secao') desenhar[b.secao]();
     else if (b.tipo === 'lista') desenharLista(b);
+    else if (b.tipo === 'fluxograma') desenharFluxograma(b);
     else if (b.tipo === 'quebra') conteudo.push({ text: '', pageBreak: 'before' });
     else if (b.tipo === 'texto')
     {

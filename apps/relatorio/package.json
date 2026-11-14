@@ -14,6 +14,7 @@
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@internationalized/date": "^3.12.4",
     "@supervisao/core": "*",
+    "@xyflow/svelte": "^1.7.1",
     "bits-ui": "^2.21.0",
     "firebase": "^13.2.0",
     "open-props": "^1.7.23",

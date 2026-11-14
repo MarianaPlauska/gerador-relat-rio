@@ -19,6 +19,7 @@
     { href: '/cards', nome: 'Cards' },
     { href: '/semana', nome: 'Semana' },
     { href: '/listas', nome: 'Listas' },
+    { href: '/fluxos', nome: 'Fluxos' },
     { href: '/relatorio', nome: 'Relatório' },
   ];
 

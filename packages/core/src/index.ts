@@ -18,3 +18,4 @@ export * from './leitor/csv';
 export * from './modelo';
 export * from './fluxo';
 export * from './checklist';
+export * from './fluxograma';

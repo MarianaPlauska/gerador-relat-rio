@@ -50,7 +50,9 @@ export type Bloco =
   | { tipo: 'tabela'; indicadores: (keyof TotaisPainel)[]; titulo?: string | undefined }
   | { tipo: 'quebra' }
   // lista de checagem: progresso por fase, pendências, o que andou no período e o diário; sem listaId, todas as listas
-  | { tipo: 'lista'; listaId?: string | undefined; titulo?: string | undefined; comDiario?: boolean | undefined };
+  | { tipo: 'lista'; listaId?: string | undefined; titulo?: string | undefined; comDiario?: boolean | undefined }
+  // fluxograma desenhado na tela Fluxos; sem fluxoId, todos
+  | { tipo: 'fluxograma'; fluxoId?: string | undefined; titulo?: string | undefined };
 
 export interface Modelo
 {
@@ -153,6 +155,8 @@ function lerBloco(b: unknown, posicao: number, erros: string[]): Bloco | undefin
       return { tipo: 'quebra' };
     case 'lista':
       return { tipo: 'lista', listaId: ehTexto(o.listaId) ? o.listaId : undefined, titulo: ehTexto(o.titulo) ? o.titulo : undefined, comDiario: o.comDiario !== false };
+    case 'fluxograma':
+      return { tipo: 'fluxograma', fluxoId: ehTexto(o.fluxoId) ? o.fluxoId : undefined, titulo: ehTexto(o.titulo) ? o.titulo : undefined };
     default:
       erros.push(`${onde}: tipo "${String(o.tipo)}" não existe.`);
       return undefined;
@@ -219,6 +223,7 @@ export function pedidoDeModelo(descricao: string): string
     '- {"tipo": "tabela", "indicadores": ["<indicador>", ...], "titulo": "..."}: tabela anterior x atual x variação',
     '- {"tipo": "quebra"}: começa uma página nova',
     '- {"tipo": "lista", "titulo": "...", "comDiario": true}: listas de checagem da supervisora (implantação por empresa): progresso por fase, pendências por etapa, o que andou no período e o diário de anotações',
+    '- {"tipo": "fluxograma", "titulo": "..."}: fluxogramas de processo desenhados pela supervisora',
     '',
     '## Seções prontas',
     ...(Object.keys(nomesSecoes) as SecaoPadrao[]).map((s) => `- ${s}: ${nomesSecoes[s]} (${descricoesSecoes[s]})`),
