@@ -187,6 +187,18 @@
   {
     opacity: 0.45;
   }
+  /* o hover geral dos botões pinta o texto de verde: aqui o fundo já é verde */
+  .entrar:hover:not(:disabled)
+  {
+    background: #19c065;
+    border-color: #19c065;
+    color: #04130b;
+  }
+  .google:hover:not(:disabled)
+  {
+    border-color: #12a454;
+    color: #fff;
+  }
   .google
   {
     background: transparent;
