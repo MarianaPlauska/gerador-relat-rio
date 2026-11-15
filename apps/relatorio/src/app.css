@@ -9,19 +9,20 @@
 :root
 {
   color-scheme: dark;
-  --fundo: #1a211e;
-  --superficie: #232b27;
-  --superficie-2: #2b3530;
-  --borda: #36423c;
-  --borda-forte: #4a5a52;
-  --texto: #e9efec;
-  --suave: #a2afa8;
-  --marca: #1ec46b;
-  --sobre-marca: #04130b;
-  --marca-escura: #131916;
-  --marca-clara: rgb(30 196 107 / 14%);
-  --verde: #3ddc84;
-  --verde-fundo: rgb(61 220 132 / 12%);
+  --fundo: #15191f;
+  --superficie: #1c2129;
+  --superficie-2: #242a34;
+  --borda: #2e3541;
+  --borda-forte: #404a59;
+  --texto: #e6eaf0;
+  --suave: #9aa5b4;
+  --marca: #4cc38a;
+  --sobre-marca: #06231a;
+  --marca-escura: #10141a;
+  --barra: #0f1318;
+  --marca-clara: rgb(76 195 138 / 14%);
+  --verde: #5fcf98;
+  --verde-fundo: rgb(95 207 152 / 12%);
   --amarelo: #f2c14e;
   --amarelo-fundo: rgb(242 193 78 / 13%);
   --laranja: #f39c4f;
@@ -32,15 +33,15 @@
   --azul-fundo: rgb(106 168 255 / 13%);
   --grade-fundo: rgb(255 255 255 / 3%);
   --sombra: 0 0 0 1px rgb(0 0 0 / 18%), 0 6px 18px rgb(0 0 0 / 22%);
-  --brilho: 0 0 0 1px rgb(30 196 107 / 30%), 0 0 24px rgb(30 196 107 / 10%);
+  --brilho: 0 0 0 1px rgb(76 195 138 / 30%), 0 0 24px rgb(76 195 138 / 10%);
   --raio: var(--radius-3);
   --raio-pequeno: var(--radius-2);
   --espaco: var(--size-5);
   --curva: var(--ease-3);
   --fonte-maquina: "Courier Prime", "Courier New", monospace;
   --fonte-texto: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'18'%20height%3D'20'%20viewBox%3D'0%200%2018%2020'%3E%3Cpath%20d%3D'M2%201.5%20L2%2015%20L5.5%2011.8%20L8.3%2018%20L10.8%2016.9%20L8%2010.8%20L13%2010.8%20Z'%20fill%3D'%23f1f4f2'%20stroke%3D'%231a211e'%20stroke-width%3D'1.2'%20stroke-linejoin%3D'round'%2F%3E%3C%2Fsvg%3E") 2 1, auto;
-  --cursor-clique: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'18'%20height%3D'20'%20viewBox%3D'0%200%2018%2020'%3E%3Cpath%20d%3D'M2%201.5%20L2%2015%20L5.5%2011.8%20L8.3%2018%20L10.8%2016.9%20L8%2010.8%20L13%2010.8%20Z'%20fill%3D'%23ffffff'%20stroke%3D'%231a211e'%20stroke-width%3D'1.2'%20stroke-linejoin%3D'round'%2F%3E%3C%2Fsvg%3E") 2 1, pointer;
+  --cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2720%27%20height%3D%2722%27%20viewBox%3D%270%200%2026%2028%27%3E%3Cpath%20d%3D%27M3%202%20L3%2021%20L8%2016%20L12%2025%20L16%2023.5%20L12%2015%20L19%2015%20Z%27%20fill%3D%27%2310141a%27%20stroke%3D%27%234cc38a%27%20stroke-width%3D%272%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E") 2 2, auto;
+  --cursor-clique: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2720%27%20height%3D%2722%27%20viewBox%3D%270%200%2026%2028%27%3E%3Cpath%20d%3D%27M3%202%20L3%2021%20L8%2016%20L12%2025%20L16%2023.5%20L12%2015%20L19%2015%20Z%27%20fill%3D%27%234cc38a%27%20stroke%3D%27%2310141a%27%20stroke-width%3D%272%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E") 2 2, pointer;
 }
 
 :root[data-tema='claro']
@@ -56,6 +57,7 @@
   --marca: #12a454;
   --sobre-marca: #ffffff;
   --marca-escura: #0e1311;
+  --barra: #141922;
   --marca-clara: #e3f6ea;
   --verde: #1a7f43;
   --verde-fundo: #e7f5ec;
@@ -70,8 +72,8 @@
   --grade-fundo: rgb(14 19 17 / 3.5%);
   --sombra: 0 1px 2px rgb(14 19 17 / 5%), 0 4px 16px rgb(14 19 17 / 7%);
   --brilho: 0 0 0 1px rgb(18 164 84 / 35%), 0 0 0 4px rgb(18 164 84 / 8%);
-  --cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'18'%20height%3D'20'%20viewBox%3D'0%200%2018%2020'%3E%3Cpath%20d%3D'M2%201.5%20L2%2015%20L5.5%2011.8%20L8.3%2018%20L10.8%2016.9%20L8%2010.8%20L13%2010.8%20Z'%20fill%3D'%231a211e'%20stroke%3D'%23ffffff'%20stroke-width%3D'1.2'%20stroke-linejoin%3D'round'%2F%3E%3C%2Fsvg%3E") 2 1, auto;
-  --cursor-clique: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'18'%20height%3D'20'%20viewBox%3D'0%200%2018%2020'%3E%3Cpath%20d%3D'M2%201.5%20L2%2015%20L5.5%2011.8%20L8.3%2018%20L10.8%2016.9%20L8%2010.8%20L13%2010.8%20Z'%20fill%3D'%23000000'%20stroke%3D'%23ffffff'%20stroke-width%3D'1.2'%20stroke-linejoin%3D'round'%2F%3E%3C%2Fsvg%3E") 2 1, pointer;
+  --cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2720%27%20height%3D%2722%27%20viewBox%3D%270%200%2026%2028%27%3E%3Cpath%20d%3D%27M3%202%20L3%2021%20L8%2016%20L12%2025%20L16%2023.5%20L12%2015%20L19%2015%20Z%27%20fill%3D%27%2310141a%27%20stroke%3D%27%2312a454%27%20stroke-width%3D%272%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E") 2 2, auto;
+  --cursor-clique: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2720%27%20height%3D%2722%27%20viewBox%3D%270%200%2026%2028%27%3E%3Cpath%20d%3D%27M3%202%20L3%2021%20L8%2016%20L12%2025%20L16%2023.5%20L12%2015%20L19%2015%20Z%27%20fill%3D%27%2312a454%27%20stroke%3D%27%2310141a%27%20stroke-width%3D%272%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E") 2 2, pointer;
 }
 
 *

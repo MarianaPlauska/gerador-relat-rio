@@ -81,7 +81,7 @@
 </script>
 
 <div class="tela">
-  <canvas use:chuva={{ fundo: 'rgba(7, 10, 9, 0.16)', cor: '#12a454', tamanho: 15, fps: 14 }}></canvas>
+  <canvas use:chuva={{ fundo: 'rgba(8, 11, 15, 0.16)', cor: '#4cc38a', tamanho: 15, fps: 14 }}></canvas>
   <div class="vinheta"></div>
 
   <form class="caixa" onsubmit={enviar}>
@@ -186,7 +186,7 @@
   {
     font-family: var(--fonte-maquina);
     font-size: 0.78rem;
-    color: #12a454;
+    color: #4cc38a;
   }
   h1
   {
@@ -197,7 +197,7 @@
   }
   .cursor
   {
-    color: #12a454;
+    color: #4cc38a;
     animation: piscar 1s steps(1) infinite;
   }
   .lema
@@ -231,7 +231,7 @@
   input:not([type='checkbox']):focus
   {
     outline: none;
-    border-color: #12a454;
+    border-color: #4cc38a;
     box-shadow: 0 0 0 3px rgba(18, 164, 84, 0.2);
   }
   .manter
@@ -244,7 +244,7 @@
   }
   .manter input
   {
-    accent-color: #12a454;
+    accent-color: #4cc38a;
   }
   .entrar
   {
@@ -256,9 +256,9 @@
   }
   .entrar
   {
-    background: #12a454;
-    border: 1px solid #12a454;
-    color: #04130b;
+    background: #4cc38a;
+    border: 1px solid #4cc38a;
+    color: #06231a;
   }
   .entrar:disabled
   {
@@ -269,7 +269,7 @@
   {
     background: #19c065;
     border-color: #19c065;
-    color: #04130b;
+    color: #06231a;
   }
   .erro
   {
@@ -345,6 +345,6 @@
   {
     margin: 0;
     font-size: 0.84rem;
-    color: #3ddc84;
+    color: #5fcf98;
   }
 </style>

@@ -54,7 +54,7 @@
 
 {#if !aberta}
   <nav>
-    <canvas class="chuva-nav" use:chuva={{ fundo: 'rgba(19, 25, 22, 0.2)', cor: '#12a454', tamanho: 12 }}></canvas>
+    <canvas class="chuva-nav" use:chuva={{ fundo: 'rgba(15, 19, 24, 0.2)', cor: '#4cc38a', tamanho: 12 }}></canvas>
     <a href="/" class="marca">OrbisOS<span>_</span></a>
     <div class="links">
       {#each links as l (l.href)}
@@ -126,9 +126,9 @@
   footer
   {
     margin-top: var(--size-8);
-    background: var(--superficie);
-    border-top: 1px solid var(--borda);
-    color: var(--suave);
+    background: var(--barra);
+    border-top: 2px solid var(--marca);
+    color: #9aa5b4;
     font-size: 0.84rem;
   }
   .rodape
@@ -146,12 +146,12 @@
     font-family: var(--fonte-maquina);
     font-weight: 700;
     font-size: 1.05rem;
-    color: var(--texto);
+    color: #fff;
     text-decoration: none;
   }
   .nome-rodape span
   {
-    color: var(--suave);
+    color: var(--marca);
   }
   .rodape-marca p
   {
@@ -166,12 +166,12 @@
   }
   .rodape-links a
   {
-    color: var(--suave);
+    color: #9aa5b4;
     text-decoration: none;
   }
   .rodape-links a:hover
   {
-    color: var(--texto);
+    color: #fff;
     text-decoration: underline;
   }
   .rodape-info
@@ -181,7 +181,7 @@
   }
   .rodape-fim
   {
-    border-top: 1px solid var(--borda);
+    border-top: 1px solid rgb(255 255 255 / 8%);
     padding: var(--size-3) var(--size-6);
     text-align: center;
     font-family: var(--fonte-maquina);
@@ -219,8 +219,8 @@
     gap: var(--size-5);
     padding: 0 var(--size-6);
     height: 58px;
-    background: #131916;
-    border-bottom: 1px solid rgb(30 196 107 / 18%);
+    background: var(--barra);
+    border-bottom: 1px solid rgb(76 195 138 / 20%);
     position: sticky;
     top: 0;
     z-index: 10;
@@ -236,7 +236,7 @@
   }
   .marca span
   {
-    color: #1ec46b;
+    color: var(--marca);
     animation: piscar 1.1s steps(1) infinite;
   }
   .links
@@ -268,7 +268,7 @@
   .links .ativo
   {
     color: #fff;
-    border-bottom-color: #1ec46b;
+    border-bottom-color: var(--marca);
     font-weight: 700;
   }
   .direita
@@ -301,7 +301,7 @@
   .tema:hover:not(:disabled)
   {
     color: #fff;
-    border-color: #1ec46b;
+    border-color: var(--marca);
   }
   /* o gatilho e o menu do Bits UI ficam fora do escopo deste componente */
   :global(.usuario)
@@ -318,7 +318,7 @@
   }
   :global(.usuario:hover)
   {
-    border-color: #1ec46b !important;
+    border-color: var(--marca) !important;
   }
   .inicial
   {
@@ -327,8 +327,8 @@
     border-radius: 50%;
     display: grid;
     place-items: center;
-    background: #1ec46b;
-    color: #04130b;
+    background: var(--marca);
+    color: var(--sobre-marca);
     font-weight: 700;
   }
   :global(.menu-conta)

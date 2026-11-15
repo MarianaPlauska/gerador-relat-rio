@@ -1,22 +1,23 @@
 <script lang="ts">
   import
   {
-    acoesDeHoje, aplicarControle, definicoesPadrao, diasUteisEntre, historico, linhaDoTempo, progressoDaLista, resumoDoFluxo, ritmoPorPessoa, segundaDaSemana, semanaDoAno, serieSemanal, somarDias, textoProjecao,
+    acoesDeHoje, aplicarControle, definicoesPadrao, diasUteisEntre, historico, linhaDoTempo, progressoDaLista, resumoDoFluxo, ritmoPorPessoa, segundaDaSemana, serieSemanal, somarDias, textoProjecao,
     type Destino, type Evento, type TotaisPainel,
   } from '@supervisao/core';
-  import { carregar, exportarJson, importarJson, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
+  import { Tabs } from 'bits-ui';
+  import { carregar, type NotasRelatorio } from '#lib/armazenamento.ts';
   import { svgLinha, svgSparkline } from '#lib/graficos.ts';
   import { nuvem, sairDaNuvem } from '#lib/nuvem.svelte.ts';
   import { baixarTexto, copiar, textoPacote, textoTeams } from '#lib/saidas.ts';
   import { contextoDaSemana, dataCurta, dataMedia, hoje, semanasDisponiveis } from '#lib/semana.ts';
-  import { fecharSessao, lerSessao } from '#lib/sessao.ts';
-  import { goto } from '$app/navigation';
+  import { lerSessao } from '#lib/sessao.ts';
 
-  let dados = $state<Dados>(carregar());
+  const dados = carregar();
   const dia = hoje();
   let semana = $state(segundaDaSemana(dia));
   let copiado = $state('');
-  let entradaBackup = $state<HTMLInputElement>();
+  let abaSemana = $state('percebido');
+  let abaLateral = $state('listas');
 
   const ctx = $derived(contextoDaSemana(dados, semana));
   const notas = $derived<NotasRelatorio>(dados.relatorios[semana] ?? {});
@@ -52,14 +53,6 @@
     return new Map(ritmoPorPessoa(emExec, dados.pessoas).map((r) => [r.pessoa.id, r.contagem]));
   });
 
-  const nomesDias = ['seg', 'ter', 'qua', 'qui', 'sex'];
-  const rotinaDia = ['colar o painel e planejar', 'acompanhar', 'colar o painel', 'acompanhar', 'colar o painel e fechar'];
-  const regua = $derived(nomesDias.map((nome, i) =>
-  {
-    const data = somarDias(semana, i);
-    return { nome, data, rotina: rotinaDia[i]!, hoje: data === dia, passou: data < dia, foto: dados.fotos.some((f) => f.data === data) };
-  }));
-
   const rotas: Record<Destino, string> = { painel: '/painel', semana: '/semana', cards: '/cards', relatorio: '/relatorio', listas: '/listas' };
   const iconeEvento: Record<Evento['tipo'], string> = {
     foto: '[foto]', etapa: '[etapa]', previsao: '[previsão]', ritmo: '[ritmo]', entrou: '[entrou]', saiu: '[saiu]', plano: '[plano]', entrega: '[entrega]', risco: '[risco]',
@@ -71,18 +64,10 @@
 
   const ultimaFoto = $derived([...dados.fotos].filter((f) => f.data <= dia).sort((a, b) => a.data.localeCompare(b.data)).at(-1));
   const diasDesdeFoto = $derived(ultimaFoto ? diasUteisEntre(ultimaFoto.data, dia, definicoesPadrao.feriados) : 0);
-  const nomesNuvem: Record<typeof nuvem.estado, string> = { desligada: 'desligada', sem_login: 'sem login', sincronizando: 'sincronizando', ok: 'ok', erro: 'erro' };
   // atenção primeiro: com a lista recolhida, o que importa aparece
   const ordemTom = { atencao: 0, positivo: 1, neutro: 2 };
   const frasesOrdenadas = $derived([...ctx.frases].sort((a, b) => ordemTom[a.tom] - ordemTom[b.tom]));
   let todasFrases = $state(false);
-
-  function sair()
-  {
-    fecharSessao();
-    sairDaNuvem().catch(() => {});
-    goto('/entrar');
-  }
 
   function variacao(chave: keyof TotaisPainel, sufixo = ''): string
   {
@@ -99,63 +84,24 @@
     copiado = nome;
     setTimeout(() => (copiado = ''), 2000);
   }
-
-  async function restaurar(arquivo?: File)
-  {
-    if (!arquivo || !confirm('Restaurar o backup substitui todos os dados deste navegador. Continuar?')) return;
-    dados = await importarJson(arquivo);
-    salvar($state.snapshot(dados) as Dados);
-  }
 </script>
 
 <main>
-  <section class="topo">
+  <header>
     <div>
-      <span class="prompt">&gt; {saudacao.toLowerCase()}{primeiroNome ? `, ${primeiroNome.toLowerCase()}` : ''}<span class="cursor">_</span></span>
-      <h1>OrbisOS</h1>
-      <p class="lema">seu giro da semana: painel, plano, riscos e relatório num lugar só.</p>
+      <span class="prompt">&gt; {saudacao.toLowerCase()}{primeiroNome ? `, ${primeiroNome.toLowerCase()}` : ''}</span>
+      <h1>Início<span class="cursor">_</span></h1>
     </div>
-    <div class="topo-direita">
-      <select bind:value={semana} aria-label="Semana">
-        {#each semanasDisponiveis(dados) as s (s)}<option value={s}>{dataCurta(s)} a {dataCurta(somarDias(s, 4))}</option>{/each}
-      </select>
-      <button class="link" onclick={sair}>sair</button>
-    </div>
-  </section>
+    <select bind:value={semana} aria-label="Semana">
+      {#each semanasDisponiveis(dados) as s (s)}<option value={s}>{dataCurta(s)} a {dataCurta(somarDias(s, 4))}</option>{/each}
+    </select>
+  </header>
 
-  <ul class="status maquina">
-    <li><span>semana</span><b>S{semanaDoAno(semana)}</b></li>
-    <li class:aviso={!ultimaFoto || diasDesdeFoto >= 2}><span>última foto</span><b>{ultimaFoto ? `${dataCurta(ultimaFoto.data)}${diasDesdeFoto > 0 ? ` · há ${diasDesdeFoto} d úteis` : ' · hoje'}` : 'nenhuma'}</b></li>
-    <li class:aviso={ctx.alertas.length > 0}><span>alertas</span><b>{ctx.alertas.length}</b></li>
-    <li class:aviso={fluxo.parados.length > 0}><span>parados</span><b>{fluxo.parados.length}</b></li>
-    <li class:ok={nuvem.estado === 'ok'}><span>nuvem</span><b>{nomesNuvem[nuvem.estado]}</b></li>
-  </ul>
-
-  <ol class="regua">
-    {#each regua as d (d.data)}
-      <li class:hoje={d.hoje} class:passou={d.passou}>
-        <span class="dia maquina">{d.nome} {dataCurta(d.data)}</span>
-        <span class="rotina">{d.rotina}</span>
-        {#if d.foto}<span class="marca-foto" title="foto do painel neste dia">foto</span>{/if}
-      </li>
-    {/each}
-  </ol>
-
-  <section class="hoje-painel">
-    <div class="titulo-hoje">
-      <span class="etiqueta">agora</span>
-      <h2>O que fazer</h2>
-    </div>
-    <ul class="acoes">
-      {#each acoes as a, i (i)}
-        <li class={a.nivel}>
-          <i></i>
-          <span>{a.texto}</span>
-          {#if a.destino}<a href={rotas[a.destino]}>abrir</a>{/if}
-        </li>
-      {/each}
-    </ul>
-  </section>
+  {#if !ultimaFoto}
+    <p class="aviso">Nenhuma foto do painel ainda. <a href="/painel">Colar o painel</a> para começar.</p>
+  {:else if diasDesdeFoto >= 2}
+    <p class="aviso">A última foto do painel é de {dataCurta(ultimaFoto.data)}, há {diasDesdeFoto} dias úteis. <a href="/painel">Colar o painel</a></p>
+  {/if}
 
   <section class="kpis">
     <div class="kpi">
@@ -189,8 +135,28 @@
   </section>
 
   <div class="grade">
-    <div class="principal-col">
-      <section class="cartao fluxo">
+    <div class="coluna">
+      <section class="cartao">
+        <h2>O que fazer</h2>
+        <ul class="acoes">
+          {#each acoes as a, i (i)}
+            <li class={a.nivel}>
+              <i></i>
+              <span>{a.texto}</span>
+              {#if a.destino}<a href={rotas[a.destino]}>abrir</a>{/if}
+            </li>
+          {/each}
+        </ul>
+      </section>
+
+      {#if serie('dentroDoPrazoPct').length >= 2}
+        <section class="cartao">
+          <h2>Evolução do prazo</h2>
+          <div class="grafico">{@html svgLinha(serie('dentroDoPrazoPct').map((p) => ({ rotulo: dataCurta(p.data), valor: p.valor })), { meta: ctx.meta, sufixo: '%', largura: 760 })}</div>
+        </section>
+      {/if}
+
+      <section class="cartao">
         <h2>Fluxo</h2>
         <div class="projecao">
           {#if fluxo.projecao}
@@ -221,42 +187,41 @@
       </section>
 
       <section class="cartao">
-        <h2>O que o sistema percebeu</h2>
-        {#if ctx.frases.length}
-          <ul class="frases">
-            {#each todasFrases ? frasesOrdenadas : frasesOrdenadas.slice(0, 6) as f, i (i)}<li class={f.tom}><i></i>{f.texto}</li>{/each}
-          </ul>
-          {#if frasesOrdenadas.length > 6}
-            <button class="link" onclick={() => (todasFrases = !todasFrases)}>{todasFrases ? 'mostrar menos' : `ver todas (${frasesOrdenadas.length})`}</button>
-          {/if}
-        {:else}
-          <p class="dica">Cole o painel e monte o plano para o sistema comparar com a semana anterior.</p>
-        {/if}
+        <h2>Esta semana</h2>
+        <Tabs.Root bind:value={abaSemana}>
+          <Tabs.List class="abas">
+            <Tabs.Trigger value="percebido" class="aba">O que o sistema percebeu ({ctx.frases.length})</Tabs.Trigger>
+            <Tabs.Trigger value="tempo" class="aba">Linha do tempo</Tabs.Trigger>
+          </Tabs.List>
+          <Tabs.Content value="percebido">
+            {#if ctx.frases.length}
+              <ul class="frases">
+                {#each todasFrases ? frasesOrdenadas : frasesOrdenadas.slice(0, 6) as f, i (i)}<li class={f.tom}><i></i>{f.texto}</li>{/each}
+              </ul>
+              {#if frasesOrdenadas.length > 6}
+                <button class="link" onclick={() => (todasFrases = !todasFrases)}>{todasFrases ? 'mostrar menos' : `ver todas (${frasesOrdenadas.length})`}</button>
+              {/if}
+            {:else}
+              <p class="dica">Cole o painel e monte o plano para o sistema comparar com a semana anterior.</p>
+            {/if}
+          </Tabs.Content>
+          <Tabs.Content value="tempo">
+            {#each eventosPorDia as [data, lista] (data)}
+              <div class="dia-tempo">
+                <span class="data maquina">{dataMedia(data)}</span>
+                <ul>
+                  {#each lista as e, i (i)}<li class={e.tipo}><span class="tipo maquina">{iconeEvento[e.tipo]}</span> {e.texto}</li>{/each}
+                </ul>
+              </div>
+            {:else}
+              <p class="dica">Nada registrado nesta semana ainda.</p>
+            {/each}
+          </Tabs.Content>
+        </Tabs.Root>
       </section>
-
-      <section class="cartao">
-        <h2>Linha do tempo da semana</h2>
-        {#each eventosPorDia as [data, lista] (data)}
-          <div class="dia-tempo">
-            <span class="data maquina">{dataMedia(data)}</span>
-            <ul>
-              {#each lista as e, i (i)}<li class={e.tipo}><span class="tipo maquina">{iconeEvento[e.tipo]}</span> {e.texto}</li>{/each}
-            </ul>
-          </div>
-        {:else}
-          <p class="dica">Nada registrado nesta semana ainda.</p>
-        {/each}
-      </section>
-
-      {#if serie('dentroDoPrazoPct').length >= 2}
-        <section class="cartao">
-          <h2>Evolução do prazo</h2>
-          <div class="grafico">{@html svgLinha(serie('dentroDoPrazoPct').map((p) => ({ rotulo: dataCurta(p.data), valor: p.valor })), { meta: ctx.meta, sufixo: '%', largura: 760 })}</div>
-        </section>
-      {/if}
     </div>
 
-    <aside class="pilha">
+    <aside class="coluna">
       <section class="cartao">
         <h2>Time</h2>
         {#each ctx.comp.pessoas as p (p.pessoa.id)}
@@ -292,206 +257,227 @@
         <button class="saida" onclick={() => copiarSaida('pacote', textoPacote(dados, ctx, notas))}>
           <b>{copiado === 'pacote' ? 'Copiado!' : 'Pacote para IA'}</b><span>números conferidos + dicionário; a IA só escreve</span>
         </button>
-        <div class="backup">
-          <button class="link" onclick={() => exportarJson($state.snapshot(dados) as Dados)}>baixar backup</button>
-          <button class="link" onclick={() => entradaBackup?.click()}>restaurar backup</button>
-          <button class="link" onclick={() => baixarTexto(textoPacote(dados, ctx, notas), `pacote-ia-${dados.prefixo}-${semana}.md`)}>baixar pacote .md</button>
-          <a class="link" href="/modelos">modelos de relatório</a>
-          <input type="file" accept="application/json" hidden bind:this={entradaBackup} onchange={(e) => restaurar(e.currentTarget.files?.[0])} />
-        </div>
+        <button class="link" onclick={() => baixarTexto(textoPacote(dados, ctx, notas), `pacote-ia-${dados.prefixo}-${semana}.md`)}>baixar pacote .md</button>
       </section>
 
       <section class="cartao">
-        <h2>Listas</h2>
-        {#each dados.listas as l (l.id)}
-          {@const pr = progressoDaLista(l)}
-          <div class="lista-resumo">
-            <div class="linha"><b>{l.nome}</b><span class="maquina dica">{pr.concluidos}/{pr.total}</span></div>
-            <span class="barra clara"><span style:width="{pr.pct}%"></span></span>
-          </div>
-        {:else}
-          <p class="dica">Checklists suas, como o teste de agendamentos por empresa.</p>
-        {/each}
-        <a class="link-secao" href="/listas">{dados.listas.length ? 'abrir listas' : 'criar uma lista'}</a>
-      </section>
-
-      <section class="cartao">
-        <h2>Compromissos com a gestão</h2>
-        {#each emAberto as p (p.id)}
-          <p class="compromisso">{p.texto}</p>
-        {:else}
-          <p class="dica">{promessasDaSemana.length ? 'Todos os compromissos da semana têm situação.' : 'Nenhum compromisso registrado nesta semana.'}</p>
-        {/each}
-        <a class="link-secao" href="/semana">ver na semana</a>
-      </section>
-
-      <section class="cartao nuvem">
-        <h2>Nuvem</h2>
-        {#if nuvem.estado === 'desligada'}
-          <p class="dica">Desligada: os dados ficam só neste navegador. Para ligar, preencha a configuração do Firebase (passo a passo no README).</p>
-        {:else if nuvem.estado === 'sem_login'}
-          <p class="dica">Entre na sua conta para guardar tudo na nuvem e abrir em outro computador.</p>
-          <a class="botao" href="/entrar">Entrar ou criar conta</a>
-        {:else}
-          <p class="estado {nuvem.estado}">
-            {nuvem.estado === 'sincronizando' ? 'sincronizando...' : nuvem.estado === 'erro' ? 'erro ao sincronizar' : 'tudo guardado na nuvem'}
-          </p>
-          <p class="dica">{nuvem.email} - <a href="/perfil">perfil</a>{nuvem.ultimoEnvio ? ` - último envio ${nuvem.ultimoEnvio.slice(11, 16)}` : ''}</p>
-          {#if nuvem.erro}<p class="dica erro">{nuvem.erro}</p>{/if}
-          <button class="link" onclick={() => sairDaNuvem()}>sair da nuvem</button>
-        {/if}
+        <h2>Em andamento</h2>
+        <Tabs.Root bind:value={abaLateral}>
+          <Tabs.List class="abas">
+            <Tabs.Trigger value="listas" class="aba">Listas</Tabs.Trigger>
+            <Tabs.Trigger value="compromissos" class="aba">Compromissos{emAberto.length ? ` (${emAberto.length})` : ''}</Tabs.Trigger>
+            <Tabs.Trigger value="conta" class="aba">Conta</Tabs.Trigger>
+          </Tabs.List>
+          <Tabs.Content value="listas">
+            {#each dados.listas as l (l.id)}
+              {@const pr = progressoDaLista(l)}
+              <div class="lista-resumo">
+                <div class="linha"><b>{l.nome}</b><span class="maquina dica">{pr.concluidos}/{pr.total}</span></div>
+                <span class="barra clara"><span style:width="{pr.pct}%"></span></span>
+              </div>
+            {:else}
+              <p class="dica">Checklists suas, como o teste de agendamentos por empresa.</p>
+            {/each}
+            <a class="link-secao" href="/listas">{dados.listas.length ? 'abrir listas' : 'criar uma lista'}</a>
+          </Tabs.Content>
+          <Tabs.Content value="compromissos">
+            {#each emAberto as p (p.id)}
+              <p class="compromisso">{p.texto}</p>
+            {:else}
+              <p class="dica">{promessasDaSemana.length ? 'Todos os compromissos da semana têm situação.' : 'Nenhum compromisso registrado nesta semana.'}</p>
+            {/each}
+            <a class="link-secao" href="/semana">ver na semana</a>
+          </Tabs.Content>
+          <Tabs.Content value="conta">
+            {#if nuvem.estado === 'desligada'}
+              <p class="dica">Nuvem desligada: os dados ficam só neste navegador.</p>
+            {:else if nuvem.estado === 'sem_login'}
+              <p class="dica">Entre na sua conta para guardar tudo na nuvem e abrir em outro computador.</p>
+              <a class="botao" href="/entrar">Entrar ou criar conta</a>
+            {:else}
+              <p class="estado {nuvem.estado}">
+                {nuvem.estado === 'sincronizando' ? 'sincronizando...' : nuvem.estado === 'erro' ? 'erro ao sincronizar' : 'tudo guardado na nuvem'}
+              </p>
+              <p class="dica">{nuvem.email} - <a href="/perfil">perfil</a>{nuvem.ultimoEnvio ? ` - último envio ${nuvem.ultimoEnvio.slice(11, 16)}` : ''}</p>
+              {#if nuvem.erro}<p class="dica erro">{nuvem.erro}</p>{/if}
+              <button class="link" onclick={() => sairDaNuvem()}>sair da nuvem</button>
+            {/if}
+          </Tabs.Content>
+        </Tabs.Root>
       </section>
     </aside>
   </div>
 </main>
 
 <style>
-  .topo
+  /* fundo de grade discreto, como papel quadriculado de terminal */
+  main
   {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    flex-wrap: wrap;
-    gap: 16px;
+    background-image: linear-gradient(var(--grade-fundo) 1px, transparent 1px), linear-gradient(90deg, var(--grade-fundo) 1px, transparent 1px);
+    background-size: 28px 28px;
+    background-position: -1px -1px;
   }
-  h1
+  header > div
   {
-    font-size: 2.8rem;
-    margin: 6px 0 0;
-    letter-spacing: -0.02em;
+    margin-right: auto;
   }
-  .lema
+  .aviso a
   {
-    margin: 4px 0 0;
-    color: var(--suave);
-    font-family: var(--fonte-maquina);
+    color: inherit;
+    font-weight: 700;
   }
-  .cursor
+  .aviso
   {
-    color: var(--marca);
-    animation: piscar 1.1s steps(1) infinite;
+    margin: 0 0 var(--size-4);
   }
-  @keyframes piscar
+  .kpis
   {
-    50%
-    {
-      opacity: 0;
-    }
-  }
-  .regua
-  {
-    list-style: none;
-    padding: 0;
-    margin: 22px 0 0;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 6px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--size-4);
   }
-  .regua li
+  .kpi
   {
-    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 10px 12px;
-    border-radius: 10px;
+    gap: var(--size-1);
     background: var(--superficie);
-    border: 1px solid var(--borda);
-    background-image: none;
     color: var(--texto);
+    border: 1px solid var(--borda);
+    border-top: 2px solid var(--marca);
+    border-radius: var(--raio);
+    padding: var(--size-4);
+    text-decoration: none;
+    min-height: 140px;
+    transition: border-color 0.2s;
   }
-  .regua li.passou
+  a.kpi:hover
   {
-    opacity: 0.6;
-  }
-  .regua li.hoje
-  {
-    background: var(--marca-escura);
     border-color: var(--marca);
-    color: #fff;
-    opacity: 1;
   }
-  .regua .dia
+  .kpi .valor
   {
-    font-weight: 700;
-    text-transform: uppercase;
-    font-size: 0.8rem;
-  }
-  .regua li.hoje .dia
-  {
-    color: var(--marca);
-  }
-  .regua .rotina
-  {
-    font-size: 0.8rem;
-    color: var(--suave);
-  }
-  .regua li.hoje .rotina
-  {
-    color: #cfd8d3;
-  }
-  .marca-foto
-  {
-    position: absolute;
-    top: 8px;
-    right: 10px;
     font-family: var(--fonte-maquina);
-    font-size: 0.68rem;
-    color: var(--marca);
-    border: 1px solid var(--marca);
-    border-radius: 999px;
-    padding: 0 6px;
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1;
   }
-  .hoje-painel
+  .kpi .detalhe
+  {
+    font-size: 0.82rem;
+    color: var(--suave);
+    flex: 1;
+  }
+  .kpi .detalhe b
+  {
+    color: var(--verde);
+  }
+  .kpi .detalhe b.abaixo
+  {
+    color: var(--amarelo);
+  }
+  .kpi.alerta
+  {
+    border-top-color: var(--amarelo);
+  }
+  .kpi.alerta .valor
+  {
+    color: var(--amarelo);
+  }
+  .barra
+  {
+    display: block;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--borda);
+    overflow: hidden;
+  }
+  .barra span
+  {
+    display: block;
+    height: 100%;
+    background: var(--marca);
+  }
+  /* coluna principal e lateral: sem buraco entre as duas */
+  .grade
   {
     display: grid;
-    grid-template-columns: 180px 1fr;
-    gap: 18px;
-    margin-top: 16px;
-    padding: 20px 22px;
-    border-radius: var(--raio);
-    background: var(--superficie);
-    border: 1px solid var(--borda);
-    border-left: 5px solid var(--marca);
-    box-shadow: var(--sombra);
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    gap: var(--size-4);
+    align-items: start;
+    margin-top: var(--size-4);
   }
-  .titulo-hoje h2
+  .coluna
   {
-    font-size: 1.5rem;
-    margin: 4px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4);
+    min-width: 0;
   }
-  .acoes
+  .coluna .cartao
+  {
+    margin-top: 0;
+    transition: border-color 0.2s;
+  }
+  .coluna .cartao:hover
+  {
+    border-color: color-mix(in srgb, var(--marca) 40%, var(--borda));
+  }
+  /* títulos dos quadros como comentário de código */
+  .coluna .cartao > h2::before
+  {
+    content: '// ';
+    color: var(--marca);
+  }
+  .acoes, .frases
   {
     list-style: none;
     padding: 0;
     margin: 0;
   }
-  .acoes li
+  .acoes li, .frases li
   {
     display: flex;
     align-items: baseline;
-    gap: 10px;
-    padding: 7px 0;
+    gap: var(--size-2);
+    padding: var(--size-2) 0;
     border-bottom: 1px dashed var(--borda);
     background: none;
     color: var(--texto);
   }
-  .acoes li:last-child
+  .acoes li:last-child, .frases li:last-child
   {
     border-bottom: none;
   }
-  .acoes i
+  .frases li
+  {
+    font-size: 0.92rem;
+  }
+  .acoes i, .frases i
   {
     flex: 0 0 9px;
     height: 9px;
-    border-radius: 2px;
     background: var(--marca);
+    border-radius: 2px;
+  }
+  .frases i
+  {
+    border-radius: 50%;
+    background: var(--borda-forte);
   }
   .acoes .alto i
   {
     background: var(--vermelho);
   }
   .acoes .medio i
+  {
+    background: var(--amarelo);
+  }
+  .frases .positivo i
+  {
+    background: var(--verde);
+  }
+  .frases .atencao i
   {
     background: var(--amarelo);
   }
@@ -503,128 +489,116 @@
   {
     font-family: var(--fonte-maquina);
     font-weight: 700;
-    color: var(--marca);
     font-size: 0.85rem;
   }
-  .kpis
+  .projecao
   {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
-    margin-top: 16px;
+    padding: var(--size-3);
+    border-radius: var(--raio-pequeno);
+    background: var(--fundo);
+    margin-bottom: var(--size-4);
   }
-  .kpi
+  .projecao p
   {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    background: var(--marca-escura);
-    color: #fff;
-    border: 1px solid var(--borda);
-    border-radius: var(--raio);
-    padding: 18px;
-    text-decoration: none;
-    min-height: 150px;
-  }
-  .kpi .etiqueta
-  {
-    color: #b9b6b0;
-  }
-  .kpi .valor
-  {
-    font-family: var(--fonte-maquina);
-    font-size: 2.4rem;
-    font-weight: 700;
-    line-height: 1;
-    color: #fff;
-  }
-  .kpi .detalhe
-  {
-    font-size: 0.82rem;
-    color: #d5d2cc;
-    flex: 1;
-  }
-  .kpi .detalhe b
-  {
-    color: var(--marca);
-  }
-  .kpi .detalhe b.abaixo
-  {
-    color: #f5c542;
-  }
-  .kpi.alerta .valor
-  {
-    color: #f5c542;
-  }
-  .barra
-  {
-    display: block;
-    height: 6px;
-    border-radius: 3px;
-    background: rgb(150 150 150 / 25%);
-    overflow: hidden;
-  }
-  .barra span
-  {
-    display: block;
-    height: 100%;
-    background: var(--marca);
-  }
-  .colunas
-  {
-    display: grid;
-    grid-template-columns: 3fr 2fr;
-    gap: 18px;
-  }
-  .pilha
-  {
-    display: flex;
-    flex-direction: column;
-  }
-  .frases
-  {
-    list-style: none;
-    padding: 0;
     margin: 0;
   }
-  .frases li
+  .projecao .dica
+  {
+    margin-top: var(--size-1);
+  }
+  .veredito
+  {
+    font-weight: 700;
+  }
+  .veredito.bate
+  {
+    color: var(--verde);
+  }
+  .veredito.perto
+  {
+    color: var(--amarelo);
+  }
+  .veredito.nao_bate
+  {
+    color: var(--vermelho);
+  }
+  .colunas-fluxo
+  {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--size-5);
+  }
+  .colunas-fluxo h3
+  {
+    font-size: 0.85rem;
+    margin: 0 0 var(--size-2);
+  }
+  .linha-fluxo
+  {
+    font-size: 0.86rem;
+    margin: 0 0 var(--size-2);
+  }
+  .linha-fluxo .dica
+  {
+    display: block;
+    font-size: 0.78rem;
+  }
+  .grafico
+  {
+    overflow-x: auto;
+  }
+  .grafico :global(svg)
+  {
+    max-width: 100%;
+    height: auto;
+  }
+  /* abas do Bits UI */
+  :global(.abas)
   {
     display: flex;
-    gap: 10px;
-    align-items: baseline;
+    flex-wrap: wrap;
+    gap: var(--size-1);
+    margin-bottom: var(--size-3);
+    border-bottom: 1px solid var(--borda);
+  }
+  :global(.aba)
+  {
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
     background: none;
+    padding: var(--size-1) var(--size-3);
+    font-size: 0.82rem;
+    color: var(--suave);
+    margin-bottom: -1px;
+  }
+  :global(.aba:hover:not(:disabled))
+  {
     color: var(--texto);
-    padding: 7px 0;
-    border-bottom: 1px dashed var(--borda);
-    font-size: 0.92rem;
+    border-color: transparent transparent var(--borda-forte);
   }
-  .frases i
+  :global(.aba[data-state='active'])
   {
-    flex: 0 0 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: var(--borda-forte);
-  }
-  .frases .positivo i
-  {
-    background: var(--verde);
-  }
-  .frases .atencao i
-  {
-    background: var(--amarelo);
+    color: var(--marca);
+    border-bottom-color: var(--marca);
   }
   .pessoa
   {
     display: flex;
     flex-direction: column;
     gap: 5px;
-    padding: 10px 0;
+    padding: var(--size-3) 0;
     border-bottom: 1px dashed var(--borda);
   }
-  .pessoa .linha
+  .pessoa:last-child
+  {
+    border-bottom: none;
+  }
+  .linha
   {
     display: flex;
     justify-content: space-between;
+    gap: var(--size-2);
   }
   .estourou
   {
@@ -643,7 +617,7 @@
   }
   .barra-ritmo span
   {
-    color: #fff;
+    color: #10141a;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -670,8 +644,8 @@
   {
     display: grid;
     grid-template-columns: 80px 1fr;
-    gap: 10px;
-    padding: 8px 0;
+    gap: var(--size-2);
+    padding: var(--size-2) 0;
     border-bottom: 1px dashed var(--borda);
   }
   .dia-tempo .data
@@ -687,10 +661,10 @@
   }
   .dia-tempo li
   {
-    padding: 2px 0;
-    font-size: 0.88rem;
     background: none;
     color: var(--texto);
+    padding: 2px 0;
+    font-size: 0.88rem;
   }
   .dia-tempo .tipo
   {
@@ -709,7 +683,7 @@
   {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--size-2);
   }
   .saida
   {
@@ -718,10 +692,10 @@
     align-items: flex-start;
     gap: 2px;
     text-align: left;
-    padding: 12px 14px;
-    border-radius: 10px;
+    padding: var(--size-3);
+    border-radius: var(--raio-pequeno);
     border: 1px solid var(--borda);
-    background: var(--superficie);
+    background: var(--superficie-2);
     color: var(--texto);
     text-decoration: none;
     font-family: inherit;
@@ -739,7 +713,6 @@
   {
     border-color: var(--marca);
     background: var(--marca-clara);
-    color: var(--texto);
   }
   .saida.principal
   {
@@ -754,70 +727,23 @@
   .saida.principal:hover
   {
     filter: brightness(1.1);
-    color: var(--sobre-marca);
   }
-  .backup
-  {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 4px;
-  }
-  .colunas-fluxo
+  .lista-resumo
   {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
+    gap: 6px;
+    margin-bottom: var(--size-3);
   }
-  .colunas-fluxo h3
-  {
-    font-size: 0.85rem;
-    margin: 0 0 8px;
-  }
-  .linha-fluxo
-  {
-    font-size: 0.86rem;
-    margin: 0 0 6px;
-  }
-  .linha-fluxo .dica
-  {
-    display: block;
-    font-size: 0.78rem;
-  }
-  .veredito
-  {
-    font-weight: 700;
-    margin: 0 0 4px;
-  }
-  .veredito.bate
-  {
-    color: var(--verde);
-  }
-  .veredito.perto
-  {
-    color: var(--amarelo);
-  }
-  .veredito.nao_bate
-  {
-    color: var(--vermelho);
-  }
-  @media (max-width: 900px)
-  {
-    .colunas-fluxo
-    {
-      grid-template-columns: 1fr;
-    }
-  }
-  .nuvem .estado
+  .estado
   {
     font-weight: 600;
     margin: 0;
   }
-  .nuvem .ok
+  .estado.ok
   {
     color: var(--verde);
   }
-  .nuvem .erro
+  .dica.erro
   {
     color: var(--vermelho);
   }
@@ -829,6 +755,7 @@
     text-decoration: underline;
     padding: 0;
     font-size: 0.82rem;
+    justify-self: start;
   }
   .compromisso
   {
@@ -840,161 +767,16 @@
   .link-secao
   {
     display: inline-block;
-    margin-top: 8px;
-    color: var(--marca);
+    margin-top: var(--size-2);
     font-size: 0.85rem;
-  }
-  .grafico
-  {
-    overflow-x: auto;
-  }
-  .grafico :global(svg)
-  {
-    max-width: 100%;
-    height: auto;
   }
   @media (max-width: 900px)
   {
     .kpis
     {
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    .regua
-    {
-      grid-template-columns: repeat(5, minmax(90px, 1fr));
-      overflow-x: auto;
-    }
-    .colunas, .hoje-painel
-    {
-      grid-template-columns: 1fr;
-    }
-  }
-  /* fundo de grade discreto, como papel quadriculado de terminal */
-  main
-  {
-    background-image: linear-gradient(var(--grade-fundo) 1px, transparent 1px), linear-gradient(90deg, var(--grade-fundo) 1px, transparent 1px);
-    background-size: 28px 28px;
-    background-position: -1px -1px;
-  }
-  .prompt
-  {
-    font-family: var(--fonte-maquina);
-    font-size: 0.85rem;
-    color: var(--marca);
-  }
-  .topo-direita
-  {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-  }
-  .status
-  {
-    list-style: none;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 0;
-    margin: 18px 0 0;
-  }
-  .status li
-  {
-    display: flex;
-    gap: 8px;
-    align-items: baseline;
-    padding: 6px 12px;
-    border: 1px solid var(--borda);
-    border-left: 3px solid var(--marca);
-    border-radius: 8px;
-    background: var(--superficie);
-    font-size: 0.8rem;
-  }
-  .status span
-  {
-    color: var(--suave);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: 0.7rem;
-  }
-  .status li.aviso
-  {
-    border-left-color: var(--amarelo);
-  }
-  .status li.ok b
-  {
-    color: var(--verde);
-  }
-  /* coluna principal e lateral: sem buraco entre as duas */
-  .grade
-  {
-    display: grid;
-    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
-    gap: 18px;
-    align-items: start;
-  }
-  /* títulos dos quadros como comentário de código */
-  .grade .cartao > h2::before
-  {
-    content: '// ';
-    color: var(--marca);
-  }
-  .grade .cartao
-  {
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-  .grade .cartao:hover
-  {
-    border-color: rgb(18 164 84 / 35%);
-    box-shadow: var(--sombra), 0 0 0 3px rgb(18 164 84 / 6%);
-  }
-  .kpi
-  {
-    position: relative;
-    overflow: hidden;
-    border-top: 2px solid var(--marca);
-  }
-  .kpi::after
-  {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 100% 0%, rgb(18 164 84 / 18%), transparent 55%);
-    pointer-events: none;
-  }
-  .kpi.alerta
-  {
-    border-top-color: #f5c542;
-  }
-  .projecao
-  {
-    padding: 12px 14px;
-    border-radius: 8px;
-    background: var(--fundo);
-    margin-bottom: 16px;
-  }
-  .projecao p
-  {
-    margin: 0;
-  }
-  .projecao .dica
-  {
-    margin-top: 4px;
-  }
-  .lista-resumo
-  {
-    display: grid;
-    gap: 6px;
-    margin-bottom: 12px;
-  }
-  .lista-resumo .linha
-  {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-  }
-  @media (max-width: 900px)
-  {
-    .grade
+    .grade, .colunas-fluxo
     {
       grid-template-columns: 1fr;
     }

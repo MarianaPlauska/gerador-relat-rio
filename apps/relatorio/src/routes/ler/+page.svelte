@@ -237,7 +237,7 @@
     align-items: baseline;
     gap: var(--size-3);
     padding: var(--size-3) var(--size-6);
-    background: #131916;
+    background: var(--barra);
     border-bottom: 1px solid var(--borda);
   }
   .marca
