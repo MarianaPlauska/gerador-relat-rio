@@ -7,6 +7,7 @@
   } from '@supervisao/core';
   import { SvelteSet } from 'svelte/reactivity';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { carregar, salvar, type Dados } from '#lib/armazenamento.ts';
   import { lerImagem } from '#lib/ocr.ts';
   import { baixarCsv, lerArquivoPlanilha } from '#lib/planilha.ts';
@@ -17,7 +18,7 @@
   $effect(() => salvar($state.snapshot(dados)));
 
   const dia = hoje();
-  let atualId = $state(dados.listas[0]?.id);
+  let atualId = $state(page.url.searchParams.get('id') ?? dados.listas[0]?.id);
   let aba = $state<'lista' | 'diario'>('lista');
   let criando = $state(!dados.listas.length);
   let nomeNova = $state('');

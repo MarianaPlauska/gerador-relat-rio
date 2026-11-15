@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import { dicionarioPadrao, resumoSugerido, segundaDaSemana, somarDias, type Bloco, type CorSemaforo } from '@supervisao/core';
   import { carregar, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
   import { montarInterativo } from '#lib/interativo.ts';
@@ -11,11 +12,14 @@
   import { contextoDoRelatorio, dataCurta, hoje, periodoDaSemana, semaforoDoRelatorio, semanasDisponiveis, type Periodo } from '#lib/semana.ts';
 
   let dados = $state<Dados>(carregar());
-  let semana = $state(segundaDaSemana(hoje()));
-  let semanaAnterior = $state(somarDias(segundaDaSemana(hoje()), -7));
+  // quem chega de um relatório vivo traz o período na URL
+  const pedido = page.url.searchParams;
+  const semanaInicial = pedido.get('semana') ?? segundaDaSemana(hoje());
+  let semana = $state(semanaInicial);
+  let semanaAnterior = $state(somarDias(semanaInicial, -7));
   // período livre: por padrão as últimas 4 semanas até a sexta desta
-  let de = $state(somarDias(segundaDaSemana(hoje()), -21));
-  let ate = $state(somarDias(segundaDaSemana(hoje()), 4));
+  let de = $state(pedido.get('de') ?? somarDias(segundaDaSemana(hoje()), -21));
+  let ate = $state(pedido.get('ate') ?? somarDias(segundaDaSemana(hoje()), 4));
   let modeloId = $state(dados.ultimoModelo);
   const modelo = $derived(acharModelo(dados, modeloId));
   const periodo = $derived<Periodo>(modelo.periodo === 'livre' ? { inicio: de, fim: ate, livre: true } : periodoDaSemana(semana, semanaAnterior));

@@ -1,6 +1,6 @@
 import
 {
-  agoraLocal, dicionarioPadrao, migrarFluxograma, migrarLista, type Fluxograma, pessoasExemplo, type Bloco, type ControleCard, type Lista, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type Risco, type Snapshot,
+  agoraLocal, dicionarioPadrao, migrarFluxograma, migrarLista, migrarVivo, type Fluxograma, type RelatorioVivo, pessoasExemplo, type Bloco, type ControleCard, type Lista, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type Risco, type Snapshot,
 } from '@supervisao/core';
 import { agendarEnvio, iniciarNuvem, marcarLocal } from './nuvem.svelte.ts';
 
@@ -52,18 +52,20 @@ export interface Dados
   listas: Lista[];
   // fluxogramas de processo
   fluxos: Fluxograma[];
+  // relatórios vivos: preenchidos aos poucos, todo dia
+  vivos: RelatorioVivo[];
 }
 
 function padrao(): Dados
 {
-  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [] };
+  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [], vivos: [] };
 }
 
 // campos que faltam ganham o padrão; listas antigas ganham fases e diário
 function completar(bruto: Partial<Dados>): Dados
 {
   const d = { ...padrao(), ...bruto };
-  return { ...d, listas: d.listas.map(migrarLista), fluxos: d.fluxos.map(migrarFluxograma) };
+  return { ...d, listas: d.listas.map(migrarLista), fluxos: d.fluxos.map(migrarFluxograma), vivos: d.vivos.map(migrarVivo) };
 }
 
 function lerLocal(): Dados

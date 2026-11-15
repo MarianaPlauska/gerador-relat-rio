@@ -1,11 +1,14 @@
 <script lang="ts">
-  import { agoraLocal, aplicarControle, type CardSnapshot, type ControleCard, type OrigemLeitura, type Ritmo } from '@supervisao/core';
+  import { page } from '$app/state';
+  import { agoraLocal, semAcento, aplicarControle, type CardSnapshot, type ControleCard, type OrigemLeitura, type Ritmo } from '@supervisao/core';
   import { carregar, salvar, type Dados } from '#lib/armazenamento.ts';
 
   let dados = $state<Dados>(carregar());
   let dataFoto = $state(dados.fotos.at(-1)?.data ?? '');
   let pessoa = $state('');
-  let origem = $state<'' | OrigemLeitura>('em_execucao');
+  // a paleta de comandos (Ctrl+K) abre um card por ?q=
+  let busca = $state(page.url.searchParams.get('q') ?? '');
+  let origem = $state<'' | OrigemLeitura>(page.url.searchParams.get('q') ? '' : 'em_execucao');
   let ritmosVisiveis = $state<Ritmo[]>(['atrasado', 'em_risco', 'no_ritmo']);
 
   const hoje = agoraLocal().slice(0, 10);
@@ -21,6 +24,7 @@
     (foto?.cards ?? [])
       .filter((c) => !origem || c.origens.includes(origem))
       .map((painel) => ({ painel, card: aplicarControle(painel, dataFoto, dados.controle[painel.codigo]) }))
+      .filter(({ card }) => !busca || semAcento(`${card.codigo} ${card.titulo}`).includes(semAcento(busca)))
       .filter(({ card }) => !pessoa || card.responsavelEtapaAtual === pessoa || card.responsaveis.includes(pessoa))
       .sort((a, b) => (a.card.previsao ?? '9999').localeCompare(b.card.previsao ?? '9999')),
   );
@@ -70,6 +74,9 @@
         <option value="">Todos</option>
         {#each dados.pessoas as p (p.id)}<option value={p.id}>{p.nome}</option>{/each}
       </select>
+    </label>
+    <label>Buscar
+      <input bind:value={busca} placeholder="DEV-198 ou palavra" />
     </label>
     <label>Trecho
       <select bind:value={origem}>

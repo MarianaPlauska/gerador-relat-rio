@@ -9,6 +9,7 @@
   import { page } from '$app/state';
   import { carregar, exportarJson } from '#lib/armazenamento.ts';
   import { chuva } from '#lib/chuva.ts';
+  import Paleta from '#lib/Paleta.svelte';
   import { nuvem, sairDaNuvem } from '#lib/nuvem.svelte.ts';
   import { fecharSessao, lerSessao } from '#lib/sessao.ts';
 
@@ -21,9 +22,11 @@
     { href: '/semana', nome: 'Semana' },
     { href: '/listas', nome: 'Listas' },
     { href: '/fluxos', nome: 'Fluxos' },
+    { href: '/vivos', nome: 'Vivos' },
     { href: '/relatorio', nome: 'Relatório' },
   ];
 
+  let paletaAberta = $state(false);
   let escuro = $state(typeof document === 'undefined' || document.documentElement.dataset.tema !== 'claro');
   // telas abertas sem conta: entrada e relatório recebido por link
   const aberta = $derived(page.url.pathname === '/entrar' || page.url.pathname === '/ler');
@@ -62,6 +65,9 @@
       {/each}
     </div>
     <div class="direita">
+      <button class="busca" onclick={() => (paletaAberta = true)} aria-label="Abrir a paleta de comandos (Ctrl+K)">
+        <span>Buscar</span><kbd>Ctrl K</kbd>
+      </button>
       <button class="tema" onclick={trocarTema} title="Trocar tema" aria-label="Trocar para o tema {escuro ? 'claro' : 'escuro'}">
         {#if escuro}
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" /><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" /></svg>
@@ -96,6 +102,7 @@
 </div>
 
 {#if !aberta}
+  <Paleta bind:aberta={paletaAberta} {trocarTema} baixarBackup={() => exportarJson(carregar())} {sair} />
   <footer>
     <div class="rodape">
       <div class="rodape-marca">
@@ -277,6 +284,32 @@
     align-items: center;
     gap: var(--size-2);
   }
+  .busca
+  {
+    display: flex;
+    align-items: center;
+    gap: var(--size-3);
+    padding: 5px 10px;
+    border-radius: var(--radius-round);
+    background: rgb(255 255 255 / 5%);
+    border-color: rgb(255 255 255 / 12%);
+    color: #9aa5b4;
+    font-size: 0.8rem;
+  }
+  .busca kbd
+  {
+    font-family: var(--fonte-maquina);
+    font-size: 0.68rem;
+    padding: 1px 6px;
+    border: 1px solid rgb(255 255 255 / 18%);
+    border-radius: 4px;
+    color: #c9d3cd;
+  }
+  .busca:hover:not(:disabled)
+  {
+    color: #fff;
+    border-color: var(--marca);
+  }
   .tema
   {
     width: 36px;
@@ -388,9 +421,14 @@
       padding: 0 var(--size-3);
       gap: var(--size-3);
     }
-    .nome-usuario
+    .nome-usuario, .busca span, .busca kbd
     {
       display: none;
+    }
+    .busca::before
+    {
+      content: '/';
+      font-family: var(--fonte-maquina);
     }
   }
 </style>

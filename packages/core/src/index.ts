@@ -20,3 +20,4 @@ export * from './fluxo';
 export * from './checklist';
 export * from './fluxograma';
 export * from './interativo';
+export * from './vivo';
