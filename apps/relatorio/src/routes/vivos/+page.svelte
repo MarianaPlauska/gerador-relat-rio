@@ -169,8 +169,17 @@
         </section>
 
         <section class="cartao">
-          <h2>Relatório</h2>
-          <p class="dica">Abrir no Relatório copia os registros para os campos do período e deixa gerar o PDF ou o link. Os números vêm do painel.</p>
+          <h2>Fechar e enviar</h2>
+          <ol class="passos">
+            {#if v.livre}
+              <li>Conferir o mês na <a href="/mes">Visão do mês</a>.</li>
+            {:else}
+              <li>Conferir o plano e fechar a semana em <a href="/semana">Semana</a>.</li>
+            {/if}
+            <li><button class="link" onclick={() => abrirNoRelatorio(v)}>Abrir no Relatório</button>: os registros viram os campos do período.</li>
+            <li>No Relatório, baixar o PDF ou publicar o link.</li>
+            <li>Acompanhar as marcas e os comentários em <a href="/retornos">Retornos</a>.</li>
+          </ol>
           <div class="linha">
             {#if v.encerradoEm}
               <button onclick={() => (v.encerradoEm = undefined)}>Reabrir</button>
@@ -361,6 +370,23 @@
     display: flex;
     align-items: center;
     gap: var(--size-2);
+  }
+  .passos
+  {
+    margin: 0 0 var(--size-3);
+    padding-left: var(--size-5);
+    font-size: 0.9rem;
+    display: grid;
+    gap: var(--size-2);
+  }
+  .link
+  {
+    border: none;
+    background: none;
+    color: var(--marca);
+    text-decoration: underline;
+    padding: 0;
+    font-size: inherit;
   }
   .perigo
   {

@@ -57,8 +57,14 @@
 
 <div class="ia">
   {#if etapa === 'parado'}
-    <button class="link" disabled={!disponivel} onclick={escrever} title={disponivel ? `Modelo ${modeloIa}, roda neste navegador` : 'Precisa de Chrome ou Edge com WebGPU'}>escrever rascunho com IA local</button>
-    {#if !disponivel}<span class="dica">indisponível: este navegador não tem WebGPU.</span>{/if}
+    <div class="chamada">
+      <button class="botao-ia" disabled={!disponivel} onclick={escrever} title={disponivel ? `Modelo ${modeloIa}, roda neste navegador` : 'Precisa de Chrome ou Edge com WebGPU'}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3l1.9 5.1L17 10l-5.1 1.9L10 17l-1.9-5.1L3 10l5.1-1.9z" /><path d="M18.5 14l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z" /></svg>
+        Escrever com IA
+      </button>
+      <span class="selo">IA local</span>
+      <span class="dica">{disponivel ? 'Roda no seu navegador, de graça. Escreve só com os números conferidos do painel e avisa se aparecer número que não está lá. Você revisa antes de usar.' : 'Indisponível: precisa de Chrome ou Edge com WebGPU.'}</span>
+    </div>
   {:else if etapa === 'carregando'}
     <div class="carregando">
       <span class="barra"><span style:width="{pct}%"></span></span>
@@ -88,20 +94,50 @@
     gap: var(--size-2);
     margin-top: var(--size-1);
   }
-  .link
+  .chamada
   {
-    justify-self: start;
-    border: none;
-    background: none;
-    color: var(--marca);
-    text-decoration: underline;
-    padding: 0;
-    font-size: 0.82rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--size-2) var(--size-3);
   }
-  .link:disabled
+  .botao-ia
   {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--size-2);
+    border-color: var(--marca);
+    color: var(--marca);
+    background: var(--marca-clara);
+  }
+  .botao-ia svg
+  {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+  }
+  .botao-ia:disabled
+  {
+    border-color: var(--borda-forte);
     color: var(--suave);
-    text-decoration: none;
+    background: transparent;
+  }
+  .selo
+  {
+    font-family: var(--fonte-maquina);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 1px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--marca);
+    color: var(--marca);
+  }
+  .chamada .dica
+  {
+    flex: 1 1 260px;
+    margin: 0;
+    font-size: 0.8rem;
   }
   .barra
   {

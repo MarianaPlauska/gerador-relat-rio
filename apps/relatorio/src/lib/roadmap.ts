@@ -30,8 +30,7 @@ export const roadmap: EtapaRoadmap[] = [
   {
     periodo: '2027, primeiro trimestre',
     itens: [
-      { titulo: 'App instalável e offline', texto: 'Instalar o OrbisOS como programa e usar sem internet.', situacao: 'planejado' },
-      { titulo: 'Lembretes', texto: 'Avisos de colar o painel, fechar a semana e registrar o dia.', situacao: 'planejado' },
+      { titulo: 'Lembretes', texto: 'Avisos dentro do sistema, no computador: colar o painel, fechar a semana e registrar o dia.', situacao: 'planejado' },
       { titulo: 'Testes automáticos', texto: 'Rodar os testes no GitHub a cada envio, antes de publicar.', situacao: 'planejado' },
     ],
   },

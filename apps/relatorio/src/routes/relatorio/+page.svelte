@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { dicionarioPadrao, resumoSugerido, segundaDaSemana, somarDias, type Bloco, type CorSemaforo } from '@supervisao/core';
+  import { agoraLocal, alternarItem, dicionarioPadrao, idCurto, itemFeito, novoVivo, progressoVivo, resumoSugerido, segundaDaSemana, somarDias, type Bloco, type CorSemaforo } from '@supervisao/core';
   import { carregar, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
   import { montarInterativo } from '#lib/interativo.ts';
   import EscreverComIa from '#lib/EscreverComIa.svelte';
@@ -52,6 +52,27 @@
   function anotar<K extends keyof NotasRelatorio>(campo: K, valor: NotasRelatorio[K])
   {
     dados.relatorios[chave] = { ...notas, [campo]: valor };
+  }
+
+  // checklist do relatório vivo deste período: marcar e acrescentar tarefas sem sair da tela
+  const vivo = $derived(dados.vivos.find((v) => !v.encerradoEm && v.inicio === periodo.inicio && v.fim === periodo.fim));
+  let itemNovo = $state('');
+
+  function criarVivo()
+  {
+    dados.vivos.push(novoVivo(`${modelo.nome}, ${periodo.livre ? `${dataCurta(periodo.inicio)} a ${dataCurta(periodo.fim)}` : `semana de ${dataCurta(periodo.inicio)}`}`, modelo.id, periodo.inicio, periodo.fim, periodo.livre, agoraLocal()));
+  }
+
+  function adicionarTarefa(texto: string)
+  {
+    const t = texto.trim();
+    if (!vivo || !t || vivo.itens.some((i) => i.texto === t)) return;
+    vivo.itens.push({ id: idCurto(), texto: t, diario: false });
+  }
+
+  function enviarProximosPassos()
+  {
+    for (const linha of (notas.proximosPassos ?? '').split('\n')) adicionarTarefa(linha.replace(/^[-*]\s*/, ''));
   }
 
   function trocarSemana(nova: string)
@@ -264,6 +285,25 @@
     </div>
 
     <div class="bloco">
+      <h2>Checklist e tarefas do período</h2>
+      {#if vivo}
+        {@const pr = progressoVivo(vivo, hoje())}
+        <p class="dica">{pr.feitos} de {pr.total} itens marcados hoje. <a href="/vivos?id={vivo.id}">abrir o relatório vivo</a></p>
+        {#each vivo.itens as item (item.id)}
+          <label class="marcavel"><input type="checkbox" checked={itemFeito(item, hoje())} onchange={() => alternarItem(item, hoje())} /> {item.texto}{item.diario ? ' (todo dia)' : ''}</label>
+        {/each}
+        <div class="nova-tarefa">
+          <input bind:value={itemNovo} placeholder="Nova tarefa para marcar" onkeydown={(e) => { if (e.key === 'Enter') { adicionarTarefa(itemNovo); itemNovo = ''; } }} />
+          <button disabled={!itemNovo.trim()} onclick={() => { adicionarTarefa(itemNovo); itemNovo = ''; }}>Adicionar</button>
+          <button disabled={!notas.proximosPassos?.trim()} onclick={enviarProximosPassos} title="Cada linha dos próximos passos vira uma tarefa do checklist">Mandar os próximos passos para o checklist</button>
+        </div>
+      {:else}
+        <p class="dica">Crie o relatório vivo deste período para ter um checklist de tarefas, marcar o que foi feito e registrar o dia.</p>
+        <button onclick={criarVivo}>Criar relatório vivo deste período</button>
+      {/if}
+    </div>
+
+    <div class="bloco">
       <h2>Dicionário do painel</h2>
       <p class="dica">O que significa cada número do painel do gestor. Uma linha por termo, no formato "Termo: definição". Vai para o glossário do PDF e para o pacote da IA.</p>
       <textarea rows="8" bind:value={dados.dicionario}></textarea>
@@ -467,5 +507,16 @@
     {
       height: 80vh;
     }
+  }
+  .nova-tarefa
+  {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .nova-tarefa input
+  {
+    flex: 1 1 220px;
   }
 </style>
