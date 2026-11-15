@@ -9,7 +9,9 @@
   import { page } from '$app/state';
   import { carregar, exportarJson } from '#lib/armazenamento.ts';
   import { chuva } from '#lib/chuva.ts';
+  import Abertura from '#lib/Abertura.svelte';
   import Paleta from '#lib/Paleta.svelte';
+  import { onMount } from 'svelte';
   import { nuvem, sairDaNuvem } from '#lib/nuvem.svelte.ts';
   import { fecharSessao, lerSessao } from '#lib/sessao.ts';
 
@@ -20,6 +22,7 @@
     { href: '/painel', nome: 'Colar painel' },
     { href: '/cards', nome: 'Cards' },
     { href: '/semana', nome: 'Semana' },
+    { href: '/mes', nome: 'Mês' },
     { href: '/listas', nome: 'Listas' },
     { href: '/fluxos', nome: 'Fluxos' },
     { href: '/vivos', nome: 'Vivos' },
@@ -27,6 +30,34 @@
   ];
 
   let paletaAberta = $state(false);
+  let abertura = $state(false);
+
+  // a abertura com o nome aparece uma vez por navegador, na Início, para quem tem movimento reduzido ela não aparece
+  onMount(() =>
+  {
+    try
+    {
+      if (localStorage.getItem('orbisos-abertura') || page.url.pathname !== '/' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      abertura = true;
+    }
+    catch
+    {
+      // sem armazenamento: sem abertura
+    }
+  });
+
+  function terminarAbertura()
+  {
+    abertura = false;
+    try
+    {
+      localStorage.setItem('orbisos-abertura', '1');
+    }
+    catch
+    {
+      // sem armazenamento: ela volta na próxima vez
+    }
+  }
   let escuro = $state(typeof document === 'undefined' || document.documentElement.dataset.tema !== 'claro');
   // telas abertas sem conta: entrada e relatório recebido por link
   const aberta = $derived(page.url.pathname === '/entrar' || page.url.pathname === '/ler');
@@ -101,6 +132,10 @@
   {@render children()}
 </div>
 
+{#if abertura && !aberta}
+  <Abertura terminar={terminarAbertura} />
+{/if}
+
 {#if !aberta}
   <Paleta bind:aberta={paletaAberta} {trocarTema} baixarBackup={() => exportarJson(carregar())} {sair} />
   <footer>
@@ -115,6 +150,7 @@
         <a href="/fluxos">Fluxos</a>
         <a href="/modelos">Modelos</a>
         <a href="/relatorio">Relatório</a>
+        <a href="/roadmap">Roadmap 2027</a>
       </div>
       <div class="rodape-info">
         <span>Dados guardados neste navegador{nuvem.estado === 'ok' ? ' e na nuvem' : ''}.</span>

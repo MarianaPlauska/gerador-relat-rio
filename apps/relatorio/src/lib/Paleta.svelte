@@ -101,6 +101,14 @@
     }
   }
 
+  // a Início tem um campo que abre a paleta por este evento
+  $effect(() =>
+  {
+    const abrir = () => (aberta = true);
+    window.addEventListener('orbispaleta', abrir);
+    return () => window.removeEventListener('orbispaleta', abrir);
+  });
+
   function atalhoGlobal(e: KeyboardEvent)
   {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k')

@@ -1,23 +1,28 @@
 <script lang="ts">
   import
   {
-    acoesDeHoje, aplicarControle, definicoesPadrao, diasUteisEntre, historico, linhaDoTempo, progressoDaLista, resumoDoFluxo, ritmoPorPessoa, segundaDaSemana, serieSemanal, somarDias, textoProjecao,
+    acoesDeHoje, alternarItem, aplicarControle, itemFeito, progressoVivo, registrouHoje, definicoesPadrao, diasUteisEntre, historico, linhaDoTempo, progressoDaLista, resumoDoFluxo, ritmoPorPessoa, segundaDaSemana, serieSemanal, somarDias, textoProjecao,
     type Destino, type Evento, type TotaisPainel,
   } from '@supervisao/core';
   import { Tabs } from 'bits-ui';
-  import { carregar, type NotasRelatorio } from '#lib/armazenamento.ts';
+  import { carregar, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
   import { svgLinha, svgSparkline } from '#lib/graficos.ts';
   import { nuvem, sairDaNuvem } from '#lib/nuvem.svelte.ts';
   import { baixarTexto, copiar, textoPacote, textoTeams } from '#lib/saidas.ts';
   import { contextoDaSemana, dataCurta, dataMedia, hoje, semanasDisponiveis } from '#lib/semana.ts';
+  import { roadmap } from '#lib/roadmap.ts';
   import { lerSessao } from '#lib/sessao.ts';
 
-  const dados = carregar();
+  const dados = $state<Dados>(carregar());
+  $effect(() => salvar($state.snapshot(dados)));
   const dia = hoje();
   let semana = $state(segundaDaSemana(dia));
   let copiado = $state('');
   let abaSemana = $state('percebido');
   let abaLateral = $state('listas');
+
+  const vivosAbertos = $derived(dados.vivos.filter((v) => !v.encerradoEm));
+  const proximos = roadmap.filter((e) => e.periodo.startsWith('2027')).flatMap((e) => e.itens).slice(0, 3);
 
   const ctx = $derived(contextoDaSemana(dados, semana));
   const notas = $derived<NotasRelatorio>(dados.relatorios[semana] ?? {});
@@ -97,6 +102,10 @@
     </select>
   </header>
 
+  <button class="comando" onclick={() => window.dispatchEvent(new CustomEvent('orbispaleta'))}>
+    <span>Buscar uma tela, lista, fluxo ou card, ou executar uma ação</span><kbd>Ctrl K</kbd>
+  </button>
+
   {#if !ultimaFoto}
     <p class="aviso">Nenhuma foto do painel ainda. <a href="/painel">Colar o painel</a> para começar.</p>
   {:else if diasDesdeFoto >= 2}
@@ -136,6 +145,24 @@
 
   <div class="grade">
     <div class="coluna">
+      <section class="cartao">
+        <h2>Hoje nos relatórios vivos</h2>
+        {#each vivosAbertos as v (v.id)}
+          {@const pr = progressoVivo(v, dia)}
+          <div class="vivo">
+            <div class="linha"><a href="/vivos?id={v.id}"><b>{v.nome}</b></a><span class="dica maquina">{pr.feitos}/{pr.total} hoje</span></div>
+            <span class="barra"><span style:width="{pr.pct}%"></span></span>
+            {#each v.itens.filter((i) => i.diario) as item (item.id)}
+              <label class="item-vivo"><input type="checkbox" checked={itemFeito(item, dia)} onchange={() => alternarItem(item, dia)} /> <span class:feito={itemFeito(item, dia)}>{item.texto}</span></label>
+            {/each}
+            <span class="dica">{registrouHoje(v, dia) ? 'Hoje já tem registro.' : 'Nada registrado hoje.'} <a href="/vivos?id={v.id}">registrar</a></span>
+          </div>
+        {:else}
+          <p class="dica">Nenhum relatório vivo aberto. Crie um para ir preenchendo todo dia.</p>
+          <a class="link-secao" href="/vivos">criar relatório vivo</a>
+        {/each}
+      </section>
+
       <section class="cartao">
         <h2>O que fazer</h2>
         <ul class="acoes">
@@ -261,6 +288,14 @@
       </section>
 
       <section class="cartao">
+        <h2>Roadmap 2027</h2>
+        <ul class="proximos">
+          {#each proximos as item (item.titulo)}<li><b>{item.titulo}</b><span class="dica">{item.texto}</span></li>{/each}
+        </ul>
+        <a class="link-secao" href="/roadmap">ver o roadmap completo</a>
+      </section>
+
+      <section class="cartao">
         <h2>Em andamento</h2>
         <Tabs.Root bind:value={abaLateral}>
           <Tabs.List class="abas">
@@ -320,6 +355,85 @@
   header > div
   {
     margin-right: auto;
+  }
+  .comando
+  {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: var(--size-4);
+    padding: var(--size-3) var(--size-4);
+    background: var(--superficie);
+    border: 1px solid var(--borda-forte);
+    border-radius: var(--raio);
+    color: var(--suave);
+    font-family: var(--fonte-maquina);
+    font-size: 0.9rem;
+    text-align: left;
+  }
+  .comando kbd
+  {
+    font-size: 0.72rem;
+    padding: 1px 8px;
+    border: 1px solid var(--borda-forte);
+    border-radius: 4px;
+    color: var(--texto);
+  }
+  .comando:hover:not(:disabled)
+  {
+    border-color: var(--marca);
+    color: var(--texto);
+  }
+  .vivo
+  {
+    display: grid;
+    gap: var(--size-2);
+    padding: var(--size-3) 0;
+    border-bottom: 1px dashed var(--borda);
+  }
+  .vivo:last-child
+  {
+    border-bottom: none;
+  }
+  .vivo a
+  {
+    color: var(--texto);
+    text-decoration: none;
+  }
+  .vivo .dica a
+  {
+    color: var(--marca);
+    text-decoration: underline;
+  }
+  .item-vivo
+  {
+    display: flex;
+    align-items: center;
+    gap: var(--size-2);
+    color: var(--texto);
+    font-size: 0.9rem;
+  }
+  .feito
+  {
+    color: var(--suave);
+    text-decoration: line-through;
+  }
+  .proximos
+  {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .proximos li
+  {
+    display: grid;
+    padding: var(--size-2) 0;
+    border-bottom: 1px dashed var(--borda);
+  }
+  .proximos li:last-child
+  {
+    border-bottom: none;
   }
   .aviso a
   {
