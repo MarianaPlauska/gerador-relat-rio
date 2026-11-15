@@ -48,4 +48,12 @@ describe('modelos', () =>
     expect(p.fechadoEm).toBeUndefined();
     expect(planos[0]!.pessoas[0]!.itens).toHaveLength(1);
   });
+
+  it('lê o bloco de 1:1 com e sem pessoa', () =>
+  {
+    const base = { id: 'x', nome: 'x', descricao: '', titulo: 'x', sigla: 'RU', periodo: 'semana', capa: 'curta', sumario: false };
+    const r = validarModelo(JSON.stringify({ ...base, blocos: [{ tipo: 'pessoa' }, { tipo: 'pessoa', pessoaId: 'ana', titulo: 'Conversa' }] }));
+    expect(r.erros).toEqual([]);
+    expect(r.modelo?.blocos).toEqual([{ tipo: 'pessoa' }, { tipo: 'pessoa', pessoaId: 'ana', titulo: 'Conversa' }]);
+  });
 });

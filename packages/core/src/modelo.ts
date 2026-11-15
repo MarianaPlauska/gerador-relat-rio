@@ -52,7 +52,9 @@ export type Bloco =
   // lista de checagem: progresso por fase, pendências, o que andou no período e o diário; sem listaId, todas as listas
   | { tipo: 'lista'; listaId?: string | undefined; titulo?: string | undefined; comDiario?: boolean | undefined }
   // fluxograma desenhado na tela Fluxos; sem fluxoId, todos
-  | { tipo: 'fluxograma'; fluxoId?: string | undefined; titulo?: string | undefined };
+  | { tipo: 'fluxograma'; fluxoId?: string | undefined; titulo?: string | undefined }
+  // 1:1: plano, entregas, carga, cards em execução, dificuldade e alertas de uma pessoa; sem pessoaId, uma página por pessoa
+  | { tipo: 'pessoa'; pessoaId?: string | undefined; titulo?: string | undefined };
 
 export interface Modelo
 {
@@ -119,6 +121,17 @@ export const modelosProntos: Modelo[] = [
     capa: 'curta',
     sumario: false,
     blocos: [{ tipo: 'lista', comDiario: true }],
+  },
+  {
+    id: 'umaum',
+    nome: '1:1 por pessoa',
+    descricao: 'Uma página por pessoa: plano da semana, entregas, carga, cards em execução, dificuldade e alertas, para a conversa 1:1.',
+    titulo: 'Acompanhamento 1:1',
+    sigla: 'RU',
+    periodo: 'semana',
+    capa: 'curta',
+    sumario: false,
+    blocos: [{ tipo: 'pessoa' }],
   },
   {
     id: 'fechamento',
@@ -231,6 +244,8 @@ function lerBloco(b: unknown, posicao: number, erros: string[]): Bloco | undefin
       return { tipo: 'lista', listaId: ehTexto(o.listaId) ? o.listaId : undefined, titulo: ehTexto(o.titulo) ? o.titulo : undefined, comDiario: o.comDiario !== false };
     case 'fluxograma':
       return { tipo: 'fluxograma', fluxoId: ehTexto(o.fluxoId) ? o.fluxoId : undefined, titulo: ehTexto(o.titulo) ? o.titulo : undefined };
+    case 'pessoa':
+      return { tipo: 'pessoa', pessoaId: ehTexto(o.pessoaId) ? o.pessoaId : undefined, titulo: ehTexto(o.titulo) ? o.titulo : undefined };
     default:
       erros.push(`${onde}: tipo "${String(o.tipo)}" não existe.`);
       return undefined;
@@ -298,6 +313,7 @@ export function pedidoDeModelo(descricao: string): string
     '- {"tipo": "quebra"}: começa uma página nova',
     '- {"tipo": "lista", "titulo": "...", "comDiario": true}: listas de checagem da supervisora (implantação por empresa): progresso por fase, pendências por etapa, o que andou no período e o diário de anotações',
     '- {"tipo": "fluxograma", "titulo": "..."}: fluxogramas de processo desenhados pela supervisora',
+    '- {"tipo": "pessoa", "pessoaId": "..."}: página de 1:1 de uma pessoa (plano, entregas, carga, cards em execução, dificuldade e alertas); sem pessoaId, uma página por pessoa',
     '',
     '## Seções prontas',
     ...(Object.keys(nomesSecoes) as SecaoPadrao[]).map((s) => `- ${s}: ${nomesSecoes[s]} (${descricoesSecoes[s]})`),

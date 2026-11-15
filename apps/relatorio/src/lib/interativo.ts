@@ -150,6 +150,18 @@ export function montarInterativo({ dados, ctx, notas, resumo, modelo, blocos }: 
         secoes.push({ id: `lista-${l.id}`, tipo: 'tabela', titulo: `${l.nome}: ${pr.concluidos} de ${pr.total} itens concluídos (${pr.pct}%)`, colunas: ['Fase', 'Situação', 'Itens', '%'], linhas });
       }
     }
+    else if (b.tipo === 'pessoa')
+    {
+      for (const x of ctx.comp.pessoas.filter((q) => (b.pessoaId ? q.pessoa.id === b.pessoaId : q.atual.planejados > 0)))
+      {
+        const itens = ctx.atual.plano?.pessoas.find((q) => q.pessoaId === x.pessoa.id)?.itens ?? [];
+        if (!itens.length) continue;
+        secoes.push({
+          id: `pessoa-${x.pessoa.id}`, tipo: 'itens', titulo: `1:1 - ${x.pessoa.nome}: ${x.atual.feitos} de ${x.atual.planejados} itens feitos`,
+          itens: itens.map((i) => ({ id: `i-${i.id}`, texto: `${i.cardCodigo ?? 'sem card'} - ${i.descricao}`, detalhe: `até ${dataCurta(i.ate)} - ${i.status.replace('_', ' ')}${i.objetivo ? `. Para quê: ${i.objetivo}` : ''}` })),
+        });
+      }
+    }
     else if (b.tipo === 'fluxograma')
     {
       for (const f of dados.fluxos.filter((x) => !b.fluxoId || x.id === b.fluxoId))

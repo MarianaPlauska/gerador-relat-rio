@@ -959,6 +959,56 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
   }
 
   // fluxograma da tela Fluxos, reduzido para caber na largura e em uma página
+  // 1:1: uma página por pessoa com plano, entregas, carga, cards em execução, dificuldade e alertas
+  function desenharPessoa(b: Extract<Bloco, { tipo: 'pessoa' }>)
+  {
+    const alvos = comp.pessoas.filter((x) => (b.pessoaId ? x.pessoa.id === b.pessoaId : x.atual.planejados > 0 || x.horas > 0));
+    alvos.forEach((x, n) =>
+    {
+      const cabecalho = h1(b.titulo && alvos.length === 1 ? b.titulo : `1:1 - ${x.pessoa.nome}`);
+      conteudo.push(n > 0 ? Object.assign(cabecalho, { pageBreak: 'before' }) : cabecalho);
+      const util = x.pessoa.capacidadeHorasSemana ? Math.round((x.horas / x.pessoa.capacidadeHorasSemana) * 100) : undefined;
+      conteudo.push(p(`Plano: ${x.atual.feitos} de ${x.atual.planejados} itens feitos (${num(x.atual.pctFeitos, '%')}), contra ${num(x.anterior?.pctFeitos, '%')} no período anterior. Carga: ${x.horas}h de ${x.pessoa.capacidadeHorasSemana}h (${num(util, '%')}). Alertas: ${x.alertas}.`));
+      const pp = atual.plano?.pessoas.find((q) => q.pessoaId === x.pessoa.id);
+      if (pp?.itens.length)
+      {
+        conteudo.push(h2('Plano e entregas'));
+        conteudo.push(tabela(`Plano de ${x.pessoa.nome}`, ['Card', 'O que', 'Até', 'Situação'], pp.itens.map((i) =>
+        {
+          const c = i.cardCodigo ? porCodigo.get(i.cardCodigo) : undefined;
+          return [
+            { stack: [{ text: i.cardCodigo ?? 'sem card', bold: true, font: 'Maquina' }, pequeno(c?.titulo)] },
+            { stack: [i.descricao, i.tipo === 'nao_planejado' ? pequeno('não planejado', cores.amarelo) : '', i.objetivo ? pequeno(`para quê: ${i.objetivo}`) : ''] },
+            { stack: [{ text: dataCurta(i.ate), font: 'Maquina' }, i.ateOriginal && i.ate !== i.ateOriginal ? pequeno(`era ${dataCurta(i.ateOriginal)}`) : ''] },
+            marcador(nomesStatus[i.status], corStatus(i.status)),
+          ];
+        }), ['*', '*', 50, 56], 'plano da supervisão'));
+      }
+      const emExecucao = cards.filter((c) => c.origens.includes('em_execucao') && (c.responsaveis.includes(x.pessoa.id) || c.responsavelEtapaAtual === x.pessoa.id));
+      if (emExecucao.length)
+      {
+        conteudo.push(h2('Cards em execução'));
+        conteudo.push(tabela(`Cards de ${x.pessoa.nome} no painel`, ['Card', 'Etapa', 'Ritmo', 'Previsão'], emExecucao.map((c) => [
+          { stack: [{ text: c.codigo, bold: true, font: 'Maquina' }, pequeno(c.titulo)] },
+          { text: `${c.etapaAtual ?? '-'}${c.etapasTotal ? ` (${c.etapasConcluidas ?? 0}/${c.etapasTotal})` : ''}`, fontSize: 8.5 },
+          { text: c.ritmoPainel ? nomesRitmo[c.ritmoPainel] : '-', fontSize: 8.5, color: c.ritmoPainel === 'atrasado' ? cores.vermelho : c.ritmoPainel === 'em_risco' ? cores.amarelo : cores.tinta },
+          { text: dataMedia(c.previsao), font: 'Maquina' },
+        ]), ['*', 120, 60, 64], 'painel do gestor'));
+      }
+      if (pp?.dificuldade?.trim())
+      {
+        conteudo.push(h2('Maior dificuldade relatada'));
+        conteudo.push(p(pp.dificuldade));
+      }
+      const alertas = ctx.alertas.filter((a) => a.pessoaId === x.pessoa.id);
+      if (alertas.length)
+      {
+        conteudo.push(h2('Alertas'));
+        conteudo.push({ ul: alertas.map((a) => a.texto), style: 'p' });
+      }
+    });
+  }
+
   function desenharFluxograma(b: Extract<Bloco, { tipo: 'fluxograma' }>)
   {
     const fluxos = dados.fluxos.filter((f) => !b.fluxoId || f.id === b.fluxoId);
@@ -984,6 +1034,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
     if (b.tipo === 'secao') desenhar[b.secao]();
     else if (b.tipo === 'lista') desenharLista(b);
     else if (b.tipo === 'fluxograma') desenharFluxograma(b);
+    else if (b.tipo === 'pessoa') desenharPessoa(b);
     else if (b.tipo === 'quebra') conteudo.push({ text: '', pageBreak: 'before' });
     else if (b.tipo === 'texto')
     {
