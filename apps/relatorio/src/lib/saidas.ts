@@ -18,7 +18,14 @@ export function textoTeams(dados: Dados, ctx: Contexto, notas: NotasRelatorio): 
   });
 }
 
-export function textoPacote(dados: Dados, ctx: Contexto, notas: NotasRelatorio): string
+// compacto: só os fatos, sem as instruções nem o dicionário, para o modelo local de IA que tem janela curta
+export function textoPacote(dados: Dados, ctx: Contexto, notas: NotasRelatorio, compacto = false): string
+{
+  const pacote = pacoteCompleto(dados, ctx, notas, compacto);
+  return compacto ? pacote.slice(Math.max(pacote.indexOf('# Contexto'), 0)) : pacote;
+}
+
+function pacoteCompleto(dados: Dados, ctx: Contexto, notas: NotasRelatorio, compacto: boolean): string
 {
   return montarPacote({
     area: dados.identificacao.area,
@@ -26,7 +33,7 @@ export function textoPacote(dados: Dados, ctx: Contexto, notas: NotasRelatorio):
     elaboradoPor: dados.identificacao.elaboradoPor || undefined,
     destinatario: dados.identificacao.destinatario || undefined,
     inicio: ctx.atual.inicio,
-    dicionario: dados.dicionario,
+    dicionario: compacto ? '' : dados.dicionario,
     comp: ctx.comp,
     meta: ctx.meta,
     semaforo: semaforoDoRelatorio(ctx, notas),

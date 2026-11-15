@@ -40,6 +40,12 @@ A semana segue o ciclo da central: segunda cola o painel e confirma o plano; ter
 
 A tela **Fluxos** desenha fluxogramas de processo: monte por passos em texto, cole um Mermaid de uma IA gratuita ou arraste as peças no editor. Os fluxos entram no PDF pelo bloco Fluxograma. O modelo **Interativo** pode ser publicado como **link**: quem recebe lê no navegador, marca Ciente, Concordo ou Dúvida em cada ponto e comenta, sem criar conta, e as respostas chegam na tela **Retornos**.
 
+A tela **Vivos** guarda relatórios que ficam abertos: checklist com itens que zeram todo dia, registros por data que viram os campos do relatório e botão para abrir no Relatório com o período certo. A **Visão do mês** resume o mês (prazo semana a semana, time, compromissos) e gera o relatório do mês. O modelo **1:1 por pessoa** faz uma página por pessoa. **Ctrl+K** abre a paleta de comandos (telas, ações, listas, fluxos, vivos e cards) e a tela **Roadmap** mostra o que vem em 2027.
+
+### IA local (opcional)
+
+Os campos de texto do Relatório têm "escrever rascunho com IA local". Ela roda no navegador pelo WebLLM (WebGPU, Chrome ou Edge), sem servidor e sem custo: o modelo Qwen2.5 1.5B baixa uma vez (cerca de 1 GB) e fica guardado. Recebe só o pacote de fatos conferido e o sistema avisa se o texto trouxer um número que não está nele. Continua valendo: nenhuma IA paga.
+
 ## Estrutura
 
 ```
@@ -47,9 +53,10 @@ packages/core      regras puras em TypeScript, sem DOM, com testes (vitest)
   src/leitor/      lê o painel: totais, cards, etapas do card, ondas e o CSV de demandas
   src/fluxo.ts     tempo de entrega, parados, gargalos, projeção da meta e vencimentos
   src/checklist.ts listas de checagem
+  src/vivo.ts      relatório vivo: checklist diário e registros por campo
   src/modelo.ts    modelos de relatório prontos e validação de modelos importados
 apps/relatorio     SvelteKit (Svelte 5, adapter-static)
-  routes/          entrar, central, colar painel, cards, semana, relatório, modelos, listas, fluxos, perfil, retornos, ler (link recebido)
+  routes/          entrar, central, colar painel, cards, semana, relatório, modelos, listas, fluxos, vivos, mes, roadmap, perfil, retornos, ler (link recebido)
   lib/pdf.ts       monta o PDF com pdfmake, bloco por bloco
   lib/ocr.ts       prepara o print e roda o tesseract.js
 ```

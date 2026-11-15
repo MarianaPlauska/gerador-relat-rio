@@ -3,6 +3,7 @@
   import { dicionarioPadrao, resumoSugerido, segundaDaSemana, somarDias, type Bloco, type CorSemaforo } from '@supervisao/core';
   import { carregar, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
   import { montarInterativo } from '#lib/interativo.ts';
+  import EscreverComIa from '#lib/EscreverComIa.svelte';
   import ListaDeBlocos from '#lib/ListaDeBlocos.svelte';
   import { atualizarConteudo, linkDe, publicar } from '#lib/links.ts';
   import { nuvem, textoDoErro } from '#lib/nuvem.svelte.ts';
@@ -210,6 +211,7 @@
         placeholder={sugestao || 'Em 2 ou 3 frases: como a semana está e o que muda para a gestão.'}
         oninput={(e) => anotar('resumo', e.currentTarget.value || undefined)}
       ></textarea>
+      <EscreverComIa instrucao="Escreva um resumo executivo de 3 a 4 frases sobre o período: como está o prazo contra a meta, o que mudou e o que pede atenção." fatos={() => textoPacote(dados, ctx, notas, true)} aceitar={(t) => anotar('resumo', t)} />
       <p class="dica">Se ficar vazio, o PDF usa o texto sugerido pelo sistema.</p>
     </div>
 
@@ -250,12 +252,15 @@
       <label>Destaques da semana
         <textarea rows="3" value={notas.destaques ?? ''} oninput={(e) => anotar('destaques', e.currentTarget.value || undefined)} placeholder="Entregas, avanços e o que deu certo."></textarea>
       </label>
+      <EscreverComIa instrucao="Liste de 3 a 5 destaques do período, uma linha cada, começando com '- '. Só o que o material sustenta: entregas concluídas, metas atingidas e melhoras." fatos={() => textoPacote(dados, ctx, notas, true)} aceitar={(t) => anotar('destaques', t)} />
       <label>Decisões e apoio necessários
         <textarea rows="3" value={notas.decisoes ?? ''} oninput={(e) => anotar('decisoes', e.currentTarget.value || undefined)} placeholder="O que a gestão precisa decidir ou destravar, com prazo."></textarea>
       </label>
+      <EscreverComIa instrucao="Liste o que a gestão precisa decidir ou destravar, uma linha cada, começando com '- '. Só o que o material sustenta (riscos abertos, decisões vencidas, alertas). Se não houver nada, escreva '- Nenhuma decisão pendente.'" fatos={() => textoPacote(dados, ctx, notas, true)} aceitar={(t) => anotar('decisoes', t)} />
       <label>Próximos passos
         <textarea rows="3" value={notas.proximosPassos ?? ''} oninput={(e) => anotar('proximosPassos', e.currentTarget.value || undefined)} placeholder="O que será feito, por quem, até quando e para quê."></textarea>
       </label>
+      <EscreverComIa instrucao="Liste os próximos passos, uma linha cada, começando com '- ': o que será feito, por quem e até quando, usando só o plano e os alertas do material." fatos={() => textoPacote(dados, ctx, notas, true)} aceitar={(t) => anotar('proximosPassos', t)} />
     </div>
 
     <div class="bloco">

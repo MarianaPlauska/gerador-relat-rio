@@ -228,3 +228,14 @@ export function montarPacote(e: EntradaPacote): string
   }
   return s.join('\n').trim() + '\n';
 }
+
+const numerosDe = (texto: string): string[] =>
+  (texto.match(/\d+(?:[.,]\d+)?/g) ?? []).map((n) => n.replace(',', '.').replace(/^0+(?=\d)/, ''));
+
+// números que um texto escrito por IA traz e que não estão no pacote conferido: a IA só escreve, não calcula
+export function numerosForaDoPacote(texto: string, pacote: string): string[]
+{
+  const conhecidos = new Set(numerosDe(pacote));
+  const semMarcadores = texto.split('\n').map((l) => l.replace(/^\s*(?:[-*]|\d+[.)])\s+/, '')).join('\n');
+  return [...new Set(numerosDe(semMarcadores))].filter((n) => !conhecidos.has(n));
+}

@@ -13,6 +13,7 @@
     "@fontsource/courier-prime": "^5.3.0",
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@internationalized/date": "^3.12.4",
+    "@mlc-ai/web-llm": "0.2.88",
     "@supervisao/core": "*",
     "@xyflow/svelte": "^1.7.1",
     "bits-ui": "^2.21.0",
