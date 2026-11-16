@@ -1,95 +1,69 @@
 <script lang="ts">
-  import
-  {
-    acoesDeHoje, alternarItem, definicoesPadrao, diasUteisEntre, historico, itemFeito, linhaDoTempo, progressoDaLista, progressoVivo, registrouHoje, resumoDoFluxo,
-    segundaDaSemana, serieSemanal, somarDias, textoProjecao,
-    type Destino, type Evento, type TotaisPainel,
+  import {
+    definicoesPadrao,
+    diasUteisEntre,
+    segundaDaSemana,
+    somarDias,
+    type TotaisPainel,
   } from '@supervisao/core';
-  import { Tabs } from 'bits-ui';
   import { goto } from '$app/navigation';
-  import { carregar, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
-  import { svgLinha, svgSparkline } from '#lib/graficos.ts';
+  import { carregar, salvar, type Dados } from '#lib/armazenamento.ts';
+  import CobrinhaMascote from '#lib/CobrinhaMascote.svelte';
   import { chaveDoRelatorio } from '#lib/modelos.ts';
-  import { nuvem, sairDaNuvem } from '#lib/nuvem.svelte.ts';
-  import { baixarTexto, copiar, textoPacote, textoTeams } from '#lib/saidas.ts';
   import { contextoDaSemana, dataCurta, dataMedia, hoje, periodoDaSemana, semaforoDoRelatorio, semanasDisponiveis } from '#lib/semana.ts';
   import { lerSessao } from '#lib/sessao.ts';
 
   const dados = $state<Dados>(carregar());
   $effect(() => salvar($state.snapshot(dados)));
+
   const dia = hoje();
   let semana = $state(segundaDaSemana(dia));
-  let copiado = $state('');
-  let abaSemana = $state('percebido');
-  let abaLateral = $state('listas');
-
-  const vivosAbertos = $derived(dados.vivos.filter((v) => !v.encerradoEm));
-  const vivoDaSemana = $derived(vivosAbertos.find((v) => !v.livre && v.inicio === semana));
 
   const ctx = $derived(contextoDaSemana(dados, semana));
-  const notas = $derived<NotasRelatorio>(dados.relatorios[semana] ?? {});
   const t = $derived<TotaisPainel>(ctx.atual.foto?.totais ?? {});
-  const ta = $derived<TotaisPainel>(ctx.anterior?.foto?.totais ?? {});
   const kp = $derived(ctx.comp.planoAtual);
-  const fotosAteSemana = $derived(dados.fotos.filter((f) => f.data <= ctx.fim));
-  const serie = (chave: keyof TotaisPainel) => historico(fotosAteSemana, chave).slice(-8);
-  const promessasDaSemana = $derived(dados.promessas.filter((p) => p.semana === semana));
-  const emAberto = $derived(promessasDaSemana.filter((p) => p.cumprida === undefined));
-
-  const acoes = $derived(acoesDeHoje({
-    hoje: dia,
-    inicio: semana,
-    fotos: dados.fotos,
-    plano: ctx.atual.plano,
-    alertas: ctx.alertas,
-    riscos: dados.riscos,
-    promessasDaSemana,
-    promessasAnteriores: ctx.promessasAnteriores,
-    listas: dados.listas,
-  }));
-  const fluxo = $derived(resumoDoFluxo(ctx.atual.foto?.cards ?? [], ctx.atual.foto?.data ?? dia, serieSemanal(fotosAteSemana, 'dentroDoPrazoPct', semana), ctx.meta));
-  const nomePessoa = (id: string) => dados.pessoas.find((p) => p.id === id)?.nome.split(' ')[0] ?? id;
-  const eventos = $derived(linhaDoTempo(dados.fotos, ctx.atual.plano, dados.riscos, dados.pessoas, semana));
-  const eventosPorDia = $derived(Object.entries(eventos.reduce<Record<string, Evento[]>>((m, e) => ((m[e.data] ??= []).push(e), m), {})));
-
-  const rotas: Record<Destino, string> = { painel: '/painel', semana: '/semana', cards: '/cards', relatorio: '/relatorio', listas: '/listas' };
-  const iconeEvento: Record<Evento['tipo'], string> = {
-    foto: '[foto]', etapa: '[etapa]', previsao: '[previsão]', ritmo: '[ritmo]', entrou: '[entrou]', saiu: '[saiu]', plano: '[plano]', entrega: '[entrega]', risco: '[risco]',
-  };
 
   const hora = new Date().getHours();
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
-  const primeiroNome = $derived((dados.identificacao.elaboradoPor || lerSessao()?.nome || '').split(' ')[0]);
+  const primeiroNome = $derived((dados.identificacao.elaboradoPor || lerSessao()?.nome || 'Mariana').split(' ')[0]);
 
   const ultimaFoto = $derived([...dados.fotos].filter((f) => f.data <= dia).sort((a, b) => a.data.localeCompare(b.data)).at(-1));
   const diasDesdeFoto = $derived(ultimaFoto ? diasUteisEntre(ultimaFoto.data, dia, definicoesPadrao.feriados) : 0);
-  // atenção primeiro: com a lista recolhida, o que importa aparece
-  const ordemTom = { atencao: 0, positivo: 1, neutro: 2 };
-  const frasesOrdenadas = $derived([...ctx.frases].sort((a, b) => ordemTom[a.tom] - ordemTom[b.tom]));
-  let todasFrases = $state(false);
 
-  // rotina do ciclo: sexta fecha a semana; nos últimos dias úteis do mês, o relatório do período
-  const ultimoDiaDoMes = `${dia.slice(0, 8)}${String(new Date(Number(dia.slice(0, 4)), Number(dia.slice(5, 7)), 0).getDate()).padStart(2, '0')}`;
-  const ehSexta = new Date(`${dia}T12:00:00`).getDay() === 5;
-  const fimDeMes = diasUteisEntre(dia, ultimoDiaDoMes, definicoesPadrao.feriados) <= 2;
+  const semaforo = $derived(semaforoDoRelatorio(ctx, {}));
+  const nomesSemaforo: Record<string, string> = { verde: 'No caminho', amarelo: 'Atenção', vermelho: 'Fora da meta' };
 
-  function variacao(chave: keyof TotaisPainel, sufixo = ''): string
+  const cardsFoto = $derived(ultimaFoto?.cards ?? []);
+  const baseCards = $derived(cardsFoto.filter((c) => c.origens.includes('em_execucao')).length ? cardsFoto.filter((c) => c.origens.includes('em_execucao')) : cardsFoto);
+
+  const atencao = $derived(
+    baseCards
+      .filter((c) => c.ritmoPainel === 'atrasado' || c.ritmoPainel === 'em_risco' || c.situacao === 'atrasado')
+      .sort((a, b) => Number(b.ritmoPainel === 'atrasado' || b.situacao === 'atrasado') - Number(a.ritmoPainel === 'atrasado' || a.situacao === 'atrasado'))
+      .slice(0, 5),
+  );
+
+  const vencimentos = $derived(
+    cardsFoto
+      .filter((c) => c.vencimento && c.vencimento >= dia && c.vencimento <= somarDias(dia, 15))
+      .sort((a, b) => (a.vencimento ?? '').localeCompare(b.vencimento ?? ''))
+      .slice(0, 4),
+  );
+
+  const pessoasPainel = $derived(dados.pessoas.map((p) =>
   {
-    const a = ta[chave];
-    const b = t[chave];
-    if (a === undefined || b === undefined) return '';
-    const d = b - a;
-    return `${d > 0 ? '+' : ''}${d}${sufixo} na semana`;
-  }
+    const meus = baseCards.filter((c) => c.responsavelEtapaAtual === p.id);
+    return {
+      pessoa: p,
+      total: meus.length,
+      noRitmo: meus.filter((c) => c.ritmoPainel === 'no_ritmo').length,
+      emRisco: meus.filter((c) => c.ritmoPainel === 'em_risco').length,
+      atrasado: meus.filter((c) => c.ritmoPainel === 'atrasado').length,
+    };
+  }));
 
-  async function copiarSaida(nome: string, texto: string)
-  {
-    await copiar(texto);
-    copiado = nome;
-    setTimeout(() => (copiado = ''), 2000);
-  }
+  const ultimoRegistro = $derived([...dados.registros].sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm))[0]);
 
-  // 1:1 de uma pessoa: o relatório da semana abre com o modelo 1:1 só com ela
   function abrirUmAUm(pessoaId: string)
   {
     const chave = chaveDoRelatorio(periodoDaSemana(semana));
@@ -99,875 +73,798 @@
     salvar($state.snapshot(dados));
     goto(`/relatorio?semana=${semana}`);
   }
-  const nomesSemaforo: Record<string, string> = { verde: 'No caminho', amarelo: 'Atenção', vermelho: 'Fora da meta' };
-  const semaforo = $derived(semaforoDoRelatorio(ctx, {}));
-  const cardsFoto = $derived(ultimaFoto?.cards ?? []);
-  const base = $derived(cardsFoto.filter((c) => c.origens.includes('em_execucao')).length ? cardsFoto.filter((c) => c.origens.includes('em_execucao')) : cardsFoto);
-  const pessoasPainel = $derived(dados.pessoas.map((p) =>
-  {
-    const meus = base.filter((c) => c.responsavelEtapaAtual === p.id);
-    return { pessoa: p, total: meus.length, noRitmo: meus.filter((c) => c.ritmoPainel === 'no_ritmo').length, emRisco: meus.filter((c) => c.ritmoPainel === 'em_risco').length, atrasado: meus.filter((c) => c.ritmoPainel === 'atrasado').length };
-  }));
-  const atencao = $derived(
-    base
-      .filter((c) => c.ritmoPainel === 'atrasado' || c.ritmoPainel === 'em_risco' || c.situacao === 'atrasado')
-      .sort((a, b) => Number(b.ritmoPainel === 'atrasado' || b.situacao === 'atrasado') - Number(a.ritmoPainel === 'atrasado' || a.situacao === 'atrasado'))
-      .slice(0, 6),
-  );
-  const vencimentos = $derived(
-    cardsFoto
-      .filter((c) => c.vencimento && c.vencimento >= dia && c.vencimento <= somarDias(dia, 15))
-      .sort((a, b) => (a.vencimento ?? '').localeCompare(b.vencimento ?? ''))
-      .slice(0, 6),
-  );
-  const registrosRecentes = $derived([...dados.registros].sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm)).slice(0, 3));
-
 </script>
 
-<main>
-  <header>
-    <div>
-      <span class="prompt">&gt; {saudacao.toLowerCase()}{primeiroNome ? `, ${primeiroNome.toLowerCase()}` : ''}</span>
-      <h1>Início<span class="cursor">_</span></h1>
+<main class="dashboard-executivo">
+  <!-- CABEÇALHO RESUMIDO COM MASCOTE TECH E SAUDAÇÃO -->
+  <header class="topo-dashboard">
+    <div class="boas-vindas">
+      <CobrinhaMascote />
+      <div class="titulos">
+        <span class="prompt">&gt; {saudacao.toLowerCase()}, {primeiroNome.toLowerCase()}</span>
+        <h1>Visão Executiva<span class="cursor">_</span></h1>
+      </div>
     </div>
-    <select bind:value={semana} aria-label="Semana">
-      {#each semanasDisponiveis(dados) as s (s)}<option value={s}>{dataCurta(s)} a {dataCurta(somarDias(s, 4))}</option>{/each}
-    </select>
+
+    <div class="seletor-semana-caixa">
+      <label for="seletor-semana" class="etiqueta-semana">Semana ativa</label>
+      <select id="seletor-semana" bind:value={semana} aria-label="Semana">
+        {#each semanasDisponiveis(dados) as s (s)}
+          <option value={s}>{dataCurta(s)} a {dataCurta(somarDias(s, 4))}</option>
+        {/each}
+      </select>
+    </div>
   </header>
 
+  <!-- AVISO DE ATUALIZAÇÃO DO PAINEL -->
   {#if !ultimaFoto}
-    <p class="aviso">Nenhuma foto do painel ainda. <a href="/painel">Colar o painel</a> para começar.</p>
+    <div class="aviso-banner">
+      <span>Nenhum print ou leitura do painel salva ainda.</span>
+      <a href="/painel" class="btn-acao-banner">Colar painel no diário &rarr;</a>
+    </div>
   {:else if diasDesdeFoto >= 2}
-    <p class="aviso">A última foto do painel é de {dataCurta(ultimaFoto.data)}, há {diasDesdeFoto} dias úteis. <a href="/painel">Colar o painel</a></p>
+    <div class="aviso-banner suave">
+      <span>Última leitura do painel feita em {dataCurta(ultimaFoto.data)} (há {diasDesdeFoto} dias úteis).</span>
+      <a href="/painel" class="btn-acao-banner">Atualizar agora &rarr;</a>
+    </div>
   {/if}
 
-  {#if ultimaFoto}
-    <section class="situacao {semaforo ?? 'sem'}">
-      <div class="sit-status">
-        <span class="sit-rotulo">como estamos hoje</span>
-        <b class="sit-valor">{semaforo ? nomesSemaforo[semaforo] : 'Sem leitura'}</b>
-        <span class="sit-detalhe">
-          {#if t.dentroDoPrazoPct !== undefined}{t.dentroDoPrazoPct}% dentro do prazo{ctx.meta !== undefined ? ` · meta ${ctx.meta}%` : ''}{:else}cole um painel para medir o prazo{/if}
+  <!-- 4 INDICADORES CHAVE (KPIS RESUMIDOS) -->
+  <section class="grade-kpis">
+    <!-- 1. SEMÁFORO GERAL -->
+    <div class="card-kpi {semaforo ?? 'neutro'}">
+      <span class="kpi-rotulo">Saúde da semana</span>
+      <div class="kpi-valor-grupo">
+        <span class="kpi-icone-status">
+          {#if semaforo === 'verde'}🟢{:else if semaforo === 'amarelo'}🟡{:else if semaforo === 'vermelho'}🔴{:else}⚪{/if}
         </span>
+        <strong class="kpi-valor-texto">{semaforo ? nomesSemaforo[semaforo] : 'Sem leitura'}</strong>
       </div>
-      <div class="sit-itens">
-        <div><b>{base.length}</b><span>demandas em acompanhamento</span></div>
-        <div class:vermelho={atencao.filter((c) => c.ritmoPainel === 'atrasado' || c.situacao === 'atrasado').length > 0}><b>{atencao.filter((c) => c.ritmoPainel === 'atrasado' || c.situacao === 'atrasado').length}</b><span>atrasadas</span></div>
-        <div class:amarelo={atencao.filter((c) => c.ritmoPainel === 'em_risco').length > 0}><b>{atencao.filter((c) => c.ritmoPainel === 'em_risco').length}</b><span>em risco</span></div>
-        <div><b>{vencimentos.length}</b><span>vencem em 15 dias</span></div>
-      </div>
-      <span class="sit-data">painel de {dataMedia(ultimaFoto.data)}</span>
-    </section>
-  {/if}
-
-  <section class="kpis">
-    <div class="kpi">
-      <span class="etiqueta">dentro do prazo</span>
-      <span class="valor">{t.dentroDoPrazoPct !== undefined ? `${t.dentroDoPrazoPct}%` : '-'}</span>
-      <span class="detalhe">
-        {#if ctx.meta !== undefined && t.dentroDoPrazoPct !== undefined}
-          meta {ctx.meta}% · <b class:abaixo={t.dentroDoPrazoPct < ctx.meta}>{t.dentroDoPrazoPct - ctx.meta >= 0 ? '+' : ''}{t.dentroDoPrazoPct - ctx.meta} pp</b>
+      <span class="kpi-detalhe">
+        {#if t.dentroDoPrazoPct !== undefined}
+          {t.dentroDoPrazoPct}% dentro do prazo {ctx.meta ? `· meta ${ctx.meta}%` : ''}
+        {:else}
+          Cole um print para avaliar
         {/if}
-        {variacao('dentroDoPrazoPct', ' pp')}
       </span>
-      {@html svgSparkline(serie('dentroDoPrazoPct').map((p) => p.valor))}
     </div>
-    <div class="kpi">
-      <span class="etiqueta">concluídos</span>
-      <span class="valor">{t.concluidos ?? '-'}</span>
-      <span class="detalhe">{t.itensCronograma !== undefined ? `de ${t.itensCronograma} itens` : ''} {variacao('concluidos')}</span>
-      {@html svgSparkline(serie('concluidos').map((p) => p.valor))}
+
+    <!-- 2. ENTREGAS DO PLANO -->
+    <div class="card-kpi">
+      <span class="kpi-rotulo">Plano da semana</span>
+      <div class="kpi-valor-grupo">
+        <strong class="kpi-valor-numero">{kp ? `${kp.feitos}/${kp.planejados}` : '0/0'}</strong>
+        <span class="kpi-valor-sub">entregas</span>
+      </div>
+      <div class="kpi-progresso-linha">
+        <div class="kpi-barra"><div class="kpi-barra-preenchimento" style:width="{kp?.pctFeitos ?? 0}%"></div></div>
+        <span class="kpi-detalhe">{kp?.pctFeitos !== undefined ? `${kp.pctFeitos}% concluído` : 'Sem plano ativo'}</span>
+      </div>
     </div>
-    <div class="kpi">
-      <span class="etiqueta">plano da semana</span>
-      <span class="valor">{kp ? `${kp.feitos}/${kp.planejados}` : '-'}</span>
-      <span class="detalhe">{kp?.pctFeitos !== undefined ? `${kp.pctFeitos}% feito` : 'sem plano ainda'}{ctx.comp.planoAnterior?.pctFeitos !== undefined ? ` · anterior ${ctx.comp.planoAnterior.pctFeitos}%` : ''}</span>
-      <span class="barra"><span style:width="{kp?.pctFeitos ?? 0}%"></span></span>
+
+    <!-- 3. DEMANDAS EM ALERTA -->
+    <div class="card-kpi" class:alerta={atencao.length > 0}>
+      <span class="kpi-rotulo">Atenção imediata</span>
+      <div class="kpi-valor-grupo">
+        <strong class="kpi-valor-numero" class:destaque-vermelho={atencao.length > 0}>{atencao.length}</strong>
+        <span class="kpi-valor-sub">{atencao.length === 1 ? 'demanda' : 'demandas'}</span>
+      </div>
+      <span class="kpi-detalhe">
+        {#if atencao.length === 0}
+          ✓ Nenhuma demanda atrasada
+        {:else}
+          {atencao.filter((c) => c.ritmoPainel === 'atrasado' || c.situacao === 'atrasado').length} atrasadas · {atencao.filter((c) => c.ritmoPainel === 'em_risco').length} em risco
+        {/if}
+      </span>
     </div>
-    <a class="kpi" href="/semana" class:alerta={ctx.alertas.length > 0}>
-      <span class="etiqueta">alertas</span>
-      <span class="valor">{ctx.alertas.length}</span>
-      <span class="detalhe">{ctx.alertas.length ? 'itens que passam do que o painel espera' : 'nada passa do painel'}</span>
+
+    <!-- 4. REGISTROS DO DIÁRIO -->
+    <div class="card-kpi">
+      <span class="kpi-rotulo">Diário do painel</span>
+      <div class="kpi-valor-grupo">
+        <strong class="kpi-valor-numero">{dados.registros.length}</strong>
+        <span class="kpi-valor-sub">registros</span>
+      </div>
+      <span class="kpi-detalhe">
+        {#if ultimoRegistro}
+          Último em {dataCurta(ultimoRegistro.data)} · {ultimoRegistro.pasta || 'DEV'}
+        {:else}
+          Nenhum registro arquivado
+        {/if}
+      </span>
+    </div>
+  </section>
+
+  <!-- 4 ATALHOS RÁPIDOS EM DESTAQUE -->
+  <section class="grade-atalhos">
+    <a href="/painel" class="card-atalho">
+      <div class="atalho-icone">📸</div>
+      <div class="atalho-info">
+        <strong>Novo registro</strong>
+        <span>Cole prints e comente</span>
+      </div>
+    </a>
+
+    <a href="/relatorio" class="card-atalho">
+      <div class="atalho-icone">📊</div>
+      <div class="atalho-info">
+        <strong>Gerar relatório</strong>
+        <span>PDF executivo ou link</span>
+      </div>
+    </a>
+
+    <a href="/fluxos" class="card-atalho">
+      <div class="atalho-icone">⑂</div>
+      <div class="atalho-info">
+        <strong>Fluxos de processo</strong>
+        <span>Editor e modo percorrer</span>
+      </div>
+    </a>
+
+    <a href="/semana" class="card-atalho">
+      <div class="atalho-icone">📅</div>
+      <div class="atalho-info">
+        <strong>Plano da semana</strong>
+        <span>Metas, time e alertas</span>
+      </div>
     </a>
   </section>
 
-  <section class="atalhos">
-    <a href="/painel"><b>＋ Novo registro</b><span>cole prints e comente</span></a>
-    <a href="/relatorio"><b>Gerar relatório</b><span>PDF ou link</span></a>
-    <a href="/fluxos"><b>Novo fluxo</b><span>de texto, semana ou registro</span></a>
-    <a href="/semana"><b>Plano da semana</b><span>entregas e alertas</span></a>
-  </section>
-  
-  <div class="grade controle">
-    <section class="cartao">
-      <h2>Precisa de atenção</h2>
-      {#each atencao as c (c.codigo)}
-        <p class="linha-fluxo">
-          <b class="maquina">{c.codigo}</b> {c.titulo ?? ''}
-          <span class="dica">{[c.etapaAtual, c.responsavelEtapaAtual && nomePessoa(c.responsavelEtapaAtual), c.ritmoPainel && c.ritmoPainel.replace('_', ' '), c.previsao && `previsão ${dataMedia(c.previsao)}`].filter(Boolean).join(' · ')}</span>
-        </p>
-      {:else}
-        <p class="dica">{ultimaFoto ? 'Nenhuma demanda atrasada ou em risco na última leitura.' : 'Sem leitura do painel ainda.'}</p>
-      {/each}
-      {#if vencimentos.length}
-        <h3 class="sub-h">Vencendo nos próximos 15 dias</h3>
-        {#each vencimentos as c (c.codigo)}
-          <p class="linha-fluxo"><b class="maquina">{c.codigo}</b> {c.titulo ?? ''} <span class="dica">vence {dataMedia(c.vencimento)}</span></p>
-        {/each}
-      {/if}
-    </section>
-  
-    <section class="cartao">
-      <h2>Demandas por pessoa</h2>
-      {#each pessoasPainel as x (x.pessoa.id)}
-        <div class="pessoa">
-          <div class="linha"><b>{x.pessoa.nome}</b><span class="dica maquina">{x.total} {x.total === 1 ? 'demanda' : 'demandas'}</span></div>
-          <span class="pilha" title="no ritmo / em risco / atrasadas">
-            <span class="p-ok" style:flex={x.noRitmo}></span><span class="p-risco" style:flex={x.emRisco}></span><span class="p-atraso" style:flex={x.atrasado}></span>
-            {#if !x.total}<span class="p-vazio"></span>{/if}
-          </span>
-          <span class="dica maquina">{x.noRitmo} no ritmo · {x.emRisco} em risco · {x.atrasado} atrasadas</span>
-        </div>
-      {/each}
-    </section>
-  </div>
-  
-  <section class="cartao diario-recente">
-    <div class="linha"><h2>Últimos registros do diário</h2><a class="link-secao" href="/painel">abrir diário</a></div>
-    {#each registrosRecentes as r (r.id)}
-      <p class="linha-fluxo"><b>{dataCurta(r.data)} · {r.pasta}</b> {r.motivo || r.resumo || 'Sem motivo'} <span class="dica">{r.capturas.length} prints · {r.cards.length} cards</span></p>
-    {:else}
-      <p class="dica">Nada guardado ainda. Cole um print no diário e comente: ele fica aqui para virar relatório quando você quiser.</p>
-    {/each}
-  </section>
-
-  <div class="grade">
-    <section class="cartao">
-      <h2>Hoje</h2>
-      {#if ehSexta}
-        <p class="rotina">Sexta: <a href="/semana">fechar a semana</a>{#if vivoDaSemana}, depois <a href="/vivos?id={vivoDaSemana.id}">abrir o checklist diário</a>{/if}.</p>
-      {/if}
-      {#if fimDeMes}
-        <p class="rotina">Fim do mês: <a href="/mes">gerar o relatório do período</a>.</p>
-      {/if}
-      {#each vivosAbertos as v (v.id)}
-        {@const pr = progressoVivo(v, dia)}
-        <div class="vivo">
-          <div class="linha"><a href="/vivos?id={v.id}"><b>{v.nome}</b></a><span class="dica maquina">{pr.feitos}/{pr.total}</span></div>
-          {#each v.itens.filter((i) => i.diario) as item (item.id)}
-            <label class="item-vivo"><input type="checkbox" checked={itemFeito(item, dia)} onchange={() => alternarItem(item, dia)} /> <span class:feito={itemFeito(item, dia)}>{item.texto}</span></label>
-          {/each}
-          {#if !registrouHoje(v, dia)}<a class="registrar" href="/vivos?id={v.id}">registrar o dia</a>{/if}
-        </div>
-      {/each}
-      <ul class="acoes">
-        {#each acoes.slice(0, 5) as a, i (i)}
-          <li class={a.nivel}>
-            <i></i>
-            <span>{a.texto}</span>
-            {#if a.destino}<a href={rotas[a.destino]}>abrir</a>{/if}
-          </li>
-        {/each}
-      </ul>
-      {#if !vivosAbertos.length}<a class="link-secao" href="/vivos">criar um checklist diário para preencher todo dia</a>{/if}
-    </section>
-
-    <section class="cartao">
-      <h2>Time</h2>
-      {#each ctx.comp.pessoas as p (p.pessoa.id)}
-        <div class="pessoa">
-          <div class="linha">
-            <b>{p.pessoa.nome}</b>
-            <span class="direita">
-              {#if p.alertas}<span class="pilula vermelho">{p.alertas}</span>{/if}
-              <button class="link" onclick={() => abrirUmAUm(p.pessoa.id)}>1:1</button>
-            </span>
-          </div>
-          <span class="barra clara"><span style:width="{p.atual.pctFeitos ?? 0}%"></span></span>
-          <span class="dica maquina">
-            {p.atual.feitos}/{p.atual.planejados} feitos · <span class:estourou={p.horas > p.pessoa.capacidadeHorasSemana}>{p.horas}h de {p.pessoa.capacidadeHorasSemana}h</span>
-          </span>
-        </div>
-      {/each}
-    </section>
-  </div>
-
-  <details class="mais">
-    <summary>Análise completa: evolução, fluxo, linha do tempo e saídas</summary>
-    <div class="grade">
-      <div class="coluna">
-        {#if serie('dentroDoPrazoPct').length >= 2}
-          <section class="cartao">
-            <h2>Evolução do prazo</h2>
-            <div class="grafico">{@html svgLinha(serie('dentroDoPrazoPct').map((p) => ({ rotulo: dataCurta(p.data), valor: p.valor })), { meta: ctx.meta, sufixo: '%', largura: 760 })}</div>
-          </section>
-        {/if}
-
-        <section class="cartao">
-          <h2>Fluxo</h2>
-          <div class="projecao">
-            {#if fluxo.projecao}
-              <p class="veredito {fluxo.projecao.veredito}">meta de prazo no fim do mês: {fluxo.projecao.veredito === 'bate' ? 'deve bater' : fluxo.projecao.veredito === 'perto' ? 'perto da meta' : 'não deve bater'} ({fluxo.projecao.projetado.toLocaleString('pt-BR')}% para {fluxo.projecao.meta}%)</p>
-              <p class="dica">{textoProjecao(fluxo.projecao)}</p>
-            {:else}
-              <p class="dica">A projeção da meta precisa de 3 semanas com "dentro do prazo" e a meta do painel.</p>
-            {/if}
-          </div>
-          <div class="colunas-fluxo">
-            <div>
-              <h3>Parados além do normal ({fluxo.parados.length})</h3>
-              {#each fluxo.parados.slice(0, 5) as x (x.card.codigo)}
-                <p class="linha-fluxo"><b class="maquina">{x.card.codigo}</b> {x.card.titulo} <span class="dica">{x.idadeDias.toLocaleString('pt-BR')} d aberto, normal até {x.limiteDias.toLocaleString('pt-BR')} d ({x.base}){x.card.responsaveis.length ? ` - ${x.card.responsaveis.map(nomePessoa).join(', ')}` : ''}</span></p>
-              {:else}
-                <p class="dica">{fluxo.tempos.geral ? 'Nenhuma demanda aberta além do normal.' : 'Importe o CSV da lista de Demandas no Diário do painel para medir o normal.'}</p>
-              {/each}
-            </div>
-            <div>
-              <h3>Onde as demandas se acumulam</h3>
-              {#each fluxo.gargalos.slice(0, 5) as g (g.etapa)}
-                <p class="linha-fluxo"><b>{g.etapa}</b> <span class="dica">{g.quantidade} {g.quantidade === 1 ? 'demanda' : 'demandas'}{g.esperando ? `, ${g.esperando} esperando começar` : ''}{g.maiorRodandoDias !== undefined ? `, maior tempo rodando ${g.maiorRodandoDias.toLocaleString('pt-BR')} d` : ''}</span></p>
-              {:else}
-                <p class="dica">Cole o "Quem está cuidando de quê" ou um card aberto para ver as etapas.</p>
-              {/each}
-            </div>
-          </div>
-        </section>
-
-        <section class="cartao">
-          <h2>Esta semana</h2>
-          <Tabs.Root bind:value={abaSemana}>
-            <Tabs.List class="abas">
-              <Tabs.Trigger value="percebido" class="aba">O que o sistema percebeu ({ctx.frases.length})</Tabs.Trigger>
-              <Tabs.Trigger value="tempo" class="aba">Linha do tempo</Tabs.Trigger>
-            </Tabs.List>
-            <Tabs.Content value="percebido">
-              {#if ctx.frases.length}
-                <ul class="frases">
-                  {#each todasFrases ? frasesOrdenadas : frasesOrdenadas.slice(0, 6) as f, i (i)}<li class={f.tom}><i></i>{f.texto}</li>{/each}
-                </ul>
-                {#if frasesOrdenadas.length > 6}
-                  <button class="link" onclick={() => (todasFrases = !todasFrases)}>{todasFrases ? 'mostrar menos' : `ver todas (${frasesOrdenadas.length})`}</button>
-                {/if}
-              {:else}
-                <p class="dica">Cole o painel e monte o plano para o sistema comparar com a semana anterior.</p>
-              {/if}
-            </Tabs.Content>
-            <Tabs.Content value="tempo">
-              {#each eventosPorDia as [data, lista] (data)}
-                <div class="dia-tempo">
-                  <span class="data maquina">{dataMedia(data)}</span>
-                  <ul>
-                    {#each lista as e, i (i)}<li class={e.tipo}><span class="tipo maquina">{iconeEvento[e.tipo]}</span> {e.texto}</li>{/each}
-                  </ul>
-                </div>
-              {:else}
-                <p class="dica">Nada registrado nesta semana ainda.</p>
-              {/each}
-            </Tabs.Content>
-          </Tabs.Root>
-        </section>
+  <!-- VISÃO RESUMIDA DA SEMANA: 2 COLUNAS OBJETIVAS -->
+  <div class="grade-dupla">
+    <!-- COLUNA 1: DEMANDAS QUE EXIGEM ATENÇÃO -->
+    <section class="cartao painel-secao">
+      <div class="secao-cabecalho">
+        <h2>Demandas prioritárias</h2>
+        <a href="/cards" class="link-subtil">ver todos os cards &rarr;</a>
       </div>
 
-      <aside class="coluna">
-        <section class="cartao saidas">
-          <h2>Saídas</h2>
-          <a class="saida principal" href="/relatorio"><b>Gerar PDF</b><span>semanal, executivo, período ou seus modelos</span></a>
-          <button class="saida" onclick={() => copiarSaida('teams', textoTeams(dados, ctx, notas))}>
-            <b>{copiado === 'teams' ? 'Copiado!' : 'Mensagem do Teams'}</b><span>8 a 10 linhas, pronta para colar</span>
-          </button>
-          <button class="saida" onclick={() => copiarSaida('pacote', textoPacote(dados, ctx, notas))}>
-            <b>{copiado === 'pacote' ? 'Copiado!' : 'Pacote para IA'}</b><span>números conferidos + dicionário; a IA só escreve</span>
-          </button>
-          <button class="link" onclick={() => baixarTexto(textoPacote(dados, ctx, notas), `pacote-ia-${dados.prefixo}-${semana}.md`)}>baixar pacote .md</button>
-        </section>
+      {#if atencao.length === 0}
+        <div class="estado-limpo">
+          <span class="icone-ok">✨</span>
+          <p><b>Tudo sob controle!</b></p>
+          <span class="dica">Nenhuma demanda atrasada ou em risco registrada nesta leitura.</span>
+        </div>
+      {:else}
+        <div class="lista-demandas">
+          {#each atencao as c (c.codigo)}
+            <div class="item-demanda" class:urgente={c.ritmoPainel === 'atrasado' || c.situacao === 'atrasado'}>
+              <div class="demanda-topo">
+                <span class="demanda-codigo">{c.codigo}</span>
+                <span class="demanda-etapa">{c.etapaAtual || 'Em andamento'}</span>
+                {#if c.ritmoPainel === 'atrasado'}
+                  <span class="tag-ritmo atrasado">Atrasado</span>
+                {:else if c.ritmoPainel === 'em_risco'}
+                  <span class="tag-ritmo risco">Em risco</span>
+                {/if}
+              </div>
+              <strong class="demanda-titulo">{c.titulo || 'Demanda sem título'}</strong>
+              <div class="demanda-meta">
+                <span>Resp.: {c.responsavelEtapaAtual || 'Não atribuído'}</span>
+                {#if c.previsao}
+                  <span>Prev.: {dataMedia(c.previsao)}</span>
+                {/if}
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/if}
 
-        <section class="cartao">
-          <h2>Em andamento</h2>
-          <Tabs.Root bind:value={abaLateral}>
-            <Tabs.List class="abas">
-              <Tabs.Trigger value="listas" class="aba">Listas</Tabs.Trigger>
-              <Tabs.Trigger value="compromissos" class="aba">Compromissos{emAberto.length ? ` (${emAberto.length})` : ''}</Tabs.Trigger>
-              <Tabs.Trigger value="conta" class="aba">Conta</Tabs.Trigger>
-            </Tabs.List>
-            <Tabs.Content value="listas">
-              {#each dados.listas as l (l.id)}
-                {@const pr = progressoDaLista(l)}
-                <div class="lista-resumo">
-                  <div class="linha"><b>{l.nome}</b><span class="maquina dica">{pr.concluidos}/{pr.total}</span></div>
-                  <span class="barra clara"><span style:width="{pr.pct}%"></span></span>
-                </div>
-              {:else}
-                <p class="dica">Checklists suas, como o teste de agendamentos por empresa.</p>
-              {/each}
-              <a class="link-secao" href="/listas">{dados.listas.length ? 'abrir listas' : 'criar uma lista'}</a>
-            </Tabs.Content>
-            <Tabs.Content value="compromissos">
-              {#each emAberto as p (p.id)}
-                <p class="compromisso">{p.texto}</p>
-              {:else}
-                <p class="dica">{promessasDaSemana.length ? 'Todos os compromissos da semana têm situação.' : 'Nenhum compromisso registrado nesta semana.'}</p>
-              {/each}
-              <a class="link-secao" href="/semana">ver na semana</a>
-            </Tabs.Content>
-            <Tabs.Content value="conta">
-              {#if nuvem.estado === 'desligada'}
-                <p class="dica">Nuvem desligada: os dados ficam só neste navegador.</p>
-              {:else if nuvem.estado === 'sem_login'}
-                <p class="dica">Entre na sua conta para guardar tudo na nuvem e abrir em outro computador.</p>
-                <a class="botao" href="/entrar">Entrar ou criar conta</a>
-              {:else}
-                <p class="estado {nuvem.estado}">
-                  {nuvem.estado === 'sincronizando' ? 'sincronizando...' : nuvem.estado === 'erro' ? 'erro ao sincronizar' : 'tudo guardado na nuvem'}
-                </p>
-                <p class="dica">{nuvem.email} - <a href="/perfil">perfil</a>{nuvem.ultimoEnvio ? ` - último envio ${nuvem.ultimoEnvio.slice(11, 16)}` : ''}</p>
-                {#if nuvem.erro}<p class="dica erro">{nuvem.erro}</p>{/if}
-                <button class="link" onclick={() => sairDaNuvem()}>sair da nuvem</button>
+      {#if vencimentos.length > 0}
+        <div class="bloco-vencimentos">
+          <span class="vencimentos-rotulo">⏰ Vencendo nos próximos 15 dias:</span>
+          <div class="vencimentos-chips">
+            {#each vencimentos as v (v.codigo)}
+              <span class="chip-vencimento">
+                <b>{v.codigo}</b> · {dataCurta(v.vencimento!)}
+              </span>
+            {/each}
+          </div>
+        </div>
+      {/if}
+    </section>
+
+    <!-- COLUNA 2: RITMO DO TIME -->
+    <section class="cartao painel-secao">
+      <div class="secao-cabecalho">
+        <h2>Carga e ritmo do time</h2>
+        <a href="/semana" class="link-subtil">ajustar equipe &rarr;</a>
+      </div>
+
+      <div class="lista-time">
+        {#each pessoasPainel as p (p.pessoa.id)}
+          <div class="item-pessoa">
+            <div class="pessoa-linha-topo">
+              <strong>{p.pessoa.nome}</strong>
+              <div class="pessoa-acoes">
+                <span class="pessoa-contagem">{p.total} {p.total === 1 ? 'demanda' : 'demandas'}</span>
+                <button class="btn-1a1" onclick={() => abrirUmAUm(p.pessoa.id)} title="Abrir pauta de 1:1">1:1</button>
+              </div>
+            </div>
+
+            <!-- BARRA DE RITMO (Verde / Amarelo / Vermelho) -->
+            <div class="barra-ritmo-pilha" title="{p.noRitmo} no ritmo · {p.emRisco} em risco · {p.atrasado} atrasadas">
+              <span class="ritmo-verde" style:flex={p.noRitmo}></span>
+              <span class="ritmo-amarelo" style:flex={p.emRisco}></span>
+              <span class="ritmo-vermelho" style:flex={p.atrasado}></span>
+              {#if p.total === 0}
+                <span class="ritmo-vazio"></span>
               {/if}
-            </Tabs.Content>
-          </Tabs.Root>
-        </section>
-      </aside>
-    </div>
-  </details>
+            </div>
+
+            <div class="pessoa-rodape">
+              <small class="ritmo-texto">
+                {#if p.total === 0}
+                  Sem demandas em andamento
+                {:else}
+                  <span class="txt-verde">{p.noRitmo} ok</span> ·
+                  <span class="txt-amarelo">{p.emRisco} risco</span> ·
+                  <span class="txt-vermelho">{p.atrasado} atraso</span>
+                {/if}
+              </small>
+            </div>
+          </div>
+        {/each}
+      </div>
+    </section>
+  </div>
+
+  <!-- ÚLTIMO REGISTRO DO DIÁRIO (CARD COMPACTO) -->
+  {#if ultimoRegistro}
+    <section class="cartao registro-compacto">
+      <div class="registro-conteudo">
+        <span class="registro-etiqueta">📸 Último registro no diário:</span>
+        <p class="registro-motivo">
+          <b>[{ultimoRegistro.pasta || 'DEV'}] {dataMedia(ultimoRegistro.data)}:</b>
+          {ultimoRegistro.motivo || ultimoRegistro.resumo || 'Registro de acompanhamento com imagens e comentários.'}
+        </p>
+      </div>
+      <div class="registro-botoes">
+        <a href="/painel" class="btn-secundario">Abrir Diário</a>
+        <a href="/relatorio" class="btn-secundario destaque">Puxar no Relatório</a>
+      </div>
+    </section>
+  {/if}
 </main>
 
 <style>
-  /* fundo de grade discreto, como papel quadriculado de terminal */
-  main
-  {
-    background-image: linear-gradient(var(--grade-fundo) 1px, transparent 1px), linear-gradient(90deg, var(--grade-fundo) 1px, transparent 1px);
-    background-size: 28px 28px;
-    background-position: -1px -1px;
-  }
-  header > div
-  {
-    margin-right: auto;
-  }
-  .aviso
-  {
-    margin: 0 0 var(--size-4);
-  }
-  .aviso a
-  {
-    color: inherit;
-    font-weight: 700;
-  }
-  .kpis
-  {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--size-4);
-  }
-  .kpi
+  .dashboard-executivo
   {
     display: flex;
     flex-direction: column;
-    gap: var(--size-1);
-    background: var(--superficie);
-    color: var(--texto);
-    border: 1px solid var(--borda);
-    border-top: 2px solid var(--marca);
-    border-radius: var(--raio);
-    padding: var(--size-4);
-    text-decoration: none;
-    min-height: 140px;
-    transition: border-color 0.2s;
+    gap: 16px;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-bottom: 24px;
   }
-  a.kpi:hover
-  {
-    border-color: var(--marca);
-  }
-  .kpi .valor
-  {
-    font-family: var(--fonte-maquina);
-    font-size: 2.2rem;
-    font-weight: 700;
-    line-height: 1;
-  }
-  .kpi .detalhe
-  {
-    font-size: 0.82rem;
-    color: var(--suave);
-    flex: 1;
-  }
-  .kpi .detalhe b
-  {
-    color: var(--verde);
-  }
-  .kpi .detalhe b.abaixo
-  {
-    color: var(--amarelo);
-  }
-  .kpi.alerta
-  {
-    border-top-color: var(--amarelo);
-  }
-  .kpi.alerta .valor
-  {
-    color: var(--amarelo);
-  }
-  .barra
-  {
-    display: block;
-    height: 6px;
-    border-radius: 3px;
-    background: var(--borda);
-    overflow: hidden;
-  }
-  .barra span
-  {
-    display: block;
-    height: 100%;
-    background: var(--marca);
-  }
-  .grade
-  {
-    display: grid;
-    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
-    gap: var(--size-4);
-    align-items: start;
-    margin-top: var(--size-4);
-  }
-  .coluna
+
+  /* TOPO DO DASHBOARD */
+  .topo-dashboard
   {
     display: flex;
-    flex-direction: column;
-    gap: var(--size-4);
-    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--borda);
   }
-  .grade > .cartao, .coluna .cartao
-  {
-    margin-top: 0;
-    transition: border-color 0.2s;
-  }
-  .grade > .cartao:hover, .coluna .cartao:hover
-  {
-    border-color: color-mix(in srgb, var(--marca) 40%, var(--borda));
-  }
-  /* títulos dos quadros como comentário de código */
-  .grade .cartao > h2::before
-  {
-    content: '// ';
-    color: var(--marca);
-  }
-  .rotina
-  {
-    margin: 0 0 var(--size-3);
-    padding: var(--size-2) var(--size-3);
-    border-radius: var(--raio-pequeno);
-    background: var(--marca-clara);
-    font-size: 0.9rem;
-  }
-  .vivo
-  {
-    display: grid;
-    gap: var(--size-2);
-    padding: var(--size-3) 0;
-    border-bottom: 1px dashed var(--borda);
-  }
-  .vivo a
-  {
-    color: var(--texto);
-    text-decoration: none;
-  }
-  .vivo .registrar
-  {
-    color: var(--marca);
-    text-decoration: underline;
-    font-size: 0.84rem;
-  }
-  .item-vivo
+  .boas-vindas
   {
     display: flex;
     align-items: center;
-    gap: var(--size-2);
-    color: var(--texto);
-    font-size: 0.9rem;
+    gap: 14px;
   }
-  .feito
+  .titulos h1
   {
-    color: var(--suave);
-    text-decoration: line-through;
-  }
-  .acoes, .frases
-  {
-    list-style: none;
-    padding: 0;
     margin: 0;
+    font-size: 1.6rem;
+    line-height: 1.1;
   }
-  .acoes li, .frases li
-  {
-    display: flex;
-    align-items: baseline;
-    gap: var(--size-2);
-    padding: var(--size-2) 0;
-    border-bottom: 1px dashed var(--borda);
-    background: none;
-    color: var(--texto);
-  }
-  .acoes li:last-child, .frases li:last-child
-  {
-    border-bottom: none;
-  }
-  .frases li
-  {
-    font-size: 0.92rem;
-  }
-  .acoes i, .frases i
-  {
-    flex: 0 0 9px;
-    height: 9px;
-    background: var(--marca);
-    border-radius: 2px;
-  }
-  .frases i
-  {
-    border-radius: 50%;
-    background: var(--borda-forte);
-  }
-  .acoes .alto i
-  {
-    background: var(--vermelho);
-  }
-  .acoes .medio i
-  {
-    background: var(--amarelo);
-  }
-  .frases .positivo i
-  {
-    background: var(--verde);
-  }
-  .frases .atencao i
-  {
-    background: var(--amarelo);
-  }
-  .acoes span
-  {
-    flex: 1;
-  }
-  .acoes a
-  {
-    font-family: var(--fonte-maquina);
-    font-weight: 700;
-    font-size: 0.85rem;
-  }
-  .pessoa
+  .seletor-semana-caixa
   {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    padding: var(--size-3) 0;
-    border-bottom: 1px dashed var(--borda);
+    align-items: flex-end;
+    gap: 3px;
   }
-  .pessoa:last-child
+  .etiqueta-semana
   {
-    border-bottom: none;
+    font-family: var(--fonte-maquina);
+    font-size: 0.72rem;
+    color: var(--suave);
+    text-transform: uppercase;
   }
-  .linha
+  .seletor-semana-caixa select
+  {
+    font-size: 0.86rem;
+    padding: 6px 12px;
+    background: var(--superficie);
+    border: 1px solid var(--borda-forte);
+    border-radius: var(--raio-pequeno);
+    color: var(--texto);
+    cursor: pointer;
+  }
+
+  /* AVISO */
+  .aviso-banner
   {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: var(--size-2);
-  }
-  .direita
-  {
-    display: flex;
-    align-items: center;
-    gap: var(--size-3);
-  }
-  .estourou
-  {
-    color: var(--vermelho);
-    font-weight: 700;
-  }
-  .mais
-  {
-    margin-top: var(--size-5);
-  }
-  .mais > summary
-  {
-    padding: var(--size-3) var(--size-4);
-    border: 1px dashed var(--borda-forte);
-    border-radius: var(--raio);
-    color: var(--suave);
-    font-family: var(--fonte-maquina);
-    font-size: 0.88rem;
-    list-style: none;
-  }
-  .mais > summary::before
-  {
-    content: '+ ';
-    color: var(--marca);
-  }
-  .mais[open] > summary::before
-  {
-    content: '- ';
-  }
-  .mais > summary:hover
-  {
-    color: var(--texto);
-    border-color: var(--marca);
-  }
-  .projecao
-  {
-    padding: var(--size-3);
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.35);
     border-radius: var(--raio-pequeno);
-    background: var(--fundo);
-    margin-bottom: var(--size-4);
-  }
-  .projecao p
-  {
-    margin: 0;
-  }
-  .projecao .dica
-  {
-    margin-top: var(--size-1);
-  }
-  .veredito
-  {
-    font-weight: 700;
-  }
-  .veredito.bate
-  {
-    color: var(--verde);
-  }
-  .veredito.perto
-  {
-    color: var(--amarelo);
-  }
-  .veredito.nao_bate
-  {
-    color: var(--vermelho);
-  }
-  .colunas-fluxo
-  {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--size-5);
-  }
-  .colunas-fluxo h3
-  {
-    font-size: 0.85rem;
-    margin: 0 0 var(--size-2);
-  }
-  .linha-fluxo
-  {
+    padding: 10px 14px;
     font-size: 0.86rem;
-    margin: 0 0 var(--size-2);
-  }
-  .linha-fluxo .dica
-  {
-    display: block;
-    font-size: 0.78rem;
-  }
-  .grafico
-  {
-    overflow-x: auto;
-  }
-  .grafico :global(svg)
-  {
-    max-width: 100%;
-    height: auto;
-  }
-  /* abas do Bits UI */
-  :global(.abas)
-  {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--size-1);
-    margin-bottom: var(--size-3);
-    border-bottom: 1px solid var(--borda);
-  }
-  :global(.aba)
-  {
-    border: none;
-    border-bottom: 2px solid transparent;
-    border-radius: 0;
-    background: none;
-    padding: var(--size-1) var(--size-3);
-    font-size: 0.82rem;
-    color: var(--suave);
-    margin-bottom: -1px;
-  }
-  :global(.aba:hover:not(:disabled))
-  {
     color: var(--texto);
-    border-color: transparent transparent var(--borda-forte);
   }
-  :global(.aba[data-state='active'])
+  .aviso-banner.suave
   {
-    color: var(--marca);
-    border-bottom-color: var(--marca);
+    background: var(--superficie-2);
+    border-color: var(--borda);
+    color: var(--suave);
   }
-  .dia-tempo
+  .btn-acao-banner
+  {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--marca);
+    text-decoration: none;
+  }
+  .btn-acao-banner:hover
+  {
+    text-decoration: underline;
+  }
+
+  /* 4 KPIS */
+  .grade-kpis
   {
     display: grid;
-    grid-template-columns: 80px 1fr;
-    gap: var(--size-2);
-    padding: var(--size-2) 0;
-    border-bottom: 1px dashed var(--borda);
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
   }
-  .dia-tempo .data
+  .card-kpi
   {
-    font-weight: 700;
-    color: var(--marca);
-  }
-  .dia-tempo ul
-  {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-  .dia-tempo li
-  {
-    padding: 2px 0;
-    font-size: 0.88rem;
-    background: none;
-    color: var(--texto);
-  }
-  .dia-tempo .tipo
-  {
-    color: var(--suave);
-    font-size: 0.75rem;
-  }
-  .dia-tempo .risco .tipo, .dia-tempo .previsao .tipo, .dia-tempo .ritmo .tipo
-  {
-    color: var(--amarelo);
-  }
-  .dia-tempo .entrega .tipo, .dia-tempo .etapa .tipo
-  {
-    color: var(--verde);
-  }
-  .saidas
-  {
-    display: flex;
-    flex-direction: column;
-    gap: var(--size-2);
-  }
-  .saida
-  {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    text-align: left;
-    padding: var(--size-3);
-    border-radius: var(--raio-pequeno);
+    background: var(--superficie);
     border: 1px solid var(--borda);
-    background: var(--superficie-2);
-    color: var(--texto);
-    text-decoration: none;
-    font-family: inherit;
+    border-radius: var(--raio);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: transform 0.12s, border-color 0.12s;
   }
-  .saida b
+  .card-kpi:hover
+  {
+    border-color: var(--borda-forte);
+  }
+  .kpi-rotulo
   {
     font-family: var(--fonte-maquina);
+    font-size: 0.74rem;
+    color: var(--suave);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
-  .saida span
+  .kpi-valor-grupo
+  {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .kpi-icone-status
+  {
+    font-size: 1rem;
+    line-height: 1;
+  }
+  .kpi-valor-texto
+  {
+    font-size: 1.25rem;
+    color: var(--texto);
+  }
+  .kpi-valor-numero
+  {
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: var(--texto);
+  }
+  .kpi-valor-sub
   {
     font-size: 0.8rem;
     color: var(--suave);
   }
-  .saida:hover
+  .kpi-detalhe
   {
-    border-color: var(--marca);
-    background: var(--marca-clara);
+    font-size: 0.78rem;
+    color: var(--suave);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .saida.principal
+  .kpi-progresso-linha
   {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .kpi-barra
+  {
+    height: 5px;
+    background: var(--superficie-2);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .kpi-barra-preenchimento
+  {
+    height: 100%;
     background: var(--marca);
-    border-color: var(--marca);
-    color: var(--sobre-marca);
+    border-radius: 999px;
+    transition: width 0.3s;
   }
-  .saida.principal span
+  .destaque-vermelho
   {
-    color: var(--sobre-marca);
+    color: var(--vermelho) !important;
   }
-  .saida.principal:hover
+  .card-kpi.alerta
   {
-    filter: brightness(1.1);
+    border-color: rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.03);
   }
-  .lista-resumo
+
+  /* 4 ATALHOS RÁPIDOS */
+  .grade-atalhos
   {
     display: grid;
-    gap: 6px;
-    margin-bottom: var(--size-3);
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
   }
-  .estado
+  .card-atalho
   {
-    font-weight: 600;
+    background: var(--superficie-2);
+    border: 1px solid var(--borda);
+    border-radius: var(--raio);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    color: var(--texto);
+    transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .card-atalho:hover
+  {
+    transform: translateY(-2px);
+    border-color: var(--marca);
+    background: var(--superficie);
+  }
+  .atalho-icone
+  {
+    font-size: 1.5rem;
+    line-height: 1;
+    flex: none;
+  }
+  .atalho-info
+  {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .atalho-info strong
+  {
+    font-size: 0.9rem;
+    color: var(--texto);
+  }
+  .atalho-info span
+  {
+    font-size: 0.76rem;
+    color: var(--suave);
+  }
+
+  /* GRADE DUPLA */
+  .grade-dupla
+  {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+  }
+  .painel-secao
+  {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px;
+  }
+  .secao-cabecalho
+  {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid var(--borda);
+    padding-bottom: 8px;
+  }
+  .secao-cabecalho h2
+  {
     margin: 0;
+    font-size: 1.05rem;
   }
-  .estado.ok
+  .link-subtil
   {
-    color: var(--verde);
+    font-size: 0.78rem;
+    color: var(--marca);
+    text-decoration: none;
   }
-  .dica.erro
+  .link-subtil:hover
   {
+    text-decoration: underline;
+  }
+
+  /* ESTADO LIMPO */
+  .estado-limpo
+  {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 24px 12px;
+    gap: 6px;
+  }
+  .icone-ok
+  {
+    font-size: 1.8rem;
+  }
+  .estado-limpo p
+  {
+    margin: 0;
+    font-size: 0.92rem;
+    color: var(--texto);
+  }
+
+  /* LISTA DE DEMANDAS */
+  .lista-demandas
+  {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .item-demanda
+  {
+    background: var(--superficie-2);
+    border: 1px solid var(--borda);
+    border-left: 3px solid var(--suave);
+    border-radius: var(--raio-pequeno);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .item-demanda.urgente
+  {
+    border-left-color: var(--vermelho);
+    background: rgba(239, 68, 68, 0.04);
+  }
+  .demanda-topo
+  {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.76rem;
+  }
+  .demanda-codigo
+  {
+    font-family: var(--fonte-maquina);
+    font-weight: 700;
+    color: var(--texto);
+  }
+  .demanda-etapa
+  {
+    color: var(--suave);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tag-ritmo
+  {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 999px;
+  }
+  .tag-ritmo.atrasado
+  {
+    background: rgba(239, 68, 68, 0.15);
     color: var(--vermelho);
   }
-  .link
+  .tag-ritmo.risco
   {
-    border: none;
-    background: none;
-    color: var(--marca);
-    text-decoration: underline;
-    padding: 0;
-    font-size: 0.82rem;
-    justify-self: start;
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
   }
-  .compromisso
+  .demanda-titulo
+  {
+    font-size: 0.85rem;
+    color: var(--texto);
+    line-height: 1.25;
+  }
+  .demanda-meta
+  {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.74rem;
+    color: var(--suave);
+  }
+
+  /* VENCIMENTOS */
+  .bloco-vencimentos
+  {
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--borda);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .vencimentos-rotulo
+  {
+    font-size: 0.76rem;
+    color: var(--suave);
+    font-weight: 500;
+  }
+  .vencimentos-chips
+  {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip-vencimento
+  {
+    font-size: 0.74rem;
+    padding: 2px 7px;
+    background: var(--superficie-2);
+    border: 1px solid var(--borda);
+    border-radius: 4px;
+    color: var(--suave);
+  }
+  .chip-vencimento b
+  {
+    color: var(--texto);
+  }
+
+  /* LISTA TIME */
+  .lista-time
+  {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .item-pessoa
+  {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    background: var(--superficie-2);
+    border: 1px solid var(--borda);
+    border-radius: var(--raio-pequeno);
+    padding: 8px 10px;
+  }
+  .pessoa-linha-topo
+  {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .pessoa-linha-topo strong
+  {
+    font-size: 0.86rem;
+  }
+  .pessoa-acoes
+  {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pessoa-contagem
+  {
+    font-family: var(--fonte-maquina);
+    font-size: 0.74rem;
+    color: var(--suave);
+  }
+  .btn-1a1
+  {
+    font-size: 0.72rem;
+    padding: 2px 6px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: 3px;
+    color: var(--suave);
+    cursor: pointer;
+  }
+  .btn-1a1:hover
+  {
+    border-color: var(--marca);
+    color: var(--marca);
+  }
+  .barra-ritmo-pilha
+  {
+    display: flex;
+    height: 6px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--superficie);
+  }
+  .ritmo-verde { background: #10b981; }
+  .ritmo-amarelo { background: #f59e0b; }
+  .ritmo-vermelho { background: #ef4444; }
+  .ritmo-vazio { flex: 1; background: var(--borda); }
+
+  .pessoa-rodape
+  {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+  }
+  .ritmo-texto .txt-verde { color: #10b981; font-weight: 500; }
+  .ritmo-texto .txt-amarelo { color: #f59e0b; font-weight: 500; }
+  .ritmo-texto .txt-vermelho { color: #ef4444; font-weight: 500; }
+
+  /* REGISTRO COMPACTO */
+  .registro-compacto
+  {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-left: 3px solid var(--marca);
+  }
+  .registro-conteudo
+  {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 250px;
+  }
+  .registro-etiqueta
+  {
+    font-family: var(--fonte-maquina);
+    font-size: 0.72rem;
+    color: var(--suave);
+    text-transform: uppercase;
+  }
+  .registro-motivo
   {
     margin: 0;
-    padding: 6px 0;
-    border-bottom: 1px dashed var(--borda);
-    font-size: 0.9rem;
-  }
-  .link-secao
-  {
-    display: inline-block;
-    margin-top: var(--size-2);
     font-size: 0.85rem;
+    color: var(--texto);
+    line-height: 1.35;
   }
-  @media (max-width: 900px)
+  .registro-botoes
   {
-    .kpis
-    {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .grade, .colunas-fluxo
-    {
-      grid-template-columns: 1fr;
-    }
+    display: flex;
+    gap: 6px;
   }
-  .situacao { display: grid; grid-template-columns: auto 1fr auto; gap: var(--size-5); align-items: center; padding: var(--size-4) var(--size-5); margin-bottom: var(--size-4); border-radius: var(--raio); border: 1px solid var(--borda); border-left: 6px solid var(--borda-forte); background: var(--superficie); }
-  .situacao.verde { border-left-color: var(--verde); background: linear-gradient(90deg, var(--verde-fundo), var(--superficie) 60%); }
-  .situacao.amarelo { border-left-color: var(--amarelo); background: linear-gradient(90deg, var(--amarelo-fundo), var(--superficie) 60%); }
-  .situacao.vermelho { border-left-color: var(--vermelho); background: linear-gradient(90deg, var(--vermelho-fundo), var(--superficie) 60%); }
-  .sit-status { display: flex; flex-direction: column; gap: 2px; }
-  .sit-rotulo { font-family: var(--fonte-maquina); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--suave); }
-  .sit-valor { font-family: var(--fonte-maquina); font-size: 1.8rem; line-height: 1.1; }
-  .sit-detalhe { font-size: 0.86rem; color: var(--suave); }
-  .sit-itens { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--size-3); }
-  .sit-itens div { display: flex; flex-direction: column; padding-left: var(--size-3); border-left: 1px dashed var(--borda-forte); }
-  .sit-itens b { font-family: var(--fonte-maquina); font-size: 1.6rem; }
-  .sit-itens span { font-size: 0.78rem; color: var(--suave); }
-  .sit-itens .vermelho b { color: var(--vermelho); }
-  .sit-itens .amarelo b { color: var(--amarelo); }
-  .sit-data { font-family: var(--fonte-maquina); font-size: 0.78rem; color: var(--suave); }
-  .atalhos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--size-3); margin-bottom: var(--size-4); }
-  .atalhos a { display: flex; flex-direction: column; gap: 2px; padding: var(--size-3) var(--size-4); border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie); color: var(--texto); text-decoration: none; transition: border-color 0.2s, transform 0.2s; }
-  .atalhos a:hover { border-color: var(--marca); transform: translateY(-2px); }
-  .atalhos b { font-family: var(--fonte-maquina); }
-  .atalhos span { font-size: 0.78rem; color: var(--suave); }
-  .controle { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); margin-bottom: var(--size-4); }
-  .sub-h { font-size: 0.85rem; margin: var(--size-4) 0 var(--size-2); }
-  .pilha { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--borda); }
-  .p-ok { background: var(--verde); }
-  .p-risco { background: var(--amarelo); }
-  .p-atraso { background: var(--vermelho); }
-  .p-vazio { flex: 1; background: var(--borda); }
-  .diario-recente { margin-bottom: var(--size-4); }
-  @media (max-width: 900px) { .situacao, .controle { grid-template-columns: 1fr; } .sit-itens, .atalhos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .btn-secundario
+  {
+    font-size: 0.8rem;
+    padding: 5px 10px;
+    background: var(--superficie-2);
+    border: 1px solid var(--borda);
+    border-radius: var(--raio-pequeno);
+    color: var(--texto);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .btn-secundario:hover
+  {
+    border-color: var(--borda-forte);
+  }
+  .btn-secundario.destaque
+  {
+    background: var(--marca-clara);
+    border-color: var(--marca);
+    color: var(--marca);
+  }
 </style>

@@ -210,24 +210,53 @@
   <Paleta bind:aberta={paletaAberta} {trocarTema} baixarBackup={() => exportarJson(carregar())} {sair} />
   <footer>
     <div class="rodape">
-      <div class="rodape-marca">
-        <a href="/" class="nome-rodape">OrbisOS<span>_</span></a>
-        <p>Supervisão de desenvolvimento: do painel do gestor ao relatório.</p>
+      <div class="rodape-sobre">
+        <div class="rodape-marca">
+          <a href="/" class="nome-rodape">OrbisOS<span>_</span></a>
+          <span class="badge-autor">por Mariana Coutinho (Plauska)</span>
+        </div>
+        <p class="sobre-resumo">
+          <b>O que é o OrbisOS?</b> Ferramenta de supervisão de desenvolvimento. Transforma o painel do gestor (prints, texto ou CSV) em acompanhamento e relatório executivo:
+        </p>
+        <ul class="sobre-lista">
+          <li>Lê cards, prazos, ritmo e totais do painel;</li>
+          <li>Compara semana com semana;</li>
+          <li>Gera semáforo e constatações automáticas;</li>
+          <li>Guarda plano, riscos e compromissos;</li>
+          <li>Emite PDF ou link interativo para a gestão responder (Ciente, Concordo, Dúvida).</li>
+        </ul>
+        <p class="sobre-dica">
+          🔒 <b>A IA é opcional:</b> tudo roda localmente no navegador (offline-first).
+        </p>
       </div>
-      <div class="rodape-links">
-        <a href="/painel">Diário do painel</a>
-        <a href="/listas">Listas</a>
-        <a href="/fluxos">Fluxos</a>
-        <a href="/modelos">Modelos</a>
-        <a href="/relatorio">Relatório</a>
-        <a href="/roadmap">Roadmap 2027</a>
+
+      <div class="rodape-links-col">
+        <strong class="coluna-titulo">Navegação</strong>
+        <div class="rodape-links">
+          <a href="/painel">Diário do painel</a>
+          <a href="/cards">Cards lidos</a>
+          <a href="/semana">Plano da semana</a>
+          <a href="/fluxos">Fluxos de processo</a>
+          <a href="/relatorio">Gerar relatório</a>
+          <a href="/modelos">Modelos de relatório</a>
+          <a href="/roadmap">Roadmap 2027</a>
+        </div>
       </div>
-      <div class="rodape-info">
-        <span>Dados guardados neste navegador{nuvem.estado === 'ok' ? ' e na nuvem' : ''}.</span>
-        <span>Sem IA paga: tudo roda no seu computador.</span>
+
+      <div class="rodape-github-col">
+        <strong class="coluna-titulo">Código Aberto</strong>
+        <a href="https://github.com/MarianaPlauska/gerador-relat-rio" target="_blank" rel="noopener noreferrer" class="card-github">
+          <svg class="git-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          <div class="git-info">
+            <span class="git-repo">MarianaPlauska / gerador-relat-rio</span>
+            <small class="git-link-txt">Acessar repositório no GitHub ↗</small>
+          </div>
+        </a>
       </div>
     </div>
-    <div class="rodape-fim">OrbisOS &copy; {new Date().getFullYear()}</div>
+    <div class="rodape-fim">
+      <span>OrbisOS · Desenvolvido por Mariana Coutinho (Plauska) &copy; {new Date().getFullYear()}</span>
+    </div>
   </footer>
 {/if}
 
@@ -250,15 +279,22 @@
     margin: 0 auto;
     padding: var(--size-6);
     display: grid;
-    grid-template-columns: 1.4fr 1fr 1.2fr;
+    grid-template-columns: 1.8fr 1fr 1.2fr;
     gap: var(--size-6);
     align-items: start;
+  }
+  .rodape-marca
+  {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
   }
   .nome-rodape
   {
     font-family: var(--fonte-maquina);
     font-weight: 700;
-    font-size: 1.05rem;
+    font-size: 1.15rem;
     color: #fff;
     text-decoration: none;
   }
@@ -266,31 +302,110 @@
   {
     color: var(--marca);
   }
-  .rodape-marca p
+  .badge-autor
   {
-    margin: var(--size-1) 0 0;
-    max-width: 34ch;
+    font-family: var(--fonte-maquina);
+    font-size: 0.72rem;
+    color: var(--marca);
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    padding: 1px 8px;
+    border-radius: 999px;
+  }
+  .sobre-resumo
+  {
+    margin: 4px 0 8px;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: #c9d3cd;
+  }
+  .sobre-lista
+  {
+    margin: 4px 0 8px;
+    padding-left: 18px;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: #9aa5b4;
+  }
+  .sobre-lista li
+  {
+    margin-bottom: 2px;
+  }
+  .sobre-dica
+  {
+    margin: 6px 0 0;
+    font-size: 0.78rem;
+    color: #6ee7b7;
+  }
+  .coluna-titulo
+  {
+    display: block;
+    font-family: var(--fonte-maquina);
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    color: #fff;
+    margin-bottom: 10px;
+    letter-spacing: 0.5px;
   }
   .rodape-links
   {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--size-1) var(--size-4);
+    flex-direction: column;
+    gap: 6px;
   }
   .rodape-links a
   {
     color: #9aa5b4;
     text-decoration: none;
+    font-size: 0.82rem;
+    transition: color 0.15s;
   }
   .rodape-links a:hover
   {
-    color: #fff;
+    color: var(--marca);
     text-decoration: underline;
   }
-  .rodape-info
+  .card-github
   {
-    display: grid;
-    gap: var(--size-1);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--raio);
+    text-decoration: none;
+    color: #fff;
+    transition: all 0.15s;
+  }
+  .card-github:hover
+  {
+    border-color: var(--marca);
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .git-icon
+  {
+    width: 24px;
+    height: 24px;
+    flex: none;
+    color: #fff;
+  }
+  .git-info
+  {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .git-repo
+  {
+    font-family: var(--fonte-maquina);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .git-link-txt
+  {
+    font-size: 0.72rem;
+    color: var(--marca);
   }
   .rodape-fim
   {
