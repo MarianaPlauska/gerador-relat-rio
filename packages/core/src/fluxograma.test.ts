@@ -121,4 +121,44 @@ describe('organizar e outras entradas', () =>
     expect(t).toContain('flowchart TD');
     expect(t).toContain('Implantação de um cliente novo');
   });
+
+  it('detecta lacunas no fluxo e extrai detalhes nos passos', async () =>
+  {
+    const { detectarLacunas, fluxoDaSemana, fluxoDosCards, fluxoDoRegistroPainel } = await import('./fluxograma');
+    const fIncompleto = {
+      nos: [
+        { id: 'n1', tipo: 'inicio' as const, texto: 'Início', x: 0, y: 0 },
+        { id: 'n2', tipo: 'passo' as const, texto: 'Passo sem destino', x: 0, y: 0 },
+        { id: 'n3', tipo: 'decisao' as const, texto: 'Aprovado?', x: 0, y: 0 },
+      ],
+      ligacoes: [
+        { id: 'l1', de: 'n1', para: 'n2' },
+      ],
+    };
+    const lacunas = detectarLacunas(fIncompleto);
+    expect(lacunas.length).toBeGreaterThanOrEqual(2);
+    expect(lacunas.some((l) => l.noId === 'n2')).toBe(true);
+
+    const fSemana = fluxoDaSemana({
+      inicio: '2026-11-16',
+      fim: '2026-11-20',
+      pessoas: [
+        { pessoaId: 'p1', itens: [{ id: 'i1', descricao: 'Homologar módulo', cardCodigo: 'CARD-10' }] },
+      ],
+    }, () => 'Mariana Coutinho');
+    expect(fSemana.nos.length).toBe(3);
+    expect(fSemana.nos[1]!.detalhes).toContain('Mariana Coutinho');
+
+    const fReg = fluxoDoRegistroPainel({
+      data: '2026-11-16',
+      motivo: 'Falha no login',
+      pasta: 'DEV',
+      capturas: [
+        { etapa: 'Tela inicial', comentario: 'Botão não responde' },
+      ],
+    });
+    expect(fReg.nome).toContain('DEV');
+    expect(fReg.nos[1]!.texto).toBe('Tela inicial');
+    expect(fReg.nos[1]!.detalhes).toBe('Botão não responde');
+  });
 });

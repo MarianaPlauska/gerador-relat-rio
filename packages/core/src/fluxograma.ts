@@ -1,6 +1,6 @@
 import { agoraLocal, idCurto, type Lista } from './checklist';
 import { interpretarAnotacao } from './leitor/anotacao';
-import type { PlanoSemana } from './tipos';
+import type { CardSnapshot, PlanoSemana, RegistroPainel } from './tipos';
 
 export type TipoNo = 'inicio' | 'passo' | 'decisao' | 'fim' | 'nota';
 
@@ -9,6 +9,7 @@ export interface NoFluxo
   id: string;
   tipo: TipoNo;
   texto: string;
+  detalhes?: string;
   // canto de cima à esquerda, como o editor usa
   x: number;
   y: number;
@@ -72,10 +73,10 @@ function montador()
   const r: Rascunho = { nos: [], ligacoes: [] };
   return {
     r,
-    no(tipo: TipoNo, texto: string): string
+    no(tipo: TipoNo, texto: string, detalhes?: string): string
     {
       const id = `n${r.nos.length + 1}`;
-      r.nos.push({ id, tipo, texto: texto.trim(), x: 0, y: 0 });
+      r.nos.push({ id, tipo, texto: texto.trim(), ...(detalhes?.trim() ? { detalhes: detalhes.trim() } : {}), x: 0, y: 0 });
       return id;
     },
     ligar(de: string, para: string, rotulo?: string)
@@ -84,6 +85,15 @@ function montador()
       r.ligacoes.push({ id: `l${r.ligacoes.length + 1}`, de, para, ...(rotulo ? { rotulo } : {}) });
     },
   };
+}
+
+export function extrairTextoEDetalhes(bruto: string): { texto: string; detalhes?: string }
+{
+  const comBarra = bruto.match(/^(.+?)\s*\/\/\s*(.+)$/);
+  if (comBarra) return { texto: comBarra[1]!.trim(), detalhes: comBarra[2]!.trim() };
+  const comParenteses = bruto.match(/^(.+?)\s*\((?:detalhes?|obs(?:erva[cç][aã]o)?)\s*:\s*(.+?)\)$/i);
+  if (comParenteses) return { texto: comParenteses[1]!.trim(), detalhes: comParenteses[2]!.trim() };
+  return { texto: bruto.trim() };
 }
 
 const opostos: Record<string, string> = { sim: 'não', nao: 'sim', não: 'sim' };
@@ -149,7 +159,8 @@ export function fluxoDosPassos(texto: string): Rascunho
         else if (volta) referencias.push({ de: id, alvo: volta[1]!, rotulo });
         else
         {
-          const passo = m.no('passo', alvo);
+          const { texto: tPasso, detalhes: dPasso } = extrairTextoEDetalhes(alvo);
+          const passo = m.no('passo', tPasso, dPasso);
           m.ligar(id, passo, rotulo);
           abertos.push({ de: passo });
         }
@@ -162,7 +173,8 @@ export function fluxoDosPassos(texto: string): Rascunho
       }
       continue;
     }
-    const id = m.no('passo', linha);
+    const { texto: tPasso, detalhes: dPasso } = extrairTextoEDetalhes(linha);
+    const id = m.no('passo', tPasso, dPasso);
     fechar(id);
     abertos = [{ de: id }];
   }
@@ -477,4 +489,130 @@ export function textoDaSemana(plano: PlanoSemana | undefined, nomePessoa: (id: s
   return plano.pessoas
     .flatMap((pp) => pp.itens.map((i) => `${i.cardCodigo ? `${i.cardCodigo} - ` : ''}${i.descricao} (${nomePessoa(pp.pessoaId).split(' ')[0]}${i.ate ? `, até ${i.ate.split('-').reverse().join('/')}` : ''})`))
     .join('\n');
+}
+
+export interface LacunaFluxo
+{
+  noId: string;
+  texto: string;
+  motivo: string;
+}
+
+// detecta pontas soltas, nós inacessíveis e decisões sem ramificação completa
+export function detectarLacunas(f: Pick<Fluxograma, 'nos' | 'ligacoes'>): LacunaFluxo[]
+{
+  const lacunas: LacunaFluxo[] = [];
+  const saem = new Map<string, LigacaoFluxo[]>();
+  const entram = new Map<string, LigacaoFluxo[]>();
+  for (const l of f.ligacoes)
+  {
+    (saem.get(l.de) ?? (saem.set(l.de, []).get(l.de)!)).push(l);
+    (entram.get(l.para) ?? (entram.set(l.para, []).get(l.para)!)).push(l);
+  }
+
+  for (const n of f.nos)
+  {
+    if (n.tipo === 'nota') continue;
+    const s = saem.get(n.id) ?? [];
+    const e = entram.get(n.id) ?? [];
+
+    if (n.tipo !== 'inicio' && e.length === 0)
+    {
+      lacunas.push({ noId: n.id, texto: n.texto, motivo: 'Nenhum passo anterior leva até aqui.' });
+    }
+    if (n.tipo !== 'fim' && s.length === 0)
+    {
+      lacunas.push({ noId: n.id, texto: n.texto, motivo: 'Falta definir o próximo passo (ponta solta).' });
+    }
+    else if (n.tipo === 'decisao' && s.length < 2)
+    {
+      lacunas.push({ noId: n.id, texto: n.texto, motivo: `Decisão com apenas ${s.length} saída (deve ter 2 ou mais ramos).` });
+    }
+  }
+  return lacunas;
+}
+
+// gera fluxo a partir das entregas e tarefas do plano da semana com detalhes por responsável
+export function fluxoDaSemana(plano: PlanoSemana | undefined, nomePessoa: (id: string) => string, agora = agoraLocal()): Fluxograma
+{
+  const m = montador();
+  let anterior = m.no('inicio', 'Início da Semana');
+  if (plano)
+  {
+    for (const pp of plano.pessoas)
+    {
+      const nome = nomePessoa(pp.pessoaId);
+      for (const i of pp.itens)
+      {
+        const titulo = `${i.cardCodigo ? `${i.cardCodigo} - ` : ''}${i.descricao}`;
+        const detalhes = `Responsável: ${nome}${i.ate ? ` · Entrega até: ${i.ate.split('-').reverse().join('/')}` : ''}`;
+        const id = m.no('passo', titulo, detalhes);
+        m.ligar(anterior, id);
+        anterior = id;
+      }
+    }
+  }
+  m.ligar(anterior, m.no('fim', 'Entregas da Semana Concluídas'));
+  const nome = plano ? `Plano da semana de ${plano.inicio.split('-').reverse().join('/')}` : 'Fluxo da semana';
+  return { ...novoFluxograma(nome, 'Fluxo gerado a partir das entregas e tarefas planejadas da semana.', agora), ...organizar(m.r.nos, m.r.ligacoes) };
+}
+
+// gera fluxo operacional a partir dos cards do dia (demandas ativas / em execução)
+export function fluxoDosCards(cards: CardSnapshot[], titulo = 'Fluxo de Demandas do Dia', agora = agoraLocal()): Fluxograma
+{
+  const m = montador();
+  let anterior = m.no('inicio', 'Início das Demandas');
+  for (const c of cards.slice(0, 25))
+  {
+    const nome = `${c.codigo ? `${c.codigo} - ` : ''}${c.titulo || c.etapaAtual || 'Demanda'}`;
+    const detalhes = [
+      c.responsavelEtapaAtual ? `Responsável: ${c.responsavelEtapaAtual}` : '',
+      c.etapaAtual ? `Etapa atual: ${c.etapaAtual}` : '',
+      c.previsao ? `Previsão: ${c.previsao.split('-').reverse().join('/')}` : '',
+      c.ritmoPainel ? `Ritmo: ${c.ritmoPainel.replace('_', ' ')}` : '',
+    ].filter(Boolean).join(' · ');
+    const id = m.no('passo', nome, detalhes);
+    m.ligar(anterior, id);
+    anterior = id;
+  }
+  m.ligar(anterior, m.no('fim', 'Ciclo de Demandas Concluído'));
+  return { ...novoFluxograma(titulo, 'Fluxo operacional gerado a partir das demandas do dia.', agora), ...organizar(m.r.nos, m.r.ligacoes) };
+}
+
+// gera fluxo a partir de um registro do diário do painel com transcrições e anotações
+export function fluxoDoRegistroPainel(
+  registro: Pick<RegistroPainel, 'data' | 'motivo' | 'pasta' | 'texto' | 'capturas'>,
+  agora = agoraLocal()
+): Fluxograma
+{
+  const m = montador();
+  const inicioTexto = registro.motivo ? `Início: ${registro.motivo}` : 'Início do Registro';
+  let anterior = m.no('inicio', inicioTexto);
+
+  if (registro.capturas && registro.capturas.length > 0)
+  {
+    for (let i = 0; i < registro.capturas.length; i++)
+    {
+      const cap = registro.capturas[i]!;
+      const titulo = cap.etapa || cap.titulo || `Etapa ${i + 1}`;
+      const detalhes = cap.comentario || (cap.textoLido ? cap.textoLido.slice(0, 200) : `Conferência do print ${i + 1}`);
+      const id = m.no('passo', titulo, detalhes);
+      m.ligar(anterior, id);
+      anterior = id;
+    }
+  }
+  else if (registro.texto)
+  {
+    const passos = prepararTextoLivre(registro.texto).split(/\r?\n/).filter(Boolean);
+    for (const p of passos)
+    {
+      const { texto: t, detalhes: d } = extrairTextoEDetalhes(p);
+      const id = m.no('passo', t, d);
+      m.ligar(anterior, id);
+      anterior = id;
+    }
+  }
+  m.ligar(anterior, m.no('fim', 'Conclusão'));
+  const nome = `Fluxo: ${registro.pasta ? `[${registro.pasta}] ` : ''}${registro.motivo || `Registro de ${registro.data.split('-').reverse().join('/')}`}`;
+  return { ...novoFluxograma(nome, 'Fluxo gerado a partir do registro do diário do painel com imagens e anotações.', agora), ...organizar(m.r.nos, m.r.ligacoes) };
 }

@@ -3,7 +3,7 @@
   import { Handle, Position, useSvelteFlow, type NodeProps } from '@xyflow/svelte';
   import { tick } from 'svelte';
 
-  let { id, data, selected }: NodeProps & { data: { texto: string; tipo: TipoNo } } = $props();
+  let { id, data, selected }: NodeProps & { data: { texto: string; tipo: TipoNo; detalhes?: string; ativoNoPercurso?: boolean } } = $props();
   const { updateNodeData } = useSvelteFlow();
   const t = $derived(tamanhoDoNo(data.tipo));
   let editando = $state(false);
@@ -25,7 +25,17 @@
   }
 </script>
 
-<div class="no {data.tipo}" class:selecionado={selected} style:width="{t.largura}px" style:height="{t.altura}px" ondblclick={editar} role="button" tabindex="-1" title="Dois cliques para editar o texto">
+<div
+  class="no {data.tipo}"
+  class:selecionado={selected}
+  class:percorrendo={data.ativoNoPercurso}
+  style:width="{t.largura}px"
+  style:height="{t.altura}px"
+  ondblclick={editar}
+  role="button"
+  tabindex="-1"
+  title="{data.texto}{data.detalhes ? `\n\nDetalhes:\n${data.detalhes}` : ''}\n(Clique para abrir propriedades no painel)"
+>
   {#if data.tipo === 'decisao'}
     <svg class="losango" viewBox="0 0 {t.largura} {t.altura}" preserveAspectRatio="none" aria-hidden="true">
       <polygon points="{t.largura / 2},1 {t.largura - 1},{t.altura / 2} {t.largura / 2},{t.altura - 1} 1,{t.altura / 2}" />
@@ -45,6 +55,9 @@
     ></textarea>
   {:else}
     <span class="texto">{data.texto}</span>
+    {#if data.detalhes}
+      <span class="tem-detalhes" title="Contém anotações / detalhes">✦</span>
+    {/if}
   {/if}
   {#if data.tipo !== 'fim' && data.tipo !== 'nota'}
     <Handle type="source" position={Position.Bottom} id="baixo" />
@@ -63,13 +76,14 @@
     padding: 6px 12px;
     box-sizing: border-box;
     text-align: center;
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     line-height: 1.25;
     color: var(--texto);
     background: var(--superficie);
     border: 1.5px solid var(--borda-forte);
-    border-radius: 10px;
-    transition: box-shadow 0.15s, border-color 0.15s;
+    border-radius: 12px;
+    transition: box-shadow 0.15s, border-color 0.15s, transform 0.15s;
+    user-select: none;
   }
   .texto
   {
@@ -80,30 +94,48 @@
     line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow-wrap: anywhere;
+    font-weight: 500;
+  }
+  .tem-detalhes
+  {
+    position: absolute;
+    top: 3px;
+    right: 5px;
+    font-size: 0.65rem;
+    color: var(--marca);
+    opacity: 0.8;
   }
   .inicio, .fim
   {
     border-radius: 999px;
     font-family: var(--fonte-maquina);
     font-weight: 700;
+    letter-spacing: 0.5px;
   }
   .inicio
   {
-    background: var(--marca-clara);
-    border-color: var(--marca);
-    color: var(--marca);
+    background: rgba(16, 185, 129, 0.12);
+    border-color: #10b981;
+    color: #34d399;
   }
   .fim
   {
-    background: var(--texto);
-    border-color: var(--texto);
-    color: var(--fundo);
+    background: var(--superficie-2);
+    border-color: var(--borda-forte);
+    color: var(--suave);
+  }
+  .passo
+  {
+    border: 1.5px solid #38bdf8;
+    background: rgba(56, 189, 248, 0.06);
   }
   .decisao
   {
     background: none;
     border: none;
     padding: 10px 34px;
+    color: #fef3c7;
+    font-weight: 600;
   }
   .losango
   {
@@ -115,8 +147,8 @@
   }
   .losango polygon
   {
-    fill: var(--amarelo-fundo);
-    stroke: var(--amarelo);
+    fill: #2f2518;
+    stroke: #f59e0b;
     stroke-width: 1.5;
     vector-effect: non-scaling-stroke;
   }
@@ -126,12 +158,13 @@
     border-style: dashed;
     font-style: italic;
     color: var(--suave);
-    border-radius: 4px;
+    border-radius: 6px;
   }
   .selecionado
   {
     border-color: var(--marca);
-    box-shadow: 0 0 0 3px var(--marca-clara);
+    box-shadow: 0 0 0 3px var(--marca-clara), 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 10;
   }
   .decisao.selecionado
   {
@@ -142,6 +175,24 @@
     stroke: var(--marca);
     stroke-width: 2.5;
   }
+  .percorrendo
+  {
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.4), 0 0 20px rgba(16, 185, 129, 0.6) !important;
+    animation: pulso 1.5s infinite;
+    z-index: 20;
+  }
+  .decisao.percorrendo .losango polygon
+  {
+    stroke: #10b981 !important;
+    stroke-width: 3 !important;
+  }
+  @keyframes pulso
+  {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
   textarea
   {
     position: relative;
@@ -151,6 +202,10 @@
     font: inherit;
     text-align: center;
     padding: 2px;
+    background: var(--fundo);
+    color: var(--texto);
+    border: 1px solid var(--marca);
+    border-radius: 6px;
   }
   /* bolinhas do lado só aparecem com o mouse em cima ou selecionado */
   .no :global(.lateral)
