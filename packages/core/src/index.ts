@@ -15,6 +15,7 @@ export * from './leitor/cards';
 export * from './leitor/mesclar';
 export * from './leitor/ondas';
 export * from './leitor/csv';
+export * from './leitor/anotacao';
 export * from './modelo';
 export * from './fluxo';
 export * from './checklist';

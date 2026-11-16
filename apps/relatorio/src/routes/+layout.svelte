@@ -17,17 +17,59 @@
 
   let { children } = $props();
 
-  const links = [
-    { href: '/', nome: 'Início' },
-    { href: '/painel', nome: 'Colar painel' },
-    { href: '/cards', nome: 'Cards' },
-    { href: '/semana', nome: 'Semana' },
-    { href: '/mes', nome: 'Mês' },
-    { href: '/listas', nome: 'Listas' },
-    { href: '/fluxos', nome: 'Fluxos' },
-    { href: '/vivos', nome: 'Vivos' },
-    { href: '/relatorio', nome: 'Relatório' },
+  interface ItemMenu
+  {
+    href: string;
+    nome: string;
+    dica: string;
+  }
+
+  interface GrupoMenu
+  {
+    id: string;
+    nome: string;
+    itens: ItemMenu[];
+  }
+
+  const gruposMenu: GrupoMenu[] = [
+    {
+      id: 'painel',
+      nome: 'Painel e Cards',
+      itens: [
+        { href: '/painel', nome: 'Colar painel', dica: 'Prints, transcrição por imagem, etapas e pastas (DEV...)' },
+        { href: '/cards', nome: 'Cards', dica: 'Busca, filtros e detalhes das demandas lidas' },
+      ],
+    },
+    {
+      id: 'ciclo',
+      nome: 'Ciclo e Rotina',
+      itens: [
+        { href: '/semana', nome: 'Semana', dica: 'Plano semanal, entregas, alertas e compromissos' },
+        { href: '/mes', nome: 'Mês', dica: 'Visão consolidada do período e evolução' },
+        { href: '/vivos', nome: 'Vivos', dica: 'Relatórios vivos e checklist diário' },
+      ],
+    },
+    {
+      id: 'processos',
+      nome: 'Listas e Fluxos',
+      itens: [
+        { href: '/listas', nome: 'Listas', dica: 'Checklists de implantação por fase e empresa' },
+        { href: '/fluxos', nome: 'Fluxos', dica: 'Editor visual de fluxogramas de processo' },
+      ],
+    },
+    {
+      id: 'saidas',
+      nome: 'Relatórios',
+      itens: [
+        { href: '/relatorio', nome: 'Gerar Relatório', dica: 'PDF técnico, link interativo, Teams e pacote IA' },
+        { href: '/modelos', nome: 'Modelos', dica: 'Personalizar seções e estrutura dos relatórios' },
+        { href: '/retornos', nome: 'Retornos', dica: 'Respostas e comentários dos links enviados' },
+      ],
+    },
   ];
+
+  let menuAberto = $state<string | null>(null);
+  const grupoAtivo = (g: GrupoMenu) => g.itens.some((i) => page.url.pathname === i.href);
 
   let paletaAberta = $state(false);
   let abertura = $state(false);
@@ -90,9 +132,42 @@
   <nav>
     <canvas class="chuva-nav" use:chuva={{ fundo: 'rgba(15, 19, 24, 0.2)', cor: '#4cc38a', tamanho: 12 }}></canvas>
     <a href="/" class="marca">OrbisOS<span>_</span></a>
-    <div class="links">
-      {#each links as l (l.href)}
-        <a href={l.href} class:ativo={page.url.pathname === l.href}>{l.nome}</a>
+    <div class="links" role="menubar">
+      <a href="/" class="item-topo" class:ativo={page.url.pathname === '/'}>Início</a>
+      {#each gruposMenu as g (g.id)}
+        <div
+          class="grupo-nav"
+          role="none"
+          onmouseenter={() => (menuAberto = g.id)}
+          onmouseleave={() => { if (menuAberto === g.id) menuAberto = null; }}
+        >
+          <button
+            type="button"
+            class="gatilho-nav"
+            class:ativo={grupoAtivo(g)}
+            aria-expanded={menuAberto === g.id}
+            onclick={() => (menuAberto = menuAberto === g.id ? null : g.id)}
+          >
+            <span>{g.nome}</span>
+            <span class="seta" class:aberta={menuAberto === g.id}>▾</span>
+          </button>
+          {#if menuAberto === g.id}
+            <div class="painel-nav" role="menu">
+              {#each g.itens as item (item.href)}
+                <a
+                  href={item.href}
+                  role="menuitem"
+                  class="subitem-nav"
+                  class:ativo={page.url.pathname === item.href}
+                  onclick={() => (menuAberto = null)}
+                >
+                  <b>{item.nome}</b>
+                  <small>{item.dica}</small>
+                </a>
+              {/each}
+            </div>
+          {/if}
+        </div>
       {/each}
     </div>
     <div class="direita">
@@ -282,34 +357,101 @@
   .links
   {
     display: flex;
-    gap: 2px;
+    align-items: stretch;
+    gap: 4px;
     height: 100%;
-    overflow-x: auto;
     flex: 1;
-    scrollbar-width: none;
   }
-  .links a
+  .item-topo, .gatilho-nav
   {
     display: flex;
     align-items: center;
+    gap: 5px;
+    height: 100%;
     font-family: var(--fonte-maquina);
     color: #93a19a;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
     text-decoration: none;
     padding: 0 var(--size-3);
     font-size: 0.92rem;
-    border-bottom: 2px solid transparent;
     white-space: nowrap;
     transition: color 0.15s;
   }
-  .links a:hover
+  .item-topo:hover, .gatilho-nav:hover:not(:disabled)
   {
     color: #fff;
+    background: rgb(255 255 255 / 4%);
   }
-  .links .ativo
+  .item-topo.ativo, .gatilho-nav.ativo
   {
     color: #fff;
     border-bottom-color: var(--marca);
     font-weight: 700;
+  }
+  .grupo-nav
+  {
+    position: relative;
+    height: 100%;
+  }
+  .seta
+  {
+    font-size: 0.72rem;
+    opacity: 0.75;
+    transition: transform 0.15s;
+  }
+  .seta.aberta
+  {
+    transform: rotate(180deg);
+    color: var(--marca);
+  }
+  .painel-nav
+  {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 260px;
+    padding: 6px;
+    background: var(--superficie);
+    border: 1px solid var(--borda-forte);
+    border-top: 2px solid var(--marca);
+    border-radius: 0 0 var(--raio) var(--raio);
+    box-shadow: var(--sombra);
+    display: grid;
+    gap: 2px;
+    z-index: 40;
+    animation: surgir-menu 0.12s var(--curva);
+  }
+  .subitem-nav
+  {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border-radius: var(--raio-pequeno);
+    text-decoration: none;
+    color: var(--texto);
+  }
+  .subitem-nav b
+  {
+    font-family: var(--fonte-maquina);
+    font-size: 0.88rem;
+  }
+  .subitem-nav small
+  {
+    font-size: 0.76rem;
+    color: var(--suave);
+    white-space: normal;
+  }
+  .subitem-nav:hover, .subitem-nav.ativo
+  {
+    background: var(--marca-clara);
+  }
+  .subitem-nav.ativo b
+  {
+    color: var(--marca);
   }
   .direita
   {

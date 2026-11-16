@@ -30,6 +30,7 @@ export function rotuloBloco(b: Bloco): string
     case 'lista': return `Lista de checagem${b.titulo ? `: ${b.titulo}` : ''}`;
     case 'fluxograma': return `Fluxograma${b.titulo ? `: ${b.titulo}` : ''}`;
     case 'pessoa': return `1:1${b.titulo ? `: ${b.titulo}` : ''}`;
+    case 'anotacao': return `Material da etapa${b.pasta ? ` (${b.pasta})` : ''}${b.titulo ? `: ${b.titulo}` : ''}`;
   }
 }
 

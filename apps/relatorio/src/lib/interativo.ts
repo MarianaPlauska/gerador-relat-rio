@@ -167,6 +167,48 @@ export function montarInterativo({ dados, ctx, notas, resumo, modelo, blocos }: 
       for (const f of dados.fluxos.filter((x) => !b.fluxoId || x.id === b.fluxoId))
         if (f.nos.length) secoes.push({ id: `fluxo-${f.id}`, tipo: 'fluxo', titulo: b.titulo && dados.fluxos.length === 1 ? b.titulo : f.nome, nos: f.nos, ligacoes: f.ligacoes });
     }
+    else if (b.tipo === 'anotacao')
+    {
+      const candidatas = dados.fotos.filter((f) =>
+        (f.anotacao || f.capturas?.some((c) => c.imagemDataUrl)) &&
+        (!b.pasta || (f.pasta ?? dados.prefixo) === b.pasta) &&
+        (b.data ? f.data === b.data : f.data >= atual.inicio && f.data <= ctx.fim),
+      );
+      const alvos = candidatas.length ? candidatas : atual.foto && (atual.foto.anotacao || atual.foto.capturas?.length) ? [atual.foto] : [];
+      for (const f of alvos)
+      {
+        const pastaRotulo = f.pasta ?? dados.prefixo;
+        const a = f.anotacao;
+        const imagens = b.comImagens !== false ? (f.capturas ?? []).filter((c) => c.imagemDataUrl).map((c) => ({ nome: c.nome, dataUrl: c.imagemDataUrl! })) : [];
+        const intro = [a?.resumo && `Resumo: ${a.resumo}`, a?.palavrasDaAutora && `Palavras da autora: ${a.palavrasDaAutora}`].filter(Boolean).join(' — ');
+        if (a?.etapas.length)
+        {
+          secoes.push({
+            id: `anotacao-${f.data}-${posicao}`,
+            tipo: 'itens',
+            titulo: b.titulo || `Material da etapa — ${pastaRotulo} (${dataMedia(f.data)})`,
+            ...(intro ? { intro } : {}),
+            ...(imagens.length ? { imagens } : {}),
+            itens: a.etapas.map((e, idx) => ({
+              id: `et-${idx}`,
+              texto: `${idx + 1}. ${e.texto}`,
+              detalhe: [e.descricao, e.cards?.length && `cards: ${e.cards.join(', ')}`, e.feito ? 'feito' : 'pendente'].filter(Boolean).join(' · '),
+              nivel: e.feito ? 'baixo' : 'medio',
+            })),
+          });
+        }
+        else if (intro || imagens.length)
+        {
+          secoes.push({
+            id: `anotacao-${f.data}-${posicao}`,
+            tipo: 'texto',
+            titulo: b.titulo || `Material da etapa — ${pastaRotulo} (${dataMedia(f.data)})`,
+            paragrafos: [a?.resumo ?? '', a?.palavrasDaAutora ?? ''].filter(Boolean),
+            ...(imagens.length ? { imagens } : {}),
+          });
+        }
+      }
+    }
   });
 
   return {

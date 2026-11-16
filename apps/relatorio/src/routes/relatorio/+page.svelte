@@ -48,6 +48,32 @@
   const sugestao = $derived(resumoSugerido(ctx.frases));
   const semaforoAuto = $derived(semaforoDoRelatorio(ctx, {}));
   const nomesSemaforo: Record<CorSemaforo, string> = { verde: 'No caminho', amarelo: 'Atenção', vermelho: 'Fora da meta' };
+  const pastas = $derived([...new Set([dados.prefixo, ...dados.fotos.map((f) => f.pasta).filter((p): p is string => !!p)])]);
+  const fotosComMaterial = $derived(
+    dados.fotos
+      .filter((f) => f.anotacao || f.capturas?.some((c) => c.imagemDataUrl))
+      .map((f) => ({ data: f.data, pasta: f.pasta ?? dados.prefixo, resumo: f.anotacao?.resumo }))
+      .sort((a, b) => b.data.localeCompare(a.data)),
+  );
+  const materialAtual = $derived(ctx.atual.foto?.anotacao);
+  const imagensAtuais = $derived((ctx.atual.foto?.capturas ?? []).filter((c) => c.imagemDataUrl));
+
+  function puxarDoPainel()
+  {
+    if (!materialAtual && !imagensAtuais.length) return;
+    if (materialAtual?.palavrasDaAutora || materialAtual?.resumo)
+    {
+      anotar('resumo', [materialAtual.resumo, materialAtual.palavrasDaAutora].filter(Boolean).join('\n\n'));
+    }
+    if (materialAtual?.etapas.length)
+    {
+      anotar('proximosPassos', materialAtual.etapas.map((e) => `- ${e.texto}${e.descricao ? `: ${e.descricao}` : ''}`).join('\n'));
+    }
+    if (!blocos.some((b) => b.tipo === 'anotacao'))
+    {
+      mudarBlocos([...blocos, { tipo: 'anotacao', pasta: ctx.atual.foto?.pasta ?? dados.prefixo, data: ctx.atual.foto?.data, comImagens: true }]);
+    }
+  }
 
   function anotar<K extends keyof NotasRelatorio>(campo: K, valor: NotasRelatorio[K])
   {
@@ -221,6 +247,18 @@
     {#if !ctx.atual.foto}<p class="aviso">{ctx.livre ? "Este período" : "Esta semana"} ainda não tem foto do painel. <a href="/painel">Colar o painel</a></p>{/if}
     {#if !ctx.anterior}<p class="dica">{ctx.livre ? "Sem foto antes do período: o comparativo usa a primeira foto do período quando houver duas." : "Sem dados da semana anterior: o comparativo aparece quando existir uma semana antes desta."}</p>{/if}
 
+    {#if materialAtual || imagensAtuais.length}
+      <div class="bloco destaque-material">
+        <div class="titulo-bloco">
+          <h2>Material salvo no painel ({ctx.atual.foto?.pasta ?? dados.prefixo})</h2>
+          <button class="link" onclick={puxarDoPainel}>puxar tudo para o relatório</button>
+        </div>
+        {#if materialAtual?.resumo}<p class="dica"><b>Resumo:</b> {materialAtual.resumo}</p>{/if}
+        {#if materialAtual?.palavrasDaAutora}<p class="dica"><b>Palavras da autora:</b> {materialAtual.palavrasDaAutora}</p>{/if}
+        <p class="dica">{materialAtual?.etapas.length ?? 0} etapas descritas · {imagensAtuais.length} {imagensAtuais.length === 1 ? 'imagem salva' : 'imagens salvas'}.</p>
+      </div>
+    {/if}
+
     <div class="bloco">
       <div class="titulo-bloco">
         <h2>Resumo executivo</h2>
@@ -255,7 +293,7 @@
         {#if mexido}<button class="link" onclick={voltarAoModelo}>voltar ao modelo</button>{/if}
       </div>
       <p class="dica">O PDF segue esta ordem. Adicione texto, gráfico ou tabela em qualquer ponto e suba ou desça. Mexer aqui não muda o modelo.</p>
-      <ListaDeBlocos listas={dados.listas} fluxos={dados.fluxos} pessoas={dados.pessoas} {blocos} onmudar={mudarBlocos} />
+      <ListaDeBlocos listas={dados.listas} fluxos={dados.fluxos} pessoas={dados.pessoas} {pastas} {fotosComMaterial} {blocos} onmudar={mudarBlocos} />
       <button class="link salvar-modelo" onclick={salvarComoModelo}>salvar estes blocos como modelo novo</button>
     </div>
 

@@ -25,6 +25,19 @@ async function prepararImagem(imagem: Blob): Promise<HTMLCanvasElement>
   return canvas;
 }
 
+// gera uma cópia leve em JPEG (data URL) para guardar na captura e usar no relatório PDF/link
+export async function miniaturaDataUrl(imagem: Blob, larguraMax = 920): Promise<string>
+{
+  const bitmap = await createImageBitmap(imagem);
+  const escala = Math.min(1, larguraMax / bitmap.width);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bitmap.width * escala));
+  canvas.height = Math.max(1, Math.round(bitmap.height * escala));
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.78);
+}
+
 export async function lerImagem(imagem: Blob, progresso: (p: number) => void): Promise<string>
 {
   const worker = await createWorker('por', 1, {

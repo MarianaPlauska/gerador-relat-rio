@@ -54,7 +54,9 @@ export type Bloco =
   // fluxograma desenhado na tela Fluxos; sem fluxoId, todos
   | { tipo: 'fluxograma'; fluxoId?: string | undefined; titulo?: string | undefined }
   // 1:1: plano, entregas, carga, cards em execução, dificuldade e alertas de uma pessoa; sem pessoaId, uma página por pessoa
-  | { tipo: 'pessoa'; pessoaId?: string | undefined; titulo?: string | undefined };
+  | { tipo: 'pessoa'; pessoaId?: string | undefined; titulo?: string | undefined }
+  // material salvo no painel: palavras da autora, resumo, etapas com descritivo e imagens das capturas
+  | { tipo: 'anotacao'; pasta?: string | undefined; data?: string | undefined; titulo?: string | undefined; comImagens?: boolean | undefined };
 
 export interface Modelo
 {
@@ -246,6 +248,8 @@ function lerBloco(b: unknown, posicao: number, erros: string[]): Bloco | undefin
       return { tipo: 'fluxograma', fluxoId: ehTexto(o.fluxoId) ? o.fluxoId : undefined, titulo: ehTexto(o.titulo) ? o.titulo : undefined };
     case 'pessoa':
       return { tipo: 'pessoa', pessoaId: ehTexto(o.pessoaId) ? o.pessoaId : undefined, titulo: ehTexto(o.titulo) ? o.titulo : undefined };
+    case 'anotacao':
+      return { tipo: 'anotacao', pasta: ehTexto(o.pasta) ? o.pasta : undefined, data: ehTexto(o.data) ? o.data : undefined, titulo: ehTexto(o.titulo) ? o.titulo : undefined, comImagens: o.comImagens !== false };
     default:
       erros.push(`${onde}: tipo "${String(o.tipo)}" não existe.`);
       return undefined;

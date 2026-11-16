@@ -153,6 +153,13 @@
         <h2>{s.titulo}</h2>
         {#if s.tipo === 'texto'}
           {#each s.paragrafos as p, i (i)}<p>{p}</p>{/each}
+          {#if s.imagens?.length}
+            <div class="imagens-secao">
+              {#each s.imagens as img, i (i)}
+                <figure><img src={img.dataUrl} alt={img.nome} /><figcaption>{img.nome}</figcaption></figure>
+              {/each}
+            </div>
+          {/if}
         {:else if s.tipo === 'tabela'}
           <div class="rolagem">
             <table>
@@ -170,6 +177,13 @@
           <div class="fluxo">{@html fluxo(s)}</div>
         {:else}
           {#if s.intro}<p class="dica">{s.intro}</p>{/if}
+          {#if s.imagens?.length}
+            <div class="imagens-secao">
+              {#each s.imagens as img, i (i)}
+                <figure><img src={img.dataUrl} alt={img.nome} /><figcaption>{img.nome}</figcaption></figure>
+              {/each}
+            </div>
+          {/if}
           <ul class="itens">
             {#each s.itens as item (item.id)}
               {@const k = chave(s.id, item.id)}
@@ -309,6 +323,28 @@
   {
     max-width: 100%;
     height: auto;
+  }
+  .imagens-secao
+  {
+    display: grid;
+    gap: var(--size-3);
+    margin: var(--size-3) 0;
+  }
+  .imagens-secao figure
+  {
+    margin: 0;
+  }
+  .imagens-secao img
+  {
+    max-width: 100%;
+    border-radius: var(--raio-pequeno);
+    border: 1px solid var(--borda);
+  }
+  .imagens-secao figcaption
+  {
+    font-size: 0.78rem;
+    color: var(--suave);
+    margin-top: 4px;
   }
   .itens
   {

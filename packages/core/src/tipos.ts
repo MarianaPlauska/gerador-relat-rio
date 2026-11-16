@@ -120,9 +120,45 @@ export interface Onda
 export interface Snapshot
 {
   data: string;
+  pasta?: string | undefined;
   totais: TotaisPainel;
   cards: CardSnapshot[];
   ondas?: Onda[] | undefined;
+  anotacao?: Anotacao | undefined;
+  capturas?: CapturaLida[] | undefined;
+}
+
+// cada print ou trecho colado no painel: guarda o que foi transcrito e o que saiu dele
+export interface CapturaLida
+{
+  id: string;
+  nome: string;
+  origem: OrigemLeitura;
+  texto: string;
+  imagemDataUrl?: string | undefined;
+  totais: (keyof TotaisPainel)[];
+  cards: string[];
+  ondas: number;
+  avisos: string[];
+  sugestoes: string[];
+}
+
+// o que a supervisão escreveu e o material de explicações gerado sobre a etapa
+export interface EtapaAnotada
+{
+  texto: string;
+  descricao?: string | undefined;
+  feito: boolean;
+  cards?: string[] | undefined;
+}
+
+export interface Anotacao
+{
+  texto: string;
+  resumo: string;
+  palavrasDaAutora?: string | undefined;
+  etapas: EtapaAnotada[];
+  cards?: string[] | undefined;
 }
 
 export interface ItemPlano

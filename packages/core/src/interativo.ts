@@ -19,9 +19,9 @@ export interface ItemInterativo
 }
 
 export type SecaoInterativa =
-  | { id: string; tipo: 'texto'; titulo: string; paragrafos: string[] }
+  | { id: string; tipo: 'texto'; titulo: string; paragrafos: string[]; imagens?: { nome: string; dataUrl: string }[] | undefined }
   // cada item pode receber uma marca e um comentário
-  | { id: string; tipo: 'itens'; titulo: string; intro?: string | undefined; itens: ItemInterativo[] }
+  | { id: string; tipo: 'itens'; titulo: string; intro?: string | undefined; itens: ItemInterativo[]; imagens?: { nome: string; dataUrl: string }[] | undefined }
   // linhas como objetos: o Firestore não guarda lista dentro de lista
   | { id: string; tipo: 'tabela'; titulo: string; colunas: string[]; linhas: { celulas: string[] }[] }
   | { id: string; tipo: 'grafico'; titulo: string; pontos: { rotulo: string; valor: number }[]; meta?: number | undefined; sufixo?: string | undefined }
