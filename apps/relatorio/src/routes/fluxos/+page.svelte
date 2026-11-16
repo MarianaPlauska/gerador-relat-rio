@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { agoraLocal, fluxoDaLista, idCurto, lerFluxo, novoFluxograma, pedidoDeFluxo, type Fluxograma, type LigacaoFluxo, type NoFluxo } from '@supervisao/core';
+  import { agoraLocal, fluxoDaLista, idCurto, lerFluxo, novoFluxograma, pedidoDeFluxo, prepararTextoLivre, textoDaSemana, type Fluxograma, type LigacaoFluxo, type NoFluxo } from '@supervisao/core';
   import { SvelteFlowProvider } from '@xyflow/svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -67,6 +67,36 @@
     if (l) guardar(fluxoDaLista(l));
   }
 
+  // um registro do diário vira fluxo: motivo e comentários viram os passos
+  function doRegistro(id: string)
+  {
+    const r = dados.registros.find((x) => x.id === id);
+    if (!r) return;
+    const comentarios = r.capturas.map((c) => c.comentario?.trim()).filter((c): c is string => !!c);
+    const base = comentarios.length ? comentarios.join('\n') : r.texto;
+    montarDe(prepararTextoLivre(base), r.motivo || `Registro de ${dataMedia(r.data)}`);
+  }
+
+  // as tarefas do plano da semana viram passos, uma por linha
+  function daSemana(inicio: string)
+  {
+    const plano = dados.planos.find((p) => p.inicio === inicio);
+    const nomePessoa = (id: string) => dados.pessoas.find((p) => p.id === id)?.nome ?? id;
+    montarDe(textoDaSemana(plano, nomePessoa), `Plano da semana de ${dataMedia(inicio)}`);
+  }
+
+  function montarDe(conteudo: string, titulo: string)
+  {
+    const r = lerFluxo(conteudo);
+    if (!r.nos.some((n) => n.tipo !== 'inicio' && n.tipo !== 'fim'))
+    {
+      aviso = 'Não encontrei passos para montar o fluxo.';
+      return;
+    }
+    aviso = '';
+    guardar({ ...novoFluxograma(titulo.slice(0, 60)), nos: r.nos, ligacoes: r.ligacoes });
+  }
+
   function duplicar(f: Fluxograma)
   {
     const agora = agoraLocal();
@@ -119,10 +149,10 @@
     <section class="cartao novo">
       <h2>O que vamos mapear hoje?</h2>
       <input bind:value={nome} placeholder="Nome do fluxo (opcional)" />
-      <textarea bind:value={texto} rows="8" placeholder={'Descrição do processo, um passo por linha:\nReceber pedido do cliente\nConferir CNPJs\nSe faltar documento? sim: Pedir ao responsável / não: Agendar implantação\nTreinar equipe\nFim'}></textarea>
+      <textarea bind:value={texto} rows="8" placeholder={'Descreva do seu jeito. Pode ser texto corrido ("Primeiro recebo o pedido, depois confiro os CNPJs. Se faltar documento, peço ao responsável.") ou um passo por linha:\nReceber pedido do cliente\nConferir CNPJs\nSe faltar documento? sim: Pedir ao responsável / não: Agendar implantação\nFim'}></textarea>
       <p class="dica">
-        Ou cole um texto gerado em outra IA. Escreva o processo do seu jeito, clique em <b>Copiar pedido para IA</b>, cole num chat gratuito
-        e traga a resposta para esta mesma caixa. Decisões: "Pergunta? sim: passo / não: passo". Para voltar a um passo: "não: voltar para conferir dados".
+        Texto corrido, lista, resposta de outra IA ou Mermaid: tudo vira fluxo. Decisões: "Pergunta? sim: passo / não: passo". Para voltar a um passo: "não: voltar para conferir dados".
+        Também dá para partir de um registro do diário, de uma semana ou de uma lista de checagem (ao lado do botão Montar fluxo).
       </p>
       {#if aviso}<p class="aviso">{aviso}</p>{/if}
       <div class="botoes">
@@ -130,6 +160,18 @@
         <button onclick={copiarPedido}>{pedidoCopiado ? 'Pedido copiado' : 'Copiar pedido para IA'}</button>
         <span class="separa">ou</span>
         <button onclick={() => guardar(novoFluxograma(nome || 'Fluxo em branco'))}>Fluxo em branco</button>
+        {#if dados.registros.length}
+          <select value="" onchange={(e) => { const id = e.currentTarget.value; e.currentTarget.value = ''; if (id) doRegistro(id); }}>
+            <option value="">A partir de um registro do diário...</option>
+            {#each [...dados.registros].sort((a, b) => b.data.localeCompare(a.data)).slice(0, 30) as r (r.id)}<option value={r.id}>{dataMedia(r.data)} · {r.pasta}{r.motivo ? ` · ${r.motivo.slice(0, 40)}` : ''}</option>{/each}
+          </select>
+        {/if}
+        {#if dados.planos.length}
+          <select value="" onchange={(e) => { const id = e.currentTarget.value; e.currentTarget.value = ''; if (id) daSemana(id); }}>
+            <option value="">A partir de uma semana...</option>
+            {#each [...dados.planos].sort((a, b) => b.inicio.localeCompare(a.inicio)) as p (p.inicio)}<option value={p.inicio}>Semana de {dataMedia(p.inicio)}</option>{/each}
+          </select>
+        {/if}
         {#if dados.listas.length}
           <select value="" onchange={(e) => { const id = e.currentTarget.value; e.currentTarget.value = ''; if (id) daLista(id); }}>
             <option value="">A partir de uma lista...</option>

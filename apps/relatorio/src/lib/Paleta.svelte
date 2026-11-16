@@ -26,16 +26,16 @@
   {
     const dados = carregar();
     const paginas: [string, string, string?][] = [
-      ['Início', '/'], ['Colar painel', '/painel'], ['Cards', '/cards'], ['Semana', '/semana'], ['Listas', '/listas'], ['Fluxos', '/fluxos'],
-      ['Relatórios vivos', '/vivos'], ['Relatório (PDF)', '/relatorio'], ['Visão do mês', '/mes'], ['Modelos de relatório', '/modelos'],
+      ['Início', '/'], ['Diário do painel', '/painel'], ['Cards', '/cards'], ['Semana', '/semana'], ['Listas', '/listas'], ['Fluxos', '/fluxos'],
+      ['Checklist diário', '/vivos'], ['Relatório (PDF)', '/relatorio'], ['Visão do mês', '/mes'], ['Modelos de relatório', '/modelos'],
       ['Retornos dos links', '/retornos'], ['Meu perfil', '/perfil'], ['Roadmap', '/roadmap'],
     ];
     const lista: Comando[] = paginas.map(([nome, rota]) => criar('Ir para', nome, ir(rota!)));
     lista.push(
-      criar('Ação', 'Novo relatório vivo', ir('/vivos'), 'registrar todo dia'),
+      criar('Ação', 'Novo checklist diário', ir('/vivos'), 'registrar todo dia'),
       criar('Ação', 'Novo fluxograma', ir('/fluxos'), 'mapear um processo'),
       criar('Ação', 'Nova lista de checagem', ir('/listas')),
-      criar('Ação', 'Colar o painel de hoje', ir('/painel')),
+      criar('Ação', 'Novo registro no diário do painel', ir('/painel')),
       criar('Ação', 'Gerar PDF da semana', ir('/relatorio')),
       criar('Ação', 'Trocar tema claro ou escuro', trocarTema),
       criar('Ação', 'Baixar backup', baixarBackup),
@@ -43,7 +43,7 @@
     );
     for (const l of dados.listas) lista.push(criar('Lista', l.nome, ir(`/listas?id=${l.id}`)));
     for (const f of dados.fluxos) lista.push(criar('Fluxo', f.nome, ir(`/fluxos?id=${f.id}`)));
-    for (const v of dados.vivos) lista.push(criar('Vivo', v.nome, ir(`/vivos?id=${v.id}`), v.encerradoEm ? 'encerrado' : 'em andamento'));
+    for (const v of dados.vivos) lista.push(criar('Checklist', v.nome, ir(`/vivos?id=${v.id}`), v.encerradoEm ? 'encerrado' : 'em andamento'));
     const cards = dados.fotos.at(-1)?.cards ?? [];
     for (const c of cards) lista.push(criar('Card', `${c.codigo} ${c.titulo}`, ir(`/cards?q=${encodeURIComponent(c.codigo)}`)));
     return lista;

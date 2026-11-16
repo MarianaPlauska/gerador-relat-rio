@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { agoraLocal, alternarItem, dicionarioPadrao, idCurto, itemFeito, novoVivo, progressoVivo, resumoSugerido, segundaDaSemana, somarDias, type Bloco, type CorSemaforo } from '@supervisao/core';
+  import { agoraLocal, alternarItem, dicionarioPadrao, filtrarRegistros, idCurto, itemFeito, novoVivo, progressoVivo, resumoSugerido, segundaDaSemana, somarDias, type Bloco, type CorSemaforo } from '@supervisao/core';
   import { carregar, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
   import { montarInterativo } from '#lib/interativo.ts';
   import EscreverComIa from '#lib/EscreverComIa.svelte';
@@ -48,31 +48,14 @@
   const sugestao = $derived(resumoSugerido(ctx.frases));
   const semaforoAuto = $derived(semaforoDoRelatorio(ctx, {}));
   const nomesSemaforo: Record<CorSemaforo, string> = { verde: 'No caminho', amarelo: 'Atenção', vermelho: 'Fora da meta' };
-  const pastas = $derived([...new Set([dados.prefixo, ...dados.fotos.map((f) => f.pasta).filter((p): p is string => !!p)])]);
-  const fotosComMaterial = $derived(
-    dados.fotos
-      .filter((f) => f.anotacao || f.capturas?.some((c) => c.imagemDataUrl))
-      .map((f) => ({ data: f.data, pasta: f.pasta ?? dados.prefixo, resumo: f.anotacao?.resumo }))
-      .sort((a, b) => b.data.localeCompare(a.data)),
-  );
-  const materialAtual = $derived(ctx.atual.foto?.anotacao);
-  const imagensAtuais = $derived((ctx.atual.foto?.capturas ?? []).filter((c) => c.imagemDataUrl));
+  const pastas = $derived([...new Set([dados.prefixo, ...dados.registros.map((r) => r.pasta)])]);
+  const registrosLista = $derived([...dados.registros].sort((a, b) => b.data.localeCompare(a.data)).map((r) => ({ id: r.id, data: r.data, pasta: r.pasta, motivo: r.motivo })));
+  const registrosDoPeriodo = $derived(filtrarRegistros(dados.registros, { de: periodo.inicio, ate: periodo.fim }));
 
-  function puxarDoPainel()
+  function puxarDoDiario()
   {
-    if (!materialAtual && !imagensAtuais.length) return;
-    if (materialAtual?.palavrasDaAutora || materialAtual?.resumo)
-    {
-      anotar('resumo', [materialAtual.resumo, materialAtual.palavrasDaAutora].filter(Boolean).join('\n\n'));
-    }
-    if (materialAtual?.etapas.length)
-    {
-      anotar('proximosPassos', materialAtual.etapas.map((e) => `- ${e.texto}${e.descricao ? `: ${e.descricao}` : ''}`).join('\n'));
-    }
-    if (!blocos.some((b) => b.tipo === 'anotacao'))
-    {
-      mudarBlocos([...blocos, { tipo: 'anotacao', pasta: ctx.atual.foto?.pasta ?? dados.prefixo, data: ctx.atual.foto?.data, comImagens: true }]);
-    }
+    if (!registrosDoPeriodo.length || blocos.some((b) => b.tipo === 'anotacao')) return;
+    mudarBlocos([...blocos, { tipo: 'anotacao', registroIds: registrosDoPeriodo.map((r) => r.id), comImagens: true }]);
   }
 
   function anotar<K extends keyof NotasRelatorio>(campo: K, valor: NotasRelatorio[K])
@@ -244,18 +227,19 @@
         </select>
       </label>
     </div>
-    {#if !ctx.atual.foto}<p class="aviso">{ctx.livre ? "Este período" : "Esta semana"} ainda não tem foto do painel. <a href="/painel">Colar o painel</a></p>{/if}
+    {#if !ctx.atual.foto}<p class="aviso">{ctx.livre ? "Este período" : "Esta semana"} ainda não tem foto do painel. <a href="/painel">Abrir o diário do painel</a></p>{/if}
     {#if !ctx.anterior}<p class="dica">{ctx.livre ? "Sem foto antes do período: o comparativo usa a primeira foto do período quando houver duas." : "Sem dados da semana anterior: o comparativo aparece quando existir uma semana antes desta."}</p>{/if}
 
-    {#if materialAtual || imagensAtuais.length}
+    {#if registrosDoPeriodo.length}
       <div class="bloco destaque-material">
         <div class="titulo-bloco">
-          <h2>Material salvo no painel ({ctx.atual.foto?.pasta ?? dados.prefixo})</h2>
-          <button class="link" onclick={puxarDoPainel}>puxar tudo para o relatório</button>
+          <h2>Diário do painel neste período ({registrosDoPeriodo.length})</h2>
+          <button class="link" onclick={puxarDoDiario} disabled={blocos.some((b) => b.tipo === 'anotacao')}>incluir no relatório</button>
         </div>
-        {#if materialAtual?.resumo}<p class="dica"><b>Resumo:</b> {materialAtual.resumo}</p>{/if}
-        {#if materialAtual?.palavrasDaAutora}<p class="dica"><b>Palavras da autora:</b> {materialAtual.palavrasDaAutora}</p>{/if}
-        <p class="dica">{materialAtual?.etapas.length ?? 0} etapas descritas · {imagensAtuais.length} {imagensAtuais.length === 1 ? 'imagem salva' : 'imagens salvas'}.</p>
+        {#each registrosDoPeriodo.slice(0, 6) as r (r.id)}
+          <p class="dica"><b>{dataCurta(r.data)} · {r.pasta}</b> {r.motivo || r.resumo}</p>
+        {/each}
+        <p class="dica">Os registros entram com o texto unido e os prints. Para escolher só alguns, use o bloco "Diário do painel" abaixo.</p>
       </div>
     {/if}
 
@@ -293,7 +277,7 @@
         {#if mexido}<button class="link" onclick={voltarAoModelo}>voltar ao modelo</button>{/if}
       </div>
       <p class="dica">O PDF segue esta ordem. Adicione texto, gráfico ou tabela em qualquer ponto e suba ou desça. Mexer aqui não muda o modelo.</p>
-      <ListaDeBlocos listas={dados.listas} fluxos={dados.fluxos} pessoas={dados.pessoas} {pastas} {fotosComMaterial} {blocos} onmudar={mudarBlocos} />
+      <ListaDeBlocos listas={dados.listas} fluxos={dados.fluxos} pessoas={dados.pessoas} {pastas} {registrosLista} {blocos} onmudar={mudarBlocos} />
       <button class="link salvar-modelo" onclick={salvarComoModelo}>salvar estes blocos como modelo novo</button>
     </div>
 
@@ -326,7 +310,7 @@
       <h2>Checklist e tarefas do período</h2>
       {#if vivo}
         {@const pr = progressoVivo(vivo, hoje())}
-        <p class="dica">{pr.feitos} de {pr.total} itens marcados hoje. <a href="/vivos?id={vivo.id}">abrir o relatório vivo</a></p>
+        <p class="dica">{pr.feitos} de {pr.total} itens marcados hoje. <a href="/vivos?id={vivo.id}">abrir o checklist diário</a></p>
         {#each vivo.itens as item (item.id)}
           <label class="marcavel"><input type="checkbox" checked={itemFeito(item, hoje())} onchange={() => alternarItem(item, hoje())} /> {item.texto}{item.diario ? ' (todo dia)' : ''}</label>
         {/each}
@@ -336,8 +320,8 @@
           <button disabled={!notas.proximosPassos?.trim()} onclick={enviarProximosPassos} title="Cada linha dos próximos passos vira uma tarefa do checklist">Mandar os próximos passos para o checklist</button>
         </div>
       {:else}
-        <p class="dica">Crie o relatório vivo deste período para ter um checklist de tarefas, marcar o que foi feito e registrar o dia.</p>
-        <button onclick={criarVivo}>Criar relatório vivo deste período</button>
+        <p class="dica">Crie o checklist diário deste período para ter um checklist de tarefas, marcar o que foi feito e registrar o dia.</p>
+        <button onclick={criarVivo}>Criar checklist diário deste período</button>
       {/if}
     </div>
 

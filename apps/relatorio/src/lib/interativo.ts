@@ -1,6 +1,6 @@
 import
 {
-  agoraLocal, itensDaFase, nomesSecoes, nomesTotais, progressoDosItens, segundaDaSemana, serieSemanal, situacaoDaFase,
+  agoraLocal, filtrarRegistros, itensDaFase, nomesSecoes, nomesTotais, progressoDosItens, segundaDaSemana, serieSemanal, situacaoDaFase,
   type Bloco, type CorSemaforo, type ItemInterativo, type Modelo, type RelatorioInterativo, type SecaoInterativa, type TotaisPainel,
 } from '@supervisao/core';
 import type { Dados, NotasRelatorio } from './armazenamento.ts';
@@ -169,44 +169,16 @@ export function montarInterativo({ dados, ctx, notas, resumo, modelo, blocos }: 
     }
     else if (b.tipo === 'anotacao')
     {
-      const candidatas = dados.fotos.filter((f) =>
-        (f.anotacao || f.capturas?.some((c) => c.imagemDataUrl)) &&
-        (!b.pasta || (f.pasta ?? dados.prefixo) === b.pasta) &&
-        (b.data ? f.data === b.data : f.data >= atual.inicio && f.data <= ctx.fim),
-      );
-      const alvos = candidatas.length ? candidatas : atual.foto && (atual.foto.anotacao || atual.foto.capturas?.length) ? [atual.foto] : [];
-      for (const f of alvos)
+      for (const r of filtrarRegistros(dados.registros, { pasta: b.pasta, ids: b.registroIds, data: b.data, de: atual.inicio, ate: ctx.fim }))
       {
-        const pastaRotulo = f.pasta ?? dados.prefixo;
-        const a = f.anotacao;
-        const imagens = b.comImagens !== false ? (f.capturas ?? []).filter((c) => c.imagemDataUrl).map((c) => ({ nome: c.nome, dataUrl: c.imagemDataUrl! })) : [];
-        const intro = [a?.resumo && `Resumo: ${a.resumo}`, a?.palavrasDaAutora && `Palavras da autora: ${a.palavrasDaAutora}`].filter(Boolean).join(' — ');
-        if (a?.etapas.length)
-        {
-          secoes.push({
-            id: `anotacao-${f.data}-${posicao}`,
-            tipo: 'itens',
-            titulo: b.titulo || `Material da etapa — ${pastaRotulo} (${dataMedia(f.data)})`,
-            ...(intro ? { intro } : {}),
-            ...(imagens.length ? { imagens } : {}),
-            itens: a.etapas.map((e, idx) => ({
-              id: `et-${idx}`,
-              texto: `${idx + 1}. ${e.texto}`,
-              detalhe: [e.descricao, e.cards?.length && `cards: ${e.cards.join(', ')}`, e.feito ? 'feito' : 'pendente'].filter(Boolean).join(' · '),
-              nivel: e.feito ? 'baixo' : 'medio',
-            })),
-          });
-        }
-        else if (intro || imagens.length)
-        {
-          secoes.push({
-            id: `anotacao-${f.data}-${posicao}`,
-            tipo: 'texto',
-            titulo: b.titulo || `Material da etapa — ${pastaRotulo} (${dataMedia(f.data)})`,
-            paragrafos: [a?.resumo ?? '', a?.palavrasDaAutora ?? ''].filter(Boolean),
-            ...(imagens.length ? { imagens } : {}),
-          });
-        }
+        const imagens = b.comImagens !== false ? r.capturas.filter((c) => c.imagemDataUrl).slice(0, 4).map((c) => ({ nome: c.nome.split(' · ')[0] ?? c.nome, dataUrl: c.imagemDataUrl! })) : [];
+        secoes.push({
+          id: `registro-${r.id}`,
+          tipo: 'texto',
+          titulo: b.titulo ? `${b.titulo} (${dataMedia(r.data)})` : `${dataMedia(r.data)} · ${r.pasta}${r.motivo ? ` · ${r.motivo}` : ''}`,
+          paragrafos: r.texto.split('\n\n').filter(Boolean),
+          ...(imagens.length ? { imagens } : {}),
+        });
       }
     }
   });

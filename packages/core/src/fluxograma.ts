@@ -1,4 +1,6 @@
 import { agoraLocal, idCurto, type Lista } from './checklist';
+import { interpretarAnotacao } from './leitor/anotacao';
+import type { PlanoSemana } from './tipos';
 
 export type TipoNo = 'inicio' | 'passo' | 'decisao' | 'fim' | 'nota';
 
@@ -264,7 +266,7 @@ export function lerFluxo(texto: string): { nos: NoFluxo[]; ligacoes: LigacaoFlux
 {
   const limpo = texto.replace(/```\w*/g, '').trim();
   const formato = pareceMermaid(limpo) ? 'mermaid' : 'passos';
-  const r = formato === 'mermaid' ? fluxoDoMermaid(limpo) : fluxoDosPassos(limpo);
+  const r = formato === 'mermaid' ? fluxoDoMermaid(limpo) : fluxoDosPassos(prepararTextoLivre(limpo));
   return { ...organizar(r.nos, r.ligacoes), formato };
 }
 
@@ -447,4 +449,32 @@ export function migrarFluxograma(f: Partial<Fluxograma>): Fluxograma
 {
   const agora = agoraLocal();
   return { ...novoFluxograma(f.nome ?? '', '', agora), ...f, nos: f.nos ?? [], ligacoes: f.ligacoes ?? [] } as Fluxograma;
+}
+
+// texto corrido ("Primeiro faço X, depois Y. Se Z, então W") vira uma lista de passos, um por linha;
+// texto que já está em linhas (2 ou mais) é usado como está
+export function prepararTextoLivre(texto: string): string
+{
+  const linhas = texto.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (linhas.length >= 2 || /\?\s*(sim|n[aã]o)\s*[:>-]/i.test(texto)) return texto;
+  const a = interpretarAnotacao(texto);
+  const base = a.etapas.length ? a.etapas.map((e) => e.texto) : texto.split(/(?<=[.!?;])\s+/).map((s) => s.trim().replace(/[.;]$/, '')).filter((s) => s.length > 2);
+  const lista = a.resumo && a.etapas.length ? [a.resumo.replace(/[.]$/, ''), ...base] : base;
+  return lista
+    .map((s) =>
+    {
+      // "Se faltar documento, pedir ao responsável" vira decisão com ramo "sim"
+      const cond = s.match(/^se\s+(.+?),\s*(?:ent[aã]o\s+)?(.+)$/i);
+      return cond ? `${cond[1]!.replace(/\?$/, '')}? sim: ${cond[2]}` : s;
+    })
+    .join('\n');
+}
+
+// uma semana de plano vira passos: um por item, na ordem do plano, agrupados por pessoa
+export function textoDaSemana(plano: PlanoSemana | undefined, nomePessoa: (id: string) => string): string
+{
+  if (!plano) return '';
+  return plano.pessoas
+    .flatMap((pp) => pp.itens.map((i) => `${i.cardCodigo ? `${i.cardCodigo} - ` : ''}${i.descricao} (${nomePessoa(pp.pessoaId).split(' ')[0]}${i.ate ? `, até ${i.ate.split('-').reverse().join('/')}` : ''})`))
+    .join('\n');
 }

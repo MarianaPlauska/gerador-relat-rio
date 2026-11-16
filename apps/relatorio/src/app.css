@@ -9,17 +9,17 @@
 :root
 {
   color-scheme: dark;
-  --fundo: #15191f;
-  --superficie: #1c2129;
-  --superficie-2: #242a34;
-  --borda: #2e3541;
-  --borda-forte: #404a59;
-  --texto: #e6eaf0;
-  --suave: #9aa5b4;
+  --fundo: #232a36;
+  --superficie: #2c3442;
+  --superficie-2: #353f4f;
+  --borda: #425064;
+  --borda-forte: #5a6a80;
+  --texto: #eef2f7;
+  --suave: #b4bfce;
   --marca: #4cc38a;
   --sobre-marca: #06231a;
   --marca-escura: #10141a;
-  --barra: #0f1318;
+  --barra: #1b222d;
   --marca-clara: rgb(76 195 138 / 14%);
   --verde: #5fcf98;
   --verde-fundo: rgb(95 207 152 / 12%);

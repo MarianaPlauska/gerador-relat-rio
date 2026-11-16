@@ -1,6 +1,6 @@
 import
 {
-  agoraLocal, dicionarioPadrao, migrarFluxograma, migrarLista, migrarVivo, type Fluxograma, type RelatorioVivo, pessoasExemplo, type Bloco, type ControleCard, type Lista, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type Risco, type Snapshot,
+  agoraLocal, dicionarioPadrao, migrarFluxograma, migrarLista, migrarVivo, type Fluxograma, type RelatorioVivo, pessoasExemplo, type Bloco, type ControleCard, type Lista, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type RegistroPainel, type Risco, type Snapshot,
 } from '@supervisao/core';
 import { agendarEnvio, iniciarNuvem, marcarLocal } from './nuvem.svelte.ts';
 
@@ -54,11 +54,13 @@ export interface Dados
   fluxos: Fluxograma[];
   // relatórios vivos: preenchidos aos poucos, todo dia
   vivos: RelatorioVivo[];
+  // diário do painel: registros guardados por pasta, com dia, motivo, prints e comentários
+  registros: RegistroPainel[];
 }
 
 function padrao(): Dados
 {
-  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [], vivos: [] };
+  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [], vivos: [], registros: [] };
 }
 
 // campos que faltam ganham o padrão; listas antigas ganham fases e diário

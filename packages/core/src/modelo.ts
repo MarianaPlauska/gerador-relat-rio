@@ -55,8 +55,8 @@ export type Bloco =
   | { tipo: 'fluxograma'; fluxoId?: string | undefined; titulo?: string | undefined }
   // 1:1: plano, entregas, carga, cards em execução, dificuldade e alertas de uma pessoa; sem pessoaId, uma página por pessoa
   | { tipo: 'pessoa'; pessoaId?: string | undefined; titulo?: string | undefined }
-  // material salvo no painel: palavras da autora, resumo, etapas com descritivo e imagens das capturas
-  | { tipo: 'anotacao'; pasta?: string | undefined; data?: string | undefined; titulo?: string | undefined; comImagens?: boolean | undefined };
+  // diário do painel: registros salvos (prints, comentários e texto unido); sem filtros, os do período do relatório
+  | { tipo: 'anotacao'; pasta?: string | undefined; data?: string | undefined; registroIds?: string[] | undefined; titulo?: string | undefined; comImagens?: boolean | undefined };
 
 export interface Modelo
 {
@@ -195,6 +195,17 @@ export const modelosProntos: Modelo[] = [
     blocos: [{ tipo: 'texto', titulo: 'Objetivo', texto: 'Registrar como o processo funciona hoje, passo a passo, para alinhar o time e apontar melhorias.' }, { tipo: 'fluxograma' }],
   },
   {
+    id: 'registro',
+    nome: 'Registro do diário',
+    descricao: 'Um ou mais registros do diário do painel: prints, comentários e o texto unido, sem depender de indicadores.',
+    titulo: 'Registro do Painel',
+    sigla: 'RG',
+    periodo: 'livre',
+    capa: 'curta',
+    sumario: false,
+    blocos: [{ tipo: 'anotacao', comImagens: true }],
+  },
+  {
     id: 'interativo',
     nome: 'Interativo (para enviar por link)',
     descricao: 'Feito para publicar como link: quem recebe lê, marca Ciente, Concordo ou Dúvida em cada ponto e comenta. As respostas aparecem em Retornos.',
@@ -249,7 +260,7 @@ function lerBloco(b: unknown, posicao: number, erros: string[]): Bloco | undefin
     case 'pessoa':
       return { tipo: 'pessoa', pessoaId: ehTexto(o.pessoaId) ? o.pessoaId : undefined, titulo: ehTexto(o.titulo) ? o.titulo : undefined };
     case 'anotacao':
-      return { tipo: 'anotacao', pasta: ehTexto(o.pasta) ? o.pasta : undefined, data: ehTexto(o.data) ? o.data : undefined, titulo: ehTexto(o.titulo) ? o.titulo : undefined, comImagens: o.comImagens !== false };
+      return { tipo: 'anotacao', pasta: ehTexto(o.pasta) ? o.pasta : undefined, data: ehTexto(o.data) ? o.data : undefined, registroIds: Array.isArray(o.registroIds) ? o.registroIds.filter(ehTexto) : undefined, titulo: ehTexto(o.titulo) ? o.titulo : undefined, comImagens: o.comImagens !== false };
     default:
       erros.push(`${onde}: tipo "${String(o.tipo)}" não existe.`);
       return undefined;

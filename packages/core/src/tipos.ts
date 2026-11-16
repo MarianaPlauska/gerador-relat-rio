@@ -141,6 +141,26 @@ export interface CapturaLida
   ondas: number;
   avisos: string[];
   sugestoes: string[];
+  // o que a supervisora acha desta etapa/print
+  comentario?: string | undefined;
+  // texto do print que não virou card nem total, e o que já tinha sido visto antes
+  naoReconhecido?: string[] | undefined;
+  repetidos?: { codigo: string; mudou: string[] }[] | undefined;
+  novos?: string[] | undefined;
+}
+
+// uma entrada do diário da pasta: prints + comentários unidos em um texto, guardada com dia e motivo
+export interface RegistroPainel
+{
+  id: string;
+  pasta: string;
+  data: string;
+  criadoEm: string;
+  motivo: string;
+  resumo: string;
+  texto: string;
+  capturas: CapturaLida[];
+  cards: string[];
 }
 
 // o que a supervisão escreveu e o material de explicações gerado sobre a etapa

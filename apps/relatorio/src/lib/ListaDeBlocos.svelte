@@ -2,7 +2,7 @@
   import { nomesSecoes, nomesTotais, type Bloco, type SecaoPadrao, type TotaisPainel } from '@supervisao/core';
   import { rotuloBloco } from './modelos.ts';
 
-  let { blocos, onmudar, listas = [], fluxos = [], pessoas = [], pastas = [], fotosComMaterial = [] }: { blocos: Bloco[]; onmudar: (novos: Bloco[]) => void; listas?: { id: string; nome: string }[]; fluxos?: { id: string; nome: string }[]; pessoas?: { id: string; nome: string }[]; pastas?: string[]; fotosComMaterial?: { data: string; pasta?: string | undefined; resumo?: string | undefined }[] } = $props();
+  let { blocos, onmudar, listas = [], fluxos = [], pessoas = [], pastas = [], registrosLista = [] }: { blocos: Bloco[]; onmudar: (novos: Bloco[]) => void; listas?: { id: string; nome: string }[]; fluxos?: { id: string; nome: string }[]; pessoas?: { id: string; nome: string }[]; pastas?: string[]; registrosLista?: { id: string; data: string; pasta: string; motivo: string }[] } = $props();
 
   const indicadores = Object.entries(nomesTotais) as [keyof TotaisPainel, string][];
   const secoesFora = $derived((Object.keys(nomesSecoes) as SecaoPadrao[]).filter((s) => !blocos.some((b) => b.tipo === 'secao' && b.secao === s)));
@@ -96,22 +96,22 @@
             </label>
             <label>Título (opcional) <input value={b.titulo ?? ''} oninput={(e) => mudar(i, { ...b, titulo: e.currentTarget.value || undefined })} /></label>
           {:else if b.tipo === 'anotacao'}
-            <label>Pasta (ex.: DEV)
-              <select value={b.pasta ?? ''} onchange={(e) => mudar(i, { ...b, pasta: e.currentTarget.value || undefined })}>
+            <label>Pasta
+              <select value={b.pasta ?? ''} onchange={(e) => mudar(i, { ...b, pasta: e.currentTarget.value || undefined, registroIds: undefined })}>
                 <option value="">Todas as pastas</option>
                 {#each pastas as p (p)}<option value={p}>{p}</option>{/each}
               </select>
             </label>
-            <label>Registro específico
-              <select value={b.data ?? ''} onchange={(e) => mudar(i, { ...b, data: e.currentTarget.value || undefined })}>
-                <option value="">Foto do período do relatório</option>
-                {#each fotosComMaterial as f (`${f.pasta ?? ''}_${f.data}`)}
-                  <option value={f.data}>{f.pasta ? `[${f.pasta}] ` : ''}{f.data}{f.resumo ? ` — ${f.resumo.slice(0, 40)}` : ''}</option>
+            <label>Quais registros
+              <select value={b.registroIds?.[0] ?? ''} onchange={(e) => mudar(i, { ...b, registroIds: e.currentTarget.value ? [e.currentTarget.value] : undefined })}>
+                <option value="">Todos do período do relatório</option>
+                {#each registrosLista.filter((r) => !b.pasta || r.pasta === b.pasta) as r (r.id)}
+                  <option value={r.id}>{r.data} · {r.pasta}{r.motivo ? ` · ${r.motivo.slice(0, 40)}` : ''}</option>
                 {/each}
               </select>
             </label>
-            <label>Título (opcional) <input value={b.titulo ?? ''} oninput={(e) => mudar(i, { ...b, titulo: e.currentTarget.value || undefined })} placeholder="Material da etapa e palavras da autora" /></label>
-            <label class="marca"><input type="checkbox" checked={b.comImagens !== false} onchange={(e) => mudar(i, { ...b, comImagens: e.currentTarget.checked })} /> incluir imagens / prints salvos</label>
+            <label>Título (opcional) <input value={b.titulo ?? ''} oninput={(e) => mudar(i, { ...b, titulo: e.currentTarget.value || undefined })} placeholder="Registros do diário do painel" /></label>
+            <label class="marca"><input type="checkbox" checked={b.comImagens !== false} onchange={(e) => mudar(i, { ...b, comImagens: e.currentTarget.checked })} /> incluir os prints</label>
           {:else if b.tipo === 'tabela'}
             <label>Legenda (opcional) <input value={b.titulo ?? ''} oninput={(e) => mudar(i, { ...b, titulo: e.currentTarget.value || undefined })} /></label>
             <div class="indicadores">
@@ -136,7 +136,7 @@
   <button onclick={() => adicionar({ tipo: 'lista', comDiario: true })}>+ Lista de checagem</button>
   <button onclick={() => adicionar({ tipo: 'fluxograma', fluxoId: fluxos[0]?.id })}>+ Fluxograma</button>
   <button onclick={() => adicionar({ tipo: 'pessoa', pessoaId: pessoas[0]?.id })}>+ 1:1 de pessoa</button>
-  <button onclick={() => adicionar({ tipo: 'anotacao', comImagens: true })}>+ Material da etapa</button>
+  <button onclick={() => adicionar({ tipo: 'anotacao', comImagens: true })}>+ Diário do painel</button>
   {#if secoesFora.length}
     <select value="" onchange={(e) => { const s = e.currentTarget.value as SecaoPadrao; e.currentTarget.value = ''; if (s) adicionar({ tipo: 'secao', secao: s }); }}>
       <option value="">+ Seção pronta...</option>

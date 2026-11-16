@@ -12,7 +12,7 @@
   import { chaveDoRelatorio } from '#lib/modelos.ts';
   import { nuvem, sairDaNuvem } from '#lib/nuvem.svelte.ts';
   import { baixarTexto, copiar, textoPacote, textoTeams } from '#lib/saidas.ts';
-  import { contextoDaSemana, dataCurta, dataMedia, hoje, periodoDaSemana, semanasDisponiveis } from '#lib/semana.ts';
+  import { contextoDaSemana, dataCurta, dataMedia, hoje, periodoDaSemana, semaforoDoRelatorio, semanasDisponiveis } from '#lib/semana.ts';
   import { lerSessao } from '#lib/sessao.ts';
 
   const dados = $state<Dados>(carregar());
@@ -99,6 +99,29 @@
     salvar($state.snapshot(dados));
     goto(`/relatorio?semana=${semana}`);
   }
+  const nomesSemaforo: Record<string, string> = { verde: 'No caminho', amarelo: 'Atenção', vermelho: 'Fora da meta' };
+  const semaforo = $derived(semaforoDoRelatorio(ctx, {}));
+  const cardsFoto = $derived(ultimaFoto?.cards ?? []);
+  const base = $derived(cardsFoto.filter((c) => c.origens.includes('em_execucao')).length ? cardsFoto.filter((c) => c.origens.includes('em_execucao')) : cardsFoto);
+  const pessoasPainel = $derived(dados.pessoas.map((p) =>
+  {
+    const meus = base.filter((c) => c.responsavelEtapaAtual === p.id);
+    return { pessoa: p, total: meus.length, noRitmo: meus.filter((c) => c.ritmoPainel === 'no_ritmo').length, emRisco: meus.filter((c) => c.ritmoPainel === 'em_risco').length, atrasado: meus.filter((c) => c.ritmoPainel === 'atrasado').length };
+  }));
+  const atencao = $derived(
+    base
+      .filter((c) => c.ritmoPainel === 'atrasado' || c.ritmoPainel === 'em_risco' || c.situacao === 'atrasado')
+      .sort((a, b) => Number(b.ritmoPainel === 'atrasado' || b.situacao === 'atrasado') - Number(a.ritmoPainel === 'atrasado' || a.situacao === 'atrasado'))
+      .slice(0, 6),
+  );
+  const vencimentos = $derived(
+    cardsFoto
+      .filter((c) => c.vencimento && c.vencimento >= dia && c.vencimento <= somarDias(dia, 15))
+      .sort((a, b) => (a.vencimento ?? '').localeCompare(b.vencimento ?? ''))
+      .slice(0, 6),
+  );
+  const registrosRecentes = $derived([...dados.registros].sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm)).slice(0, 3));
+
 </script>
 
 <main>
@@ -116,6 +139,25 @@
     <p class="aviso">Nenhuma foto do painel ainda. <a href="/painel">Colar o painel</a> para começar.</p>
   {:else if diasDesdeFoto >= 2}
     <p class="aviso">A última foto do painel é de {dataCurta(ultimaFoto.data)}, há {diasDesdeFoto} dias úteis. <a href="/painel">Colar o painel</a></p>
+  {/if}
+
+  {#if ultimaFoto}
+    <section class="situacao {semaforo ?? 'sem'}">
+      <div class="sit-status">
+        <span class="sit-rotulo">como estamos hoje</span>
+        <b class="sit-valor">{semaforo ? nomesSemaforo[semaforo] : 'Sem leitura'}</b>
+        <span class="sit-detalhe">
+          {#if t.dentroDoPrazoPct !== undefined}{t.dentroDoPrazoPct}% dentro do prazo{ctx.meta !== undefined ? ` · meta ${ctx.meta}%` : ''}{:else}cole um painel para medir o prazo{/if}
+        </span>
+      </div>
+      <div class="sit-itens">
+        <div><b>{base.length}</b><span>demandas em acompanhamento</span></div>
+        <div class:vermelho={atencao.filter((c) => c.ritmoPainel === 'atrasado' || c.situacao === 'atrasado').length > 0}><b>{atencao.filter((c) => c.ritmoPainel === 'atrasado' || c.situacao === 'atrasado').length}</b><span>atrasadas</span></div>
+        <div class:amarelo={atencao.filter((c) => c.ritmoPainel === 'em_risco').length > 0}><b>{atencao.filter((c) => c.ritmoPainel === 'em_risco').length}</b><span>em risco</span></div>
+        <div><b>{vencimentos.length}</b><span>vencem em 15 dias</span></div>
+      </div>
+      <span class="sit-data">painel de {dataMedia(ultimaFoto.data)}</span>
+    </section>
   {/if}
 
   <section class="kpis">
@@ -149,11 +191,61 @@
     </a>
   </section>
 
+  <section class="atalhos">
+    <a href="/painel"><b>＋ Novo registro</b><span>cole prints e comente</span></a>
+    <a href="/relatorio"><b>Gerar relatório</b><span>PDF ou link</span></a>
+    <a href="/fluxos"><b>Novo fluxo</b><span>de texto, semana ou registro</span></a>
+    <a href="/semana"><b>Plano da semana</b><span>entregas e alertas</span></a>
+  </section>
+  
+  <div class="grade controle">
+    <section class="cartao">
+      <h2>Precisa de atenção</h2>
+      {#each atencao as c (c.codigo)}
+        <p class="linha-fluxo">
+          <b class="maquina">{c.codigo}</b> {c.titulo ?? ''}
+          <span class="dica">{[c.etapaAtual, c.responsavelEtapaAtual && nomePessoa(c.responsavelEtapaAtual), c.ritmoPainel && c.ritmoPainel.replace('_', ' '), c.previsao && `previsão ${dataMedia(c.previsao)}`].filter(Boolean).join(' · ')}</span>
+        </p>
+      {:else}
+        <p class="dica">{ultimaFoto ? 'Nenhuma demanda atrasada ou em risco na última leitura.' : 'Sem leitura do painel ainda.'}</p>
+      {/each}
+      {#if vencimentos.length}
+        <h3 class="sub-h">Vencendo nos próximos 15 dias</h3>
+        {#each vencimentos as c (c.codigo)}
+          <p class="linha-fluxo"><b class="maquina">{c.codigo}</b> {c.titulo ?? ''} <span class="dica">vence {dataMedia(c.vencimento)}</span></p>
+        {/each}
+      {/if}
+    </section>
+  
+    <section class="cartao">
+      <h2>Demandas por pessoa</h2>
+      {#each pessoasPainel as x (x.pessoa.id)}
+        <div class="pessoa">
+          <div class="linha"><b>{x.pessoa.nome}</b><span class="dica maquina">{x.total} {x.total === 1 ? 'demanda' : 'demandas'}</span></div>
+          <span class="pilha" title="no ritmo / em risco / atrasadas">
+            <span class="p-ok" style:flex={x.noRitmo}></span><span class="p-risco" style:flex={x.emRisco}></span><span class="p-atraso" style:flex={x.atrasado}></span>
+            {#if !x.total}<span class="p-vazio"></span>{/if}
+          </span>
+          <span class="dica maquina">{x.noRitmo} no ritmo · {x.emRisco} em risco · {x.atrasado} atrasadas</span>
+        </div>
+      {/each}
+    </section>
+  </div>
+  
+  <section class="cartao diario-recente">
+    <div class="linha"><h2>Últimos registros do diário</h2><a class="link-secao" href="/painel">abrir diário</a></div>
+    {#each registrosRecentes as r (r.id)}
+      <p class="linha-fluxo"><b>{dataCurta(r.data)} · {r.pasta}</b> {r.motivo || r.resumo || 'Sem motivo'} <span class="dica">{r.capturas.length} prints · {r.cards.length} cards</span></p>
+    {:else}
+      <p class="dica">Nada guardado ainda. Cole um print no diário e comente: ele fica aqui para virar relatório quando você quiser.</p>
+    {/each}
+  </section>
+
   <div class="grade">
     <section class="cartao">
       <h2>Hoje</h2>
       {#if ehSexta}
-        <p class="rotina">Sexta: <a href="/semana">fechar a semana</a>{#if vivoDaSemana}, depois <a href="/vivos?id={vivoDaSemana.id}">abrir o relatório vivo</a>{/if}.</p>
+        <p class="rotina">Sexta: <a href="/semana">fechar a semana</a>{#if vivoDaSemana}, depois <a href="/vivos?id={vivoDaSemana.id}">abrir o checklist diário</a>{/if}.</p>
       {/if}
       {#if fimDeMes}
         <p class="rotina">Fim do mês: <a href="/mes">gerar o relatório do período</a>.</p>
@@ -177,7 +269,7 @@
           </li>
         {/each}
       </ul>
-      {#if !vivosAbertos.length}<a class="link-secao" href="/vivos">criar um relatório vivo para preencher todo dia</a>{/if}
+      {#if !vivosAbertos.length}<a class="link-secao" href="/vivos">criar um checklist diário para preencher todo dia</a>{/if}
     </section>
 
     <section class="cartao">
@@ -227,7 +319,7 @@
               {#each fluxo.parados.slice(0, 5) as x (x.card.codigo)}
                 <p class="linha-fluxo"><b class="maquina">{x.card.codigo}</b> {x.card.titulo} <span class="dica">{x.idadeDias.toLocaleString('pt-BR')} d aberto, normal até {x.limiteDias.toLocaleString('pt-BR')} d ({x.base}){x.card.responsaveis.length ? ` - ${x.card.responsaveis.map(nomePessoa).join(', ')}` : ''}</span></p>
               {:else}
-                <p class="dica">{fluxo.tempos.geral ? 'Nenhuma demanda aberta além do normal.' : 'Importe o CSV da lista de Demandas em Colar painel para medir o normal.'}</p>
+                <p class="dica">{fluxo.tempos.geral ? 'Nenhuma demanda aberta além do normal.' : 'Importe o CSV da lista de Demandas no Diário do painel para medir o normal.'}</p>
               {/each}
             </div>
             <div>
@@ -849,4 +941,33 @@
       grid-template-columns: 1fr;
     }
   }
+  .situacao { display: grid; grid-template-columns: auto 1fr auto; gap: var(--size-5); align-items: center; padding: var(--size-4) var(--size-5); margin-bottom: var(--size-4); border-radius: var(--raio); border: 1px solid var(--borda); border-left: 6px solid var(--borda-forte); background: var(--superficie); }
+  .situacao.verde { border-left-color: var(--verde); background: linear-gradient(90deg, var(--verde-fundo), var(--superficie) 60%); }
+  .situacao.amarelo { border-left-color: var(--amarelo); background: linear-gradient(90deg, var(--amarelo-fundo), var(--superficie) 60%); }
+  .situacao.vermelho { border-left-color: var(--vermelho); background: linear-gradient(90deg, var(--vermelho-fundo), var(--superficie) 60%); }
+  .sit-status { display: flex; flex-direction: column; gap: 2px; }
+  .sit-rotulo { font-family: var(--fonte-maquina); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--suave); }
+  .sit-valor { font-family: var(--fonte-maquina); font-size: 1.8rem; line-height: 1.1; }
+  .sit-detalhe { font-size: 0.86rem; color: var(--suave); }
+  .sit-itens { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--size-3); }
+  .sit-itens div { display: flex; flex-direction: column; padding-left: var(--size-3); border-left: 1px dashed var(--borda-forte); }
+  .sit-itens b { font-family: var(--fonte-maquina); font-size: 1.6rem; }
+  .sit-itens span { font-size: 0.78rem; color: var(--suave); }
+  .sit-itens .vermelho b { color: var(--vermelho); }
+  .sit-itens .amarelo b { color: var(--amarelo); }
+  .sit-data { font-family: var(--fonte-maquina); font-size: 0.78rem; color: var(--suave); }
+  .atalhos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--size-3); margin-bottom: var(--size-4); }
+  .atalhos a { display: flex; flex-direction: column; gap: 2px; padding: var(--size-3) var(--size-4); border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie); color: var(--texto); text-decoration: none; transition: border-color 0.2s, transform 0.2s; }
+  .atalhos a:hover { border-color: var(--marca); transform: translateY(-2px); }
+  .atalhos b { font-family: var(--fonte-maquina); }
+  .atalhos span { font-size: 0.78rem; color: var(--suave); }
+  .controle { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); margin-bottom: var(--size-4); }
+  .sub-h { font-size: 0.85rem; margin: var(--size-4) 0 var(--size-2); }
+  .pilha { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--borda); }
+  .p-ok { background: var(--verde); }
+  .p-risco { background: var(--amarelo); }
+  .p-atraso { background: var(--vermelho); }
+  .p-vazio { flex: 1; background: var(--borda); }
+  .diario-recente { margin-bottom: var(--size-4); }
+  @media (max-width: 900px) { .situacao, .controle { grid-template-columns: 1fr; } .sit-itens, .atalhos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>

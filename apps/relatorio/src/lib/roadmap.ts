@@ -22,7 +22,7 @@ export const roadmap: EtapaRoadmap[] = [
       { titulo: 'Relatórios em PDF', texto: 'Mais de dez modelos, período livre, blocos inseríveis, fluxogramas e modelos criados por você.', situacao: 'pronto' },
       { titulo: 'Listas e fluxogramas', texto: 'Checklists com fases e diário, editor de fluxo de arrastar e ligar.', situacao: 'pronto' },
       { titulo: 'Conta e link interativo', texto: 'Entrar com e-mail e senha, guardar na nuvem e enviar relatório por link com marcas e comentários.', situacao: 'pronto' },
-      { titulo: 'Relatório vivo, visão do mês e 1:1', texto: 'Relatório preenchido todo dia, visão mensal e uma página por pessoa para a conversa 1:1.', situacao: 'pronto' },
+      { titulo: 'Checklist diário, visão do mês e 1:1', texto: 'Relatório preenchido todo dia, visão mensal e uma página por pessoa para a conversa 1:1.', situacao: 'pronto' },
       { titulo: 'Paleta de comandos', texto: 'Ctrl+K abre qualquer tela, lista, fluxo ou card.', situacao: 'pronto' },
       { titulo: 'Escrever com IA local', texto: 'Rascunho de texto gerado no seu navegador, sem pagar nem enviar dados. Exige Chrome ou Edge com WebGPU.', situacao: 'andando' },
     ],
@@ -45,7 +45,7 @@ export const roadmap: EtapaRoadmap[] = [
   {
     periodo: '2027, segundo semestre',
     itens: [
-      { titulo: 'Equipe na mesma conta', texto: 'Mais de uma pessoa editando o mesmo relatório vivo.', situacao: 'planejado' },
+      { titulo: 'Equipe na mesma conta', texto: 'Mais de uma pessoa editando o mesmo checklist diário.', situacao: 'planejado' },
       { titulo: 'Visão anual', texto: 'O ano em uma tela: meses, entregas, riscos e decisões.', situacao: 'planejado' },
     ],
   },

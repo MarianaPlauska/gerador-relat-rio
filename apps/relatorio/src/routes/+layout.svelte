@@ -36,7 +36,7 @@
       id: 'painel',
       nome: 'Painel e Cards',
       itens: [
-        { href: '/painel', nome: 'Colar painel', dica: 'Prints, transcrição por imagem, etapas e pastas (DEV...)' },
+        { href: '/painel', nome: 'Diário do painel', dica: 'Cole prints, comente cada um e guarde por pasta (DEV...)' },
         { href: '/cards', nome: 'Cards', dica: 'Busca, filtros e detalhes das demandas lidas' },
       ],
     },
@@ -46,7 +46,7 @@
       itens: [
         { href: '/semana', nome: 'Semana', dica: 'Plano semanal, entregas, alertas e compromissos' },
         { href: '/mes', nome: 'Mês', dica: 'Visão consolidada do período e evolução' },
-        { href: '/vivos', nome: 'Vivos', dica: 'Relatórios vivos e checklist diário' },
+        { href: '/vivos', nome: 'Checklist diário', dica: 'Tarefas do período para marcar e registrar o dia' },
       ],
     },
     {
@@ -187,8 +187,6 @@
           <DropdownMenu.Content class="menu-conta" sideOffset={8} align="end">
             <div class="menu-titulo">{nome || 'sem nome'}</div>
             <DropdownMenu.Item class="menu-item" onSelect={() => goto('/perfil')}>Meu perfil</DropdownMenu.Item>
-            <DropdownMenu.Item class="menu-item" onSelect={() => goto('/retornos')}>Retornos dos links</DropdownMenu.Item>
-            <DropdownMenu.Item class="menu-item" onSelect={() => goto('/modelos')}>Modelos de relatório</DropdownMenu.Item>
             <DropdownMenu.Item class="menu-item" onSelect={() => exportarJson(carregar())}>Baixar backup</DropdownMenu.Item>
             <DropdownMenu.Item class="menu-item" onSelect={trocarTema}>Tema {escuro ? 'claro' : 'escuro'}</DropdownMenu.Item>
             <DropdownMenu.Separator class="menu-separador" />
@@ -217,7 +215,7 @@
         <p>Supervisão de desenvolvimento: do painel do gestor ao relatório.</p>
       </div>
       <div class="rodape-links">
-        <a href="/painel">Colar painel</a>
+        <a href="/painel">Diário do painel</a>
         <a href="/listas">Listas</a>
         <a href="/fluxos">Fluxos</a>
         <a href="/modelos">Modelos</a>

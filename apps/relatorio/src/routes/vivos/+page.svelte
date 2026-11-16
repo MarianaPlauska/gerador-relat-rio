@@ -97,7 +97,7 @@
     {@const atraso = diasSemRegistro(v, dia, definicoesPadrao.feriados)}
     <header>
       <div>
-        <span class="prompt">&gt; <a href="/vivos">vivos</a> / {acharModelo(dados, v.modeloId).nome}</span>
+        <span class="prompt">&gt; <a href="/vivos">checklist diário</a> / {acharModelo(dados, v.modeloId).nome}</span>
         <h1>{v.nome}<span class="cursor">_</span></h1>
       </div>
       <button class="principal" onclick={() => abrirNoRelatorio(v)}>Abrir no Relatório</button>
@@ -193,11 +193,11 @@
     </div>
   {:else}
     <span class="prompt">&gt; vivos</span>
-    <h1>Relatórios vivos<span class="cursor">_</span></h1>
+    <h1>Checklist diário<span class="cursor">_</span></h1>
     <p class="dica">Um relatório que fica aberto: você registra um pouco por dia, marca o checklist e, no fim, gera o PDF.</p>
 
     <section class="cartao">
-      <h2>Novo relatório vivo</h2>
+      <h2>Novo checklist diário</h2>
       <div class="form">
         <label>Nome <input bind:value={nome} placeholder="deixe vazio para usar o nome do modelo" /></label>
         <label>Modelo

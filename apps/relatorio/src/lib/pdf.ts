@@ -2,7 +2,7 @@ import pdfMake from 'pdfmake/build/pdfmake';
 import type { Content, CustomTableLayout, TableCell, TDocumentDefinitions } from 'pdfmake/interfaces';
 import
 {
-  aplicarControle, diarioDoPeriodo, estatisticasDoPlano, itensDaFase, kpisDosItens, pendenciasPorEtapa, progressoDosItens, situacaoDaFase, lerDicionario, mapaDeDores, mapaDeFrentes, nomesSecoes, nomesTotais, posicaoNaFaixa,
+  aplicarControle, diarioDoPeriodo, estatisticasDoPlano, filtrarRegistros, itensDaFase, kpisDosItens, pendenciasPorEtapa, progressoDosItens, situacaoDaFase, lerDicionario, mapaDeDores, mapaDeFrentes, nomesSecoes, nomesTotais, posicaoNaFaixa,
   resumirSerie, resumoDoFluxo, ritmoPorPessoa, segundaDaSemana, semanaDoAno, serieSemanal, somarDias, textoProjecao,
   type Bloco, type CorSemaforo, type ItemPlano, type Modelo, type ResumoSerie, type Ritmo, type SecaoPadrao, type Tendencia, type TotaisPainel,
 } from '@supervisao/core';
@@ -354,22 +354,11 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
     });
   }
   if (resumo.trim()) conteudo.push(p(resumo));
-  const anotacaoResumo = atual.foto?.anotacao;
-  if (anotacaoResumo && !blocos.some((b) => b.tipo === 'anotacao'))
+  const registrosResumo = blocos.some((b) => b.tipo === 'anotacao') ? [] : filtrarRegistros(dados.registros, { de: atual.inicio, ate: ctx.fim });
+  if (registrosResumo.length)
   {
-    if (anotacaoResumo.palavrasDaAutora?.trim() && anotacaoResumo.palavrasDaAutora.trim() !== resumo.trim())
-    {
-      conteudo.push({ text: 'Palavras da autora', style: 'h3', headlineLevel: 3 });
-      conteudo.push(p(anotacaoResumo.palavrasDaAutora));
-    }
-    if (anotacaoResumo.etapas.length)
-    {
-      conteudo.push(tabela('Etapas e descritivo do que será feito', ['Etapa', 'Descritivo / o que foi entendido', 'Situação'], anotacaoResumo.etapas.map((e, idx) => [
-        { stack: [{ text: `${idx + 1}. ${e.texto}`, bold: true }, e.cards?.length ? pequeno(e.cards.join(', ')) : ''] },
-        e.descricao ?? '-',
-        marcador(e.feito ? 'feito' : 'pendente', e.feito ? cores.verde : cores.amarelo),
-      ]), [150, '*', 55], 'material da supervisão'));
-    }
+    conteudo.push({ text: 'Registros do diário no período', style: 'h3', headlineLevel: 3 });
+    conteudo.push({ ul: registrosResumo.map((r) => `${dataMedia(r.data)} (${r.pasta}) — ${r.motivo || r.resumo}`), style: 'p' });
   }
   conteudo.push(tabela('Quadro-resumo dos indicadores-chave', ['Indicador', livre ? 'Início' : 'Semana anterior', livre ? 'Fim' : 'Esta semana', 'Variação'], [
     ['Dentro do prazo', direita(num(ta.dentroDoPrazoPct, '%')), direita(num(t.dentroDoPrazoPct, '%'), { bold: true }), vs(dif(ta.dentroDoPrazoPct, t.dentroDoPrazoPct), true, ' pp')],
@@ -1048,62 +1037,29 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
 
   function desenharAnotacao(b: Extract<Bloco, { tipo: 'anotacao' }>)
   {
-    const candidatas = dados.fotos.filter((f) =>
-      (f.anotacao || f.capturas?.some((c) => c.imagemDataUrl)) &&
-      (!b.pasta || (f.pasta ?? dados.prefixo) === b.pasta) &&
-      (b.data ? f.data === b.data : f.data >= atual.inicio && f.data <= ctx.fim),
-    );
-    const alvos = candidatas.length ? candidatas : atual.foto && (atual.foto.anotacao || atual.foto.capturas?.length) ? [atual.foto] : [];
+    const alvos = filtrarRegistros(dados.registros, { pasta: b.pasta, ids: b.registroIds, data: b.data, de: atual.inicio, ate: ctx.fim });
+    conteudo.push(h1(b.titulo || 'Registros do diário do painel'));
     if (!alvos.length)
     {
-      conteudo.push(h1(b.titulo || 'Material da etapa e palavras da autora'));
-      conteudo.push(p('Nenhum material de etapa ou imagem salva neste período.'));
+      conteudo.push(p('Nenhum registro do diário neste período.'));
       return;
     }
-    for (const f of alvos)
+    for (const r of alvos)
     {
-      const pastaRotulo = f.pasta ?? dados.prefixo;
-      conteudo.push(h1(b.titulo || `Material da etapa — ${pastaRotulo} (${dataMedia(f.data)})`));
-      const a = f.anotacao;
-      if (a?.resumo)
+      conteudo.push(h2(`${dataMedia(r.data)} · ${r.pasta}${r.motivo ? ` · ${r.motivo}` : ''}`));
+      for (const paragrafo of r.texto.split('\n\n').filter(Boolean)) conteudo.push(p(paragrafo));
+      if (b.comImagens === false) continue;
+      for (const cap of r.capturas.filter((c) => c.imagemDataUrl))
       {
-        conteudo.push(h2('Resumo da etapa'));
-        conteudo.push(p(a.resumo));
-      }
-      if (a?.palavrasDaAutora)
-      {
-        conteudo.push(h2('Palavras da autora'));
-        conteudo.push(p(a.palavrasDaAutora));
-      }
-      if (a?.etapas.length)
-      {
-        conteudo.push(h2('Etapas descritas e o que foi entendido'));
-        conteudo.push(tabela(`Etapas de ${pastaRotulo} em ${dataMedia(f.data)}`, ['Etapa', 'Explicação da etapa', 'Cards', 'Situação'], a.etapas.map((e, idx) => [
-          { text: `${idx + 1}. ${e.texto}`, bold: true },
-          e.descricao ?? '-',
-          { text: e.cards?.join(', ') || '-', font: 'Maquina', fontSize: 8 },
-          marcador(e.feito ? 'feito' : 'a fazer', e.feito ? cores.verde : cores.amarelo),
-        ]), [130, '*', 65, 55], 'material da supervisão'));
-      }
-      if (b.comImagens !== false)
-      {
-        const comImg = (f.capturas ?? []).filter((c) => c.imagemDataUrl);
-        if (comImg.length)
-        {
-          conteudo.push(h2('Prints e imagens coladas'));
-          for (const cap of comImg)
-          {
-            conteudo.push({
-              unbreakable: true,
-              stack: [
-                legendaFigura(`${cap.nome} (${cap.cards.length} cards, ${cap.totais.length} totais)`),
-                { image: cap.imagemDataUrl!, width: LARGURA, alignment: 'center', margin: [0, 2, 0, 4] },
-                ...(cap.sugestoes.length ? [pequeno(`Sugestões: ${cap.sugestoes.join(' ')}`)] : []),
-                fonte(`print colado em ${dataMedia(f.data)} (${pastaRotulo})`),
-              ],
-            });
-          }
-        }
+        conteudo.push({
+          unbreakable: true,
+          stack: [
+            legendaFigura(`${cap.nome.split(' · ')[0]} (${cap.cards.length} cards, ${cap.totais.length} indicadores)`),
+            { image: cap.imagemDataUrl!, width: LARGURA, alignment: 'center', margin: [0, 2, 0, 4] },
+            ...(cap.comentario?.trim() ? [pequeno(`Comentário: ${cap.comentario.trim()}`)] : []),
+            fonte(`print do diário em ${dataMedia(r.data)} (${r.pasta})`),
+          ],
+        });
       }
     }
   }

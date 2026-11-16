@@ -16,6 +16,7 @@ export * from './leitor/mesclar';
 export * from './leitor/ondas';
 export * from './leitor/csv';
 export * from './leitor/anotacao';
+export * from './leitor/complemento';
 export * from './modelo';
 export * from './fluxo';
 export * from './checklist';

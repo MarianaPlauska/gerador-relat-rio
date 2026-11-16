@@ -56,7 +56,7 @@
     <select bind:value={mes} aria-label="Mês">
       {#each meses as m (m)}<option value={m}>{rotuloMes(m)}</option>{/each}
     </select>
-    <button onclick={criarVivo}>Criar relatório vivo do mês</button>
+    <button onclick={criarVivo}>Criar checklist diário do mês</button>
     <button class="principal" onclick={gerarRelatorio}>Gerar relatório do mês</button>
   </header>
 
