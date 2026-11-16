@@ -5,7 +5,7 @@ export type CorSemaforo = 'verde' | 'amarelo' | 'vermelho';
 // situação da lista do cronograma (cada item cai em uma só)
 export type Situacao = 'concluido' | 'atrasado' | 'vence_15_dias' | 'a_iniciar' | 'em_execucao' | 'sem_data';
 
-export type OrigemLeitura = 'em_execucao' | 'fila' | 'cronograma' | 'demandas' | 'card';
+export type OrigemLeitura = 'em_execucao' | 'fila' | 'cronograma' | 'demandas' | 'card' | (string & {});
 
 export interface Pessoa
 {

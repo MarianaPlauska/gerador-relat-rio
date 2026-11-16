@@ -26,13 +26,45 @@
     },
   ];
 
-  const nomesOrigem: Record<OrigemLeitura, string> = {
+  const nomesOrigemPadrao: Record<string, string> = {
     em_execucao: 'Quem está cuidando de quê',
     fila: 'Fila de demandas a iniciar',
     cronograma: 'Cronograma',
     demandas: 'Lista de demandas',
     card: 'Card aberto (etapas)',
   };
+
+  const obterNomeOrigem = (origem: string) => nomesOrigemPadrao[origem] || origem;
+  const nomesOrigem: Record<string, string> = new Proxy(nomesOrigemPadrao, {
+    get: (target, prop: string) => target[prop] || prop,
+  });
+
+  let criandoOpcaoPara = $state<string | null>(null);
+  let textoNovaOpcao = $state('');
+
+  function adicionarNovaOpcao(capId: string)
+  {
+    const nome = textoNovaOpcao.trim();
+    if (!nome)
+    {
+      criandoOpcaoPara = null;
+      return;
+    }
+    if (!dados.origensPersonalizadas) dados.origensPersonalizadas = [];
+    if (!dados.origensPersonalizadas.includes(nome) && !nomesOrigemPadrao[nome])
+    {
+      dados.origensPersonalizadas = [...dados.origensPersonalizadas, nome];
+    }
+    const cap = capturas.find((c) => c.id === capId);
+    if (cap)
+    {
+      cap.origem = nome;
+      cap.nome = `${cap.nome.split(' · ')[0]} · ${nome}`;
+      recalcular();
+    }
+    criandoOpcaoPara = null;
+    textoNovaOpcao = '';
+  }
 
   let dados = $state<Dados>(carregar());
   let aba = $state<'novo' | 'diario'>('novo');
@@ -315,17 +347,58 @@
   {#if aviso}<p class="aviso">{aviso}</p>{/if}
 
   {#if aba === 'novo'}
-    <section class="cartao passo" class:feito={capturas.length > 0}>
-      <h2><span class="num">{capturas.length ? '✓' : '1'}</span> Envie os prints do painel</h2>
-      <p class="dica">Cole com <b>Ctrl+V</b> (Win+Shift+S tira o print), arraste imagens ou escolha arquivos. Pode enviar vários, um depois do outro: o cronograma completo, as etapas de cada demanda, a fila... O sistema descobre sozinho o que é cada um.</p>
-      <textarea class="zona" rows="3" bind:value={caixa} onpaste={aoColar} ondrop={aoSoltar} ondragover={(e) => e.preventDefault()} placeholder="Clique aqui e cole (Ctrl+V) ou solte as imagens aqui"></textarea>
-      <div class="linha">
-        <label class="botao">Escolher imagens <input type="file" accept="image/*" multiple hidden onchange={(e) => lerImagens([...(e.currentTarget.files ?? [])])} /></label>
-        <label class="botao">Escolher CSV <input type="file" accept=".csv,text/csv" hidden onchange={async (e) => { const f = e.currentTarget.files?.[0]; if (f) registrarCaptura(await f.text(), `CSV ${f.name}`); e.currentTarget.value = ''; }} /></label>
-        <button onclick={() => { registrarCaptura(caixa, `Texto ${capturas.length + 1}`); caixa = ''; }} disabled={!caixa.trim()}>Ler o texto digitado</button>
-        {#if progresso !== null}<progress value={progresso}></progress>{/if}
-      </div>
-    </section>
+    {#if capturas.length === 0}
+      <section class="cartao passo upload-reduzido">
+        <div class="linha-entre topo-upload">
+          <h2><span class="num">1</span> Envie os prints do painel</h2>
+          <span class="dica-rapida">Cole prints (Ctrl+V), arraste imagens ou selecione arquivos:</span>
+        </div>
+        <textarea
+          class="zona-compacta"
+          rows="2"
+          bind:value={caixa}
+          onpaste={aoColar}
+          ondrop={aoSoltar}
+          ondragover={(e) => e.preventDefault()}
+          placeholder="Clique aqui e cole com Ctrl+V (Win+Shift+S tira o print) ou solte as imagens aqui"
+        ></textarea>
+        <div class="linha botoes-upload">
+          <label class="botao mini">Escolher imagens <input type="file" accept="image/*" multiple hidden onchange={(e) => lerImagens([...(e.currentTarget.files ?? [])])} /></label>
+          <label class="botao mini">Escolher CSV <input type="file" accept=".csv,text/csv" hidden onchange={async (e) => { const f = e.currentTarget.files?.[0]; if (f) registrarCaptura(await f.text(), `CSV ${f.name}`); e.currentTarget.value = ''; }} /></label>
+          <button class="mini" onclick={() => { registrarCaptura(caixa, `Texto ${capturas.length + 1}`); caixa = ''; }} disabled={!caixa.trim()}>Ler o texto digitado</button>
+          {#if progresso !== null}<progress value={progresso}></progress>{/if}
+        </div>
+      </section>
+    {:else}
+      <!-- QUANDO JÁ TEM PRINTS ENVIADOS: BARRA ULTRA-COMPACTA PARA NÃO OCUPAR ESPAÇO -->
+      <section class="cartao passo upload-barra-compacta feito">
+        <div class="linha-entre barra-compacta-conteudo">
+          <div class="status-upload-linha">
+            <span class="num mini">✓</span>
+            <span class="status-txt"><b>{capturas.length} {capturas.length === 1 ? 'print enviado' : 'prints enviados'}</b></span>
+          </div>
+          <div class="acoes-upload-rapido">
+            <textarea
+              class="zona-micro"
+              rows="1"
+              bind:value={caixa}
+              onpaste={aoColar}
+              ondrop={aoSoltar}
+              ondragover={(e) => e.preventDefault()}
+              placeholder="＋ Cole mais prints (Ctrl+V) ou solte aqui..."
+            ></textarea>
+            <div class="botoes-upload-feita">
+              <label class="botao mini">＋ Imagens <input type="file" accept="image/*" multiple hidden onchange={(e) => lerImagens([...(e.currentTarget.files ?? [])])} /></label>
+              <label class="botao mini">＋ CSV <input type="file" accept=".csv,text/csv" hidden onchange={async (e) => { const f = e.currentTarget.files?.[0]; if (f) registrarCaptura(await f.text(), `CSV ${f.name}`); e.currentTarget.value = ''; }} /></label>
+              {#if caixa.trim()}
+                <button class="mini" onclick={() => { registrarCaptura(caixa, `Texto ${capturas.length + 1}`); caixa = ''; }}>Ler texto</button>
+              {/if}
+              {#if progresso !== null}<progress value={progresso}></progress>{/if}
+            </div>
+          </div>
+        </div>
+      </section>
+    {/if}
 
     {#if capturas.length}
       <section class="cartao passo" class:feito={comentados > 0}>
@@ -339,13 +412,61 @@
             <div class="conteudo">
               <div class="linha-entre">
                 <b>#{idx + 1} {cap.nome.split(' · ')[0]}</b>
-                <span class="linha">
-                  <label class="mini">Entendi como
-                    <select bind:value={cap.origem} onchange={recalcular}>
-                      {#each Object.entries(nomesOrigem) as [v, n] (v)}<option value={v}>{n}</option>{/each}
-                    </select>
-                  </label>
-                  <button class="link perigo" onclick={() => removerCaptura(cap.id)}>remover</button>
+                <span class="linha linha-acoes-captura">
+                  {#if criandoOpcaoPara === cap.id}
+                    <div class="linha-nova-opcao">
+                      <input
+                        class="input-nova-opcao"
+                        bind:value={textoNovaOpcao}
+                        placeholder="Nome da opção (ex.: Homologação...)"
+                        onkeydown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); adicionarNovaOpcao(cap.id); }
+                          else if (e.key === 'Escape') { criandoOpcaoPara = null; }
+                        }}
+                      />
+                      <button class="btn-salvar-opcao" onclick={() => adicionarNovaOpcao(cap.id)}>Salvar</button>
+                      <button class="link" onclick={() => { criandoOpcaoPara = null; textoNovaOpcao = ''; }}>cancelar</button>
+                    </div>
+                  {:else}
+                    <label class="mini">Entendi como
+                      <select
+                        value={cap.origem}
+                        onchange={(e) => {
+                          const val = e.currentTarget.value;
+                          if (val === '__nova__') {
+                            criandoOpcaoPara = cap.id;
+                            textoNovaOpcao = '';
+                          } else {
+                            cap.origem = val;
+                            cap.nome = `${cap.nome.split(' · ')[0]} · ${obterNomeOrigem(val)}`;
+                            recalcular();
+                          }
+                        }}
+                      >
+                        <optgroup label="Padrões">
+                          {#each Object.entries(nomesOrigemPadrao) as [v, n] (v)}
+                            <option value={v}>{n}</option>
+                          {/each}
+                        </optgroup>
+                        {#if dados.origensPersonalizadas && dados.origensPersonalizadas.length > 0}
+                          <optgroup label="Personalizados">
+                            {#each dados.origensPersonalizadas as custom (custom)}
+                              <option value={custom}>{custom}</option>
+                            {/each}
+                          </optgroup>
+                        {/if}
+                        <option value="__nova__">＋ Criar nova opção...</option>
+                      </select>
+                    </label>
+                    <button
+                      class="btn-adicionar-opcao"
+                      onclick={() => { criandoOpcaoPara = cap.id; textoNovaOpcao = ''; }}
+                      title="Criar nova opção personalizada de classificação"
+                    >
+                      ＋
+                    </button>
+                    <button class="link perigo" onclick={() => removerCaptura(cap.id)}>remover</button>
+                  {/if}
                 </span>
               </div>
               <div class="chips">
@@ -494,8 +615,31 @@
   .passo h2 small { font-weight: 400; color: var(--suave); font-size: 0.8rem; }
   .num { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--superficie-2); color: var(--marca); font-family: var(--fonte-maquina); font-size: 0.95rem; }
   .passo.feito .num { background: var(--marca); color: var(--sobre-marca); }
+  .num.mini { width: 22px; height: 22px; font-size: 0.8rem; }
   textarea { width: 100%; background: var(--superficie-2); font-size: 0.9rem; margin: 6px 0; }
-  .zona { border: 2px dashed var(--borda-forte); text-align: center; padding: 18px; }
+
+  /* UPLOAD COMPACTO E REDUZIDO */
+  .upload-reduzido { padding: 12px 16px; }
+  .topo-upload h2 { margin: 0; font-size: 1.05rem; }
+  .dica-rapida { font-size: 0.8rem; color: var(--suave); }
+  .zona-compacta { border: 1.5px dashed var(--borda-forte); text-align: center; padding: 10px 14px; min-height: 48px; margin: 6px 0; border-radius: var(--raio-pequeno); resize: none; font-size: 0.84rem; }
+  .botoes-upload { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+
+  .upload-barra-compacta { padding: 8px 14px; margin-bottom: 12px; background: var(--superficie); border-left: 3px solid var(--marca); }
+  .barra-compacta-conteudo { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+  .status-upload-linha { display: flex; align-items: center; gap: 8px; flex: none; }
+  .status-txt { font-size: 0.86rem; color: var(--texto); }
+  .acoes-upload-rapido { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1; justify-content: flex-end; }
+  .zona-micro { width: 260px; min-width: 180px; height: 32px; padding: 5px 8px; font-size: 0.78rem; border: 1.5px dashed var(--borda-forte); border-radius: 4px; resize: none; margin: 0; }
+  .botoes-upload-feita { display: flex; align-items: center; gap: 6px; }
+
+  /* OPÇÃO PERSONALIZADA EM 'ENTENDI COMO' */
+  .linha-acoes-captura { display: flex; align-items: center; gap: 6px; }
+  .btn-adicionar-opcao { padding: 1px 7px; font-size: 0.85rem; font-weight: 700; background: var(--superficie); border: 1px solid var(--borda-forte); border-radius: 4px; color: var(--marca); cursor: pointer; line-height: 1.3; }
+  .btn-adicionar-opcao:hover { border-color: var(--marca); background: var(--marca-clara); }
+  .linha-nova-opcao { display: flex; align-items: center; gap: 6px; background: var(--superficie); padding: 3px 6px; border: 1px solid var(--marca); border-radius: 4px; }
+  .input-nova-opcao { font-size: 0.78rem; padding: 3px 6px; border: 1px solid var(--borda); border-radius: 3px; min-width: 150px; background: var(--fundo); color: var(--texto); }
+  .btn-salvar-opcao { font-size: 0.74rem; padding: 3px 8px; background: var(--marca); color: var(--sobre-marca); border: none; border-radius: 3px; cursor: pointer; font-weight: 600; }
   .captura { display: grid; grid-template-columns: minmax(180px, 280px) 1fr; gap: 14px; padding: 12px; margin: 10px 0; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie-2); }
   .img img { width: 100%; max-height: 240px; object-fit: contain; border-radius: 6px; border: 1px solid var(--borda); background: var(--fundo); }
   .sem-img { height: 100px; display: grid; place-items: center; border: 1px dashed var(--borda); border-radius: 6px; color: var(--suave); }

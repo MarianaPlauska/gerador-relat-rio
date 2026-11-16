@@ -56,11 +56,13 @@ export interface Dados
   vivos: RelatorioVivo[];
   // diário do painel: registros guardados por pasta, com dia, motivo, prints e comentários
   registros: RegistroPainel[];
+  // opções personalizadas de tipo para "Entendi como"
+  origensPersonalizadas?: string[];
 }
 
 function padrao(): Dados
 {
-  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [], vivos: [], registros: [] };
+  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [], vivos: [], registros: [], origensPersonalizadas: [] };
 }
 
 // campos que faltam ganham o padrão; listas antigas ganham fases e diário
