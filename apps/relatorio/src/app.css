@@ -31,7 +31,7 @@
   --vermelho-fundo: rgb(255 111 97 / 13%);
   --azul: #6aa8ff;
   --azul-fundo: rgb(106 168 255 / 13%);
-  --grade-fundo: rgb(255 255 255 / 3%);
+  --grade-fundo: rgb(255 255 255 / 4.5%);
   --sombra: 0 0 0 1px rgb(0 0 0 / 18%), 0 6px 18px rgb(0 0 0 / 22%);
   --brilho: 0 0 0 1px rgb(76 195 138 / 30%), 0 0 24px rgb(76 195 138 / 10%);
   --raio: var(--radius-3);
@@ -126,11 +126,14 @@ body
 {
   margin: 0;
   font-family: var(--fonte-texto);
-  background: var(--fundo);
+  background-color: var(--fundo);
+  background-image: linear-gradient(var(--grade-fundo) 1px, transparent 1px), linear-gradient(90deg, var(--grade-fundo) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-position: -1px -1px;
   color: var(--texto);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  transition: background var(--curva) 0.2s, color var(--curva) 0.2s;
+  transition: background-color var(--curva) 0.2s, color var(--curva) 0.2s;
 }
 
 a
