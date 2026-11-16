@@ -1,7 +1,9 @@
 <script lang="ts">
   import {
+    analisarTimeNoProjeto,
     definicoesPadrao,
     diasUteisEntre,
+    idCurto,
     segundaDaSemana,
     somarDias,
     type TotaisPainel,
@@ -18,8 +20,31 @@
 
   const dia = hoje();
   let semana = $state(segundaDaSemana(dia));
+  let projetoAtual = $state(dados.registros.at(-1)?.pasta ?? dados.prefixo ?? 'DEV');
+  let novoProjeto = $state('');
+  let novaPessoa = $state('');
+  let pessoaExpandida = $state<string | null>(null);
 
-  const ctx = $derived(contextoDaSemana(dados, semana));
+  const projetos = $derived(
+    [...new Set([
+      dados.prefixo || 'DEV',
+      ...dados.registros.map((r) => r.pasta),
+      ...dados.fotos.map((f) => f.pasta).filter((p): p is string => !!p),
+      ...dados.pessoas.flatMap((p) => p.pastas ?? []),
+      projetoAtual,
+    ])].filter(Boolean),
+  );
+
+  const fotosDoProjeto = $derived(
+    dados.fotos.filter((f) => (f.pasta ?? dados.prefixo ?? 'DEV').toUpperCase() === projetoAtual.toUpperCase()),
+  );
+
+  const dadosProjeto = $derived<Dados>({
+    ...dados,
+    fotos: fotosDoProjeto,
+  });
+
+  const ctx = $derived(contextoDaSemana(dadosProjeto, semana));
   const t = $derived<TotaisPainel>(ctx.atual.foto?.totais ?? {});
   const kp = $derived(ctx.comp.planoAtual);
 
@@ -27,20 +52,32 @@
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
   const primeiroNome = $derived((dados.identificacao.elaboradoPor || lerSessao()?.nome || 'Mariana').split(' ')[0]);
 
-  const ultimaFoto = $derived([...dados.fotos].filter((f) => f.data <= dia).sort((a, b) => a.data.localeCompare(b.data)).at(-1));
+  const ultimaFoto = $derived([...fotosDoProjeto].filter((f) => f.data <= dia).sort((a, b) => a.data.localeCompare(b.data)).at(-1));
   const diasDesdeFoto = $derived(ultimaFoto ? diasUteisEntre(ultimaFoto.data, dia, definicoesPadrao.feriados) : 0);
 
   const semaforo = $derived(semaforoDoRelatorio(ctx, {}));
   const nomesSemaforo: Record<string, string> = { verde: 'No caminho', amarelo: 'Atenção', vermelho: 'Fora da meta' };
 
   const cardsFoto = $derived(ultimaFoto?.cards ?? []);
-  const baseCards = $derived(cardsFoto.filter((c) => c.origens.includes('em_execucao')).length ? cardsFoto.filter((c) => c.origens.includes('em_execucao')) : cardsFoto);
+  const baseCards = $derived(
+    cardsFoto.filter((c) => c.origens.includes('em_execucao')).length
+      ? cardsFoto.filter((c) => c.origens.includes('em_execucao'))
+      : cardsFoto,
+  );
 
-  const atencao = $derived(
-    baseCards
-      .filter((c) => c.ritmoPainel === 'atrasado' || c.ritmoPainel === 'em_risco' || c.situacao === 'atrasado')
-      .sort((a, b) => Number(b.ritmoPainel === 'atrasado' || b.situacao === 'atrasado') - Number(a.ritmoPainel === 'atrasado' || a.situacao === 'atrasado'))
-      .slice(0, 5),
+  // Tarefas da semana sem exibir o nome de cada pessoa (foco na tarefa)
+  const tarefasDaSemana = $derived(
+    [...baseCards]
+      .sort((a, b) =>
+      {
+        const peso = (r?: string, s?: string) => (r === 'atrasado' || s === 'atrasado' ? 2 : r === 'em_risco' ? 1 : 0);
+        return peso(b.ritmoPainel, b.situacao) - peso(a.ritmoPainel, a.situacao);
+      })
+      .slice(0, 8),
+  );
+
+  const atencaoCount = $derived(
+    baseCards.filter((c) => c.ritmoPainel === 'atrasado' || c.ritmoPainel === 'em_risco' || c.situacao === 'atrasado').length,
   );
 
   const vencimentos = $derived(
@@ -50,22 +87,61 @@
       .slice(0, 4),
   );
 
-  const pessoasPainel = $derived(dados.pessoas.map((p) =>
-  {
-    const meus = baseCards.filter((c) => c.responsavelEtapaAtual === p.id);
-    return {
-      pessoa: p,
-      total: meus.length,
-      noRitmo: meus.filter((c) => c.ritmoPainel === 'no_ritmo').length,
-      emRisco: meus.filter((c) => c.ritmoPainel === 'em_risco').length,
-      atrasado: meus.filter((c) => c.ritmoPainel === 'atrasado').length,
-    };
-  }));
+  // Análise completa por pessoa no projeto selecionado (com expansão, disponibilidade, sugestões e rendimento semanal + acumulado)
+  const pessoasProjeto = $derived(
+    analisarTimeNoProjeto({
+      pessoas: dados.pessoas,
+      fotos: dados.fotos,
+      planos: dados.planos,
+      pasta: projetoAtual,
+      semanaInicio: semana,
+      semanaFim: somarDias(semana, 6),
+      hoje: dia,
+    }),
+  );
 
-  const ultimoRegistro = $derived([...dados.registros].sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm))[0]);
+  const registrosProjeto = $derived(
+    [...dados.registros]
+      .filter((r) => (r.pasta || 'DEV').toUpperCase() === projetoAtual.toUpperCase())
+      .sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm)),
+  );
+  const ultimoRegistro = $derived(registrosProjeto[0]);
 
-  function abrirUmAUm(pessoaId: string)
+  function criarProjeto()
   {
+    const p = novoProjeto.trim().toUpperCase();
+    if (!p) return;
+    projetoAtual = p;
+    novoProjeto = '';
+  }
+
+  function adicionarPessoaAoProjeto()
+  {
+    const nome = novaPessoa.trim();
+    if (!nome) return;
+    const id = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || idCurto();
+    const existente = dados.pessoas.find((p) => p.id === id || p.nome.toLowerCase() === nome.toLowerCase());
+    if (existente)
+    {
+      const atuais = existente.pastas ?? ['DEV'];
+      if (!atuais.includes(projetoAtual)) existente.pastas = [...atuais, projetoAtual];
+    }
+    else
+    {
+      dados.pessoas = [...dados.pessoas, { id, nome, capacidadeHorasSemana: 40, pastas: [projetoAtual] }];
+    }
+    novaPessoa = '';
+    pessoaExpandida = id;
+  }
+
+  function alternarPessoa(id: string)
+  {
+    pessoaExpandida = pessoaExpandida === id ? null : id;
+  }
+
+  function abrirUmAUm(pessoaId: string, e: MouseEvent)
+  {
+    e.stopPropagation();
     const chave = chaveDoRelatorio(periodoDaSemana(semana));
     const atuais = dados.relatorios[chave] ?? {};
     dados.relatorios[chave] = { ...atuais, blocos: { ...atuais.blocos, umaum: [{ tipo: 'pessoa', pessoaId }] } };
@@ -76,64 +152,81 @@
 </script>
 
 <main class="dashboard-executivo">
-  <!-- CABEÇALHO RESUMIDO COM MASCOTE TECH E SAUDAÇÃO -->
   <header class="topo-dashboard">
     <div class="boas-vindas">
       <CobrinhaMascote />
       <div class="titulos">
-        <span class="prompt">&gt; {saudacao.toLowerCase()}, {primeiroNome.toLowerCase()}</span>
+        <span class="prompt">&gt; {saudacao.toLowerCase()}, {primeiroNome.toLowerCase()} · projeto {projetoAtual.toLowerCase()}</span>
         <h1>Visão Executiva<span class="cursor">_</span></h1>
       </div>
     </div>
 
-    <div class="seletor-semana-caixa">
-      <label for="seletor-semana" class="etiqueta-semana">Semana ativa</label>
-      <select id="seletor-semana" bind:value={semana} aria-label="Semana">
-        {#each semanasDisponiveis(dados) as s (s)}
-          <option value={s}>{dataCurta(s)} a {dataCurta(somarDias(s, 4))}</option>
-        {/each}
-      </select>
+    <div class="controles-topo">
+      <div class="seletor-caixa">
+        <label for="seletor-projeto" class="etiqueta">Projeto</label>
+        <div class="linha-projeto">
+          <select id="seletor-projeto" bind:value={projetoAtual} aria-label="Projeto">
+            {#each projetos as proj (proj)}
+              <option value={proj}>{proj}</option>
+            {/each}
+          </select>
+          <input
+            class="input-novo-projeto"
+            bind:value={novoProjeto}
+            placeholder="Novo..."
+            onkeydown={(e) => e.key === 'Enter' && criarProjeto()}
+            aria-label="Nome do novo projeto"
+          />
+          {#if novoProjeto.trim()}
+            <button class="btn-mini" onclick={criarProjeto}>Criar</button>
+          {/if}
+        </div>
+      </div>
+
+      <div class="seletor-caixa">
+        <label for="seletor-semana" class="etiqueta">Semana ativa</label>
+        <select id="seletor-semana" bind:value={semana} aria-label="Semana">
+          {#each semanasDisponiveis(dados) as s (s)}
+            <option value={s}>{dataCurta(s)} a {dataCurta(somarDias(s, 4))}</option>
+          {/each}
+        </select>
+      </div>
     </div>
   </header>
 
-  <!-- AVISO DE ATUALIZAÇÃO DO PAINEL -->
   {#if !ultimaFoto}
     <div class="aviso-banner">
-      <span>Nenhum print ou leitura do painel salva ainda.</span>
-      <a href="/painel" class="btn-acao-banner">Colar painel no diário &rarr;</a>
+      <span>Nenhuma leitura do painel salva para o projeto <b>{projetoAtual}</b>.</span>
+      <a href="/painel" class="btn-acao-banner">Abrir diário do painel &rarr;</a>
     </div>
   {:else if diasDesdeFoto >= 2}
     <div class="aviso-banner suave">
-      <span>Última leitura do painel feita em {dataCurta(ultimaFoto.data)} (há {diasDesdeFoto} dias úteis).</span>
-      <a href="/painel" class="btn-acao-banner">Atualizar agora &rarr;</a>
+      <span>Última leitura do projeto <b>{projetoAtual}</b> feita em {dataCurta(ultimaFoto.data)} ({diasDesdeFoto} dias úteis).</span>
+      <a href="/painel" class="btn-acao-banner">Atualizar leitura &rarr;</a>
     </div>
   {/if}
 
-  <!-- 4 INDICADORES CHAVE (KPIS RESUMIDOS) -->
+  <!-- 4 INDICADORES CHAVE (KPIS DO SISTEMA E DA SEMANA) -->
   <section class="grade-kpis">
-    <!-- 1. SEMÁFORO GERAL -->
-    <div class="card-kpi {semaforo ?? 'neutro'}">
-      <span class="kpi-rotulo">Saúde da semana</span>
+    <div class="cartao card-kpi {semaforo ?? 'neutro'}">
+      <span class="etiqueta">Saúde da semana</span>
       <div class="kpi-valor-grupo">
-        <span class="kpi-icone-status">
-          {#if semaforo === 'verde'}🟢{:else if semaforo === 'amarelo'}🟡{:else if semaforo === 'vermelho'}🔴{:else}⚪{/if}
-        </span>
+        <span class="ponto-semaforo {semaforo ?? 'neutro'}" aria-hidden="true"></span>
         <strong class="kpi-valor-texto">{semaforo ? nomesSemaforo[semaforo] : 'Sem leitura'}</strong>
       </div>
       <span class="kpi-detalhe">
         {#if t.dentroDoPrazoPct !== undefined}
           {t.dentroDoPrazoPct}% dentro do prazo {ctx.meta ? `· meta ${ctx.meta}%` : ''}
         {:else}
-          Cole um print para avaliar
+          Cole um print no diário para medir
         {/if}
       </span>
     </div>
 
-    <!-- 2. ENTREGAS DO PLANO -->
-    <div class="card-kpi">
-      <span class="kpi-rotulo">Plano da semana</span>
+    <div class="cartao card-kpi">
+      <span class="etiqueta">Plano da semana</span>
       <div class="kpi-valor-grupo">
-        <strong class="kpi-valor-numero">{kp ? `${kp.feitos}/${kp.planejados}` : '0/0'}</strong>
+        <strong class="kpi-valor-numero num">{kp ? `${kp.feitos}/${kp.planejados}` : '0/0'}</strong>
         <span class="kpi-valor-sub">entregas</span>
       </div>
       <div class="kpi-progresso-linha">
@@ -142,32 +235,30 @@
       </div>
     </div>
 
-    <!-- 3. DEMANDAS EM ALERTA -->
-    <div class="card-kpi" class:alerta={atencao.length > 0}>
-      <span class="kpi-rotulo">Atenção imediata</span>
+    <div class="cartao card-kpi" class:alerta={atencaoCount > 0}>
+      <span class="etiqueta">Atenção imediata</span>
       <div class="kpi-valor-grupo">
-        <strong class="kpi-valor-numero" class:destaque-vermelho={atencao.length > 0}>{atencao.length}</strong>
-        <span class="kpi-valor-sub">{atencao.length === 1 ? 'demanda' : 'demandas'}</span>
+        <strong class="kpi-valor-numero num" class:destaque-vermelho={atencaoCount > 0}>{atencaoCount}</strong>
+        <span class="kpi-valor-sub">{atencaoCount === 1 ? 'demanda' : 'demandas'}</span>
       </div>
       <span class="kpi-detalhe">
-        {#if atencao.length === 0}
-          ✓ Nenhuma demanda atrasada
+        {#if atencaoCount === 0}
+          Nenhuma demanda atrasada
         {:else}
-          {atencao.filter((c) => c.ritmoPainel === 'atrasado' || c.situacao === 'atrasado').length} atrasadas · {atencao.filter((c) => c.ritmoPainel === 'em_risco').length} em risco
+          {baseCards.filter((c) => c.ritmoPainel === 'atrasado' || c.situacao === 'atrasado').length} atrasadas · {baseCards.filter((c) => c.ritmoPainel === 'em_risco').length} em risco
         {/if}
       </span>
     </div>
 
-    <!-- 4. REGISTROS DO DIÁRIO -->
-    <div class="card-kpi">
-      <span class="kpi-rotulo">Diário do painel</span>
+    <div class="cartao card-kpi">
+      <span class="etiqueta">Diário ({projetoAtual})</span>
       <div class="kpi-valor-grupo">
-        <strong class="kpi-valor-numero">{dados.registros.length}</strong>
-        <span class="kpi-valor-sub">registros</span>
+        <strong class="kpi-valor-numero num">{registrosProjeto.length}</strong>
+        <span class="kpi-valor-sub">{registrosProjeto.length === 1 ? 'registro' : 'registros'}</span>
       </div>
       <span class="kpi-detalhe">
         {#if ultimoRegistro}
-          Último em {dataCurta(ultimoRegistro.data)} · {ultimoRegistro.pasta || 'DEV'}
+          Último em {dataCurta(ultimoRegistro.data)}
         {:else}
           Nenhum registro arquivado
         {/if}
@@ -175,76 +266,49 @@
     </div>
   </section>
 
-  <!-- 4 ATALHOS RÁPIDOS EM DESTAQUE -->
-  <section class="grade-atalhos">
-    <a href="/painel" class="card-atalho">
-      <div class="atalho-icone">📸</div>
-      <div class="atalho-info">
-        <strong>Novo registro</strong>
-        <span>Cole prints e comente</span>
-      </div>
-    </a>
-
-    <a href="/relatorio" class="card-atalho">
-      <div class="atalho-icone">📊</div>
-      <div class="atalho-info">
-        <strong>Gerar relatório</strong>
-        <span>PDF executivo ou link</span>
-      </div>
-    </a>
-
-    <a href="/fluxos" class="card-atalho">
-      <div class="atalho-icone">⑂</div>
-      <div class="atalho-info">
-        <strong>Fluxos de processo</strong>
-        <span>Editor e modo percorrer</span>
-      </div>
-    </a>
-
-    <a href="/semana" class="card-atalho">
-      <div class="atalho-icone">📅</div>
-      <div class="atalho-info">
-        <strong>Plano da semana</strong>
-        <span>Metas, time e alertas</span>
-      </div>
-    </a>
-  </section>
-
-  <!-- VISÃO RESUMIDA DA SEMANA: 2 COLUNAS OBJETIVAS -->
+  <!-- VISÃO RESUMIDA DA SEMANA: TAREFAS (SEM NOMES) E PESSOAS (EXPANSÍVEIS) -->
   <div class="grade-dupla">
-    <!-- COLUNA 1: DEMANDAS QUE EXIGEM ATENÇÃO -->
+    <!-- COLUNA 1: TAREFAS DA SEMANA (SEM NOME DAS PESSOAS, SÓ AS TAREFAS) -->
     <section class="cartao painel-secao">
       <div class="secao-cabecalho">
-        <h2>Demandas prioritárias</h2>
-        <a href="/cards" class="link-subtil">ver todos os cards &rarr;</a>
+        <div>
+          <span class="etiqueta">Projeto {projetoAtual}</span>
+          <h2>Tarefas da semana ({baseCards.length})</h2>
+        </div>
+        <a href="/cards" class="link-subtil">todos os cards &rarr;</a>
       </div>
 
-      {#if atencao.length === 0}
+      {#if tarefasDaSemana.length === 0}
         <div class="estado-limpo">
-          <span class="icone-ok">✨</span>
-          <p><b>Tudo sob controle!</b></p>
-          <span class="dica">Nenhuma demanda atrasada ou em risco registrada nesta leitura.</span>
+          <p><b>Nenhuma tarefa em andamento registrada nesta semana.</b></p>
+          <span class="dica">Envie prints no Diário do painel para listar as demandas do projeto {projetoAtual}.</span>
         </div>
       {:else}
         <div class="lista-demandas">
-          {#each atencao as c (c.codigo)}
+          {#each tarefasDaSemana as c (c.codigo)}
             <div class="item-demanda" class:urgente={c.ritmoPainel === 'atrasado' || c.situacao === 'atrasado'}>
               <div class="demanda-topo">
                 <span class="demanda-codigo">{c.codigo}</span>
+                {#if c.sistema}
+                  <span class="demanda-frente">{c.sistema}</span>
+                {/if}
                 <span class="demanda-etapa">{c.etapaAtual || 'Em andamento'}</span>
-                {#if c.ritmoPainel === 'atrasado'}
-                  <span class="tag-ritmo atrasado">Atrasado</span>
+                {#if c.ritmoPainel === 'atrasado' || c.situacao === 'atrasado'}
+                  <span class="pilula atrasado">atrasado</span>
                 {:else if c.ritmoPainel === 'em_risco'}
-                  <span class="tag-ritmo risco">Em risco</span>
+                  <span class="pilula em_risco">em risco</span>
+                {:else if c.ritmoPainel === 'no_ritmo'}
+                  <span class="pilula no_ritmo">no ritmo</span>
                 {/if}
               </div>
-              <strong class="demanda-titulo">{c.titulo || 'Demanda sem título'}</strong>
-              <div class="demanda-meta">
-                <span>Resp.: {c.responsavelEtapaAtual || 'Não atribuído'}</span>
-                {#if c.previsao}
-                  <span>Prev.: {dataMedia(c.previsao)}</span>
-                {/if}
-              </div>
+              <strong class="demanda-titulo">{c.titulo || 'Tarefa sem título descrito'}</strong>
+              {#if c.previsao || c.vencimento || c.comentario}
+                <div class="demanda-meta">
+                  {#if c.previsao}<span>Previsão: {dataMedia(c.previsao)}</span>{/if}
+                  {#if c.vencimento}<span>Vencimento: {dataMedia(c.vencimento)}</span>{/if}
+                  {#if c.comentario}<span>Nota: {c.comentario}</span>{/if}
+                </div>
+              {/if}
             </div>
           {/each}
         </div>
@@ -252,7 +316,7 @@
 
       {#if vencimentos.length > 0}
         <div class="bloco-vencimentos">
-          <span class="vencimentos-rotulo">⏰ Vencendo nos próximos 15 dias:</span>
+          <span class="etiqueta">Vencendo nos próximos 15 dias</span>
           <div class="vencimentos-chips">
             {#each vencimentos as v (v.codigo)}
               <span class="chip-vencimento">
@@ -264,47 +328,157 @@
       {/if}
     </section>
 
-    <!-- COLUNA 2: RITMO DO TIME -->
+    <!-- COLUNA 2: PESSOAS DO PROJETO (CLIQUE PARA EXPANDIR DETALHES, DISPONIBILIDADE, SUGESTÕES E RENDIMENTO) -->
     <section class="cartao painel-secao">
       <div class="secao-cabecalho">
-        <h2>Carga e ritmo do time</h2>
-        <a href="/semana" class="link-subtil">ajustar equipe &rarr;</a>
+        <div>
+          <span class="etiqueta">Clique na pessoa para expandir</span>
+          <h2>Equipe e rendimento ({projetoAtual})</h2>
+        </div>
+        <a href="/semana" class="link-subtil">plano da semana &rarr;</a>
       </div>
 
       <div class="lista-time">
-        {#each pessoasPainel as p (p.pessoa.id)}
-          <div class="item-pessoa">
-            <div class="pessoa-linha-topo">
-              <strong>{p.pessoa.nome}</strong>
-              <div class="pessoa-acoes">
-                <span class="pessoa-contagem">{p.total} {p.total === 1 ? 'demanda' : 'demandas'}</span>
-                <button class="btn-1a1" onclick={() => abrirUmAUm(p.pessoa.id)} title="Abrir pauta de 1:1">1:1</button>
+        {#each pessoasProjeto as p (p.pessoa.id)}
+          {@const expandida = pessoaExpandida === p.pessoa.id}
+          <div class="item-pessoa" class:expandida>
+            <div
+              class="pessoa-cabecalho-clicavel"
+              role="button"
+              tabindex="0"
+              aria-expanded={expandida}
+              onclick={() => alternarPessoa(p.pessoa.id)}
+              onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), alternarPessoa(p.pessoa.id))}
+            >
+              <div class="pessoa-linha-topo">
+                <div class="pessoa-nome-grupo">
+                  <span class="seta-expansao" class:aberta={expandida}>&#9656;</span>
+                  <strong>{p.pessoa.nome}</strong>
+                </div>
+                <div class="pessoa-acoes">
+                  <span class="badge-rendimento" title="Percentual de rendimento na semana em relação à equipe">
+                    {p.rendimentoSemanaPct}% sem.
+                  </span>
+                  <span class="badge-acumulado" title="Rendimento acumulado ao longo das semanas">
+                    {p.rendimentoAcumuladoPct}% acum.
+                  </span>
+                  <span class="pessoa-contagem">{p.total} {p.total === 1 ? 'tarefa' : 'tarefas'}</span>
+                  <button class="btn-1a1" onclick={(e) => abrirUmAUm(p.pessoa.id, e)} title="Abrir pauta de 1:1">1:1</button>
+                </div>
+              </div>
+
+              <div class="barra-ritmo-pilha" title="{p.noRitmo} no ritmo · {p.emRisco} em risco · {p.atrasado} atrasadas">
+                <span class="ritmo-verde" style:flex={p.noRitmo}></span>
+                <span class="ritmo-amarelo" style:flex={p.emRisco}></span>
+                <span class="ritmo-vermelho" style:flex={p.atrasado}></span>
+                {#if p.total === 0}
+                  <span class="ritmo-vazio"></span>
+                {/if}
+              </div>
+
+              <div class="pessoa-rodape">
+                <small class="ritmo-texto">
+                  {#if p.total === 0}
+                    Sem demandas ativas · {p.quandoLivre}
+                  {:else}
+                    <span class="txt-verde">{p.noRitmo} ok</span> ·
+                    <span class="txt-amarelo">{p.emRisco} risco</span> ·
+                    <span class="txt-vermelho">{p.atrasado} atraso</span> ·
+                    <span>{p.quandoLivre}</span>
+                  {/if}
+                </small>
               </div>
             </div>
 
-            <!-- BARRA DE RITMO (Verde / Amarelo / Vermelho) -->
-            <div class="barra-ritmo-pilha" title="{p.noRitmo} no ritmo · {p.emRisco} em risco · {p.atrasado} atrasadas">
-              <span class="ritmo-verde" style:flex={p.noRitmo}></span>
-              <span class="ritmo-amarelo" style:flex={p.emRisco}></span>
-              <span class="ritmo-vermelho" style:flex={p.atrasado}></span>
-              {#if p.total === 0}
-                <span class="ritmo-vazio"></span>
-              {/if}
-            </div>
+            {#if expandida}
+              <div class="pessoa-detalhes-expandido">
+                <!-- 1. TAREFAS E ETAPAS EM ANDAMENTO -->
+                <div class="bloco-detalhe-pessoa">
+                  <span class="etiqueta">O que está fazendo ({p.tarefas.length})</span>
+                  {#if p.tarefas.length === 0}
+                    <p class="dica-curta">Nenhuma tarefa atribuída nesta semana.</p>
+                  {:else}
+                    <ul class="lista-tarefas-pessoa">
+                      {#each p.tarefas as tar (tar.codigo)}
+                        <li>
+                          <b class="maquina">{tar.codigo}</b> {tar.titulo}
+                          {#if tar.etapa}<span class="meta-inline">· Etapa: <b>{tar.etapa}</b></span>{/if}
+                          {#if tar.frente}<span class="meta-inline">· Frente: {tar.frente}</span>{/if}
+                          {#if tar.previsao}<span class="meta-inline">· Prev.: {dataCurta(tar.previsao)}</span>{/if}
+                        </li>
+                      {/each}
+                    </ul>
+                  {/if}
+                </div>
 
-            <div class="pessoa-rodape">
-              <small class="ritmo-texto">
-                {#if p.total === 0}
-                  Sem demandas em andamento
-                {:else}
-                  <span class="txt-verde">{p.noRitmo} ok</span> ·
-                  <span class="txt-amarelo">{p.emRisco} risco</span> ·
-                  <span class="txt-vermelho">{p.atrasado} atraso</span>
-                {/if}
-              </small>
-            </div>
+                <!-- 2. ETAPAS E FRENTES ATIVAS -->
+                <div class="grade-mini-detalhes">
+                  <div>
+                    <span class="etiqueta">Etapas em andamento</span>
+                    <div class="chips-detalhe">
+                      {#each p.etapasEmAndamento as et (et)}
+                        <span class="chip-detalhe">{et}</span>
+                      {:else}
+                        <span class="dica-curta">Nenhuma etapa informada</span>
+                      {/each}
+                    </div>
+                  </div>
+                  <div>
+                    <span class="etiqueta">Frentes de atuação</span>
+                    <div class="chips-detalhe">
+                      {#each p.frentes as fr (fr)}
+                        <span class="chip-detalhe">{fr}</span>
+                      {:else}
+                        <span class="dica-curta">{projetoAtual}</span>
+                      {/each}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 3. QUANDO FICARÁ LIVRE E RENDIMENTO SEMANAL + ACUMULADO -->
+                <div class="grade-mini-detalhes">
+                  <div>
+                    <span class="etiqueta">Disponibilidade na semana</span>
+                    <p class="texto-destaque-detalhe">{p.quandoLivre}</p>
+                  </div>
+                  <div>
+                    <span class="etiqueta">Rendimento comparativo e acumulado</span>
+                    <div class="barras-rendimento">
+                      <div class="linha-rend">
+                        <span>Semana atual: <b>{p.rendimentoSemanaPct}%</b> da equipe</span>
+                        <div class="kpi-barra"><div class="kpi-barra-preenchimento" style:width="{p.rendimentoSemanaPct}%"></div></div>
+                      </div>
+                      <div class="linha-rend">
+                        <span>Acumulado ({p.acumuladoSemanas.semanasAtivas} sem.): <b>{p.rendimentoAcumuladoPct}%</b> ({p.acumuladoSemanas.entregasNoPrazo}/{p.acumuladoSemanas.totalDemandas} no prazo)</span>
+                        <div class="kpi-barra"><div class="kpi-barra-preenchimento" style:width="{p.rendimentoAcumuladoPct}%"></div></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 4. SUGESTÕES DE APOIO À EQUIPE -->
+                <div class="bloco-detalhe-pessoa sugestoes-apoio">
+                  <span class="etiqueta">Sugestões para apoiar a equipe</span>
+                  <ul class="lista-sugestoes-pessoa">
+                    {#each p.sugestoesAjuda as sug, idx (idx)}
+                      <li>{sug}</li>
+                    {/each}
+                  </ul>
+                </div>
+              </div>
+            {/if}
           </div>
         {/each}
+      </div>
+
+      <!-- ADICIONAR NOVA PESSOA AO PROJETO ATUAL -->
+      <div class="adicionar-pessoa-rodape">
+        <input
+          bind:value={novaPessoa}
+          placeholder="Adicionar colaborador ao projeto {projetoAtual}..."
+          onkeydown={(e) => e.key === 'Enter' && adicionarPessoaAoProjeto()}
+        />
+        <button onclick={adicionarPessoaAoProjeto} disabled={!novaPessoa.trim()}>+ Adicionar</button>
       </div>
     </section>
   </div>
@@ -313,15 +487,15 @@
   {#if ultimoRegistro}
     <section class="cartao registro-compacto">
       <div class="registro-conteudo">
-        <span class="registro-etiqueta">📸 Último registro no diário:</span>
+        <span class="etiqueta">Último registro no diário ({projetoAtual})</span>
         <p class="registro-motivo">
-          <b>[{ultimoRegistro.pasta || 'DEV'}] {dataMedia(ultimoRegistro.data)}:</b>
-          {ultimoRegistro.motivo || ultimoRegistro.resumo || 'Registro de acompanhamento com imagens e comentários.'}
+          <b>{dataMedia(ultimoRegistro.data)}:</b>
+          {ultimoRegistro.motivo || ultimoRegistro.resumo || 'Registro de acompanhamento salvo.'}
         </p>
       </div>
       <div class="registro-botoes">
-        <a href="/painel" class="btn-secundario">Abrir Diário</a>
-        <a href="/relatorio" class="btn-secundario destaque">Puxar no Relatório</a>
+        <a href="/painel" class="botao">Abrir Diário</a>
+        <a href="/relatorio" class="botao destaque">Usar no Relatório</a>
       </div>
     </section>
   {/if}
@@ -332,21 +506,20 @@
   {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    max-width: 1200px;
+    gap: var(--size-4);
+    max-width: 1240px;
     margin: 0 auto;
-    padding-bottom: 24px;
+    padding-bottom: var(--size-6);
   }
 
-  /* TOPO DO DASHBOARD */
   .topo-dashboard
   {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
-    gap: 16px;
-    padding-bottom: 12px;
+    gap: var(--size-3);
+    padding-bottom: var(--size-3);
     border-bottom: 1px solid var(--borda);
   }
   .boas-vindas
@@ -361,39 +534,44 @@
     font-size: 1.6rem;
     line-height: 1.1;
   }
-  .seletor-semana-caixa
+  .controles-topo
+  {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+  }
+  .seletor-caixa
   {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    gap: 3px;
+    gap: 4px;
   }
-  .etiqueta-semana
+  .linha-projeto
   {
-    font-family: var(--fonte-maquina);
-    font-size: 0.72rem;
-    color: var(--suave);
-    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
-  .seletor-semana-caixa select
+  .input-novo-projeto
   {
-    font-size: 0.86rem;
-    padding: 6px 12px;
-    background: var(--superficie);
-    border: 1px solid var(--borda-forte);
-    border-radius: var(--raio-pequeno);
-    color: var(--texto);
-    cursor: pointer;
+    width: 96px;
+    font-size: 0.82rem;
+    padding: 5px 8px;
+  }
+  .btn-mini
+  {
+    font-size: 0.78rem;
+    padding: 5px 10px;
   }
 
-  /* AVISO */
   .aviso-banner
   {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(245, 158, 11, 0.12);
-    border: 1px solid rgba(245, 158, 11, 0.35);
+    background: var(--amarelo-fundo);
+    border: 1px solid var(--borda-forte);
     border-radius: var(--raio-pequeno);
     padding: 10px 14px;
     font-size: 0.86rem;
@@ -407,8 +585,9 @@
   }
   .btn-acao-banner
   {
+    font-family: var(--fonte-maquina);
     font-size: 0.82rem;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--marca);
     text-decoration: none;
   }
@@ -426,41 +605,34 @@
   }
   .card-kpi
   {
-    background: var(--superficie);
-    border: 1px solid var(--borda);
-    border-radius: var(--raio);
+    margin-top: 0;
     padding: 14px 16px;
     display: flex;
     flex-direction: column;
     gap: 6px;
-    transition: transform 0.12s, border-color 0.12s;
-  }
-  .card-kpi:hover
-  {
-    border-color: var(--borda-forte);
-  }
-  .kpi-rotulo
-  {
-    font-family: var(--fonte-maquina);
-    font-size: 0.74rem;
-    color: var(--suave);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
   }
   .kpi-valor-grupo
   {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 8px;
   }
-  .kpi-icone-status
+  .ponto-semaforo
   {
-    font-size: 1rem;
-    line-height: 1;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--borda-forte);
+    flex: none;
   }
+  .ponto-semaforo.verde { background: var(--verde); }
+  .ponto-semaforo.amarelo { background: var(--amarelo); }
+  .ponto-semaforo.vermelho { background: var(--vermelho); }
+
   .kpi-valor-texto
   {
-    font-size: 1.25rem;
+    font-family: var(--fonte-maquina);
+    font-size: 1.2rem;
     color: var(--texto);
   }
   .kpi-valor-numero
@@ -490,86 +662,37 @@
   }
   .kpi-barra
   {
-    height: 5px;
-    background: var(--superficie-2);
+    height: 6px;
+    background: var(--fundo-barra);
     border-radius: 999px;
     overflow: hidden;
   }
   .kpi-barra-preenchimento
   {
     height: 100%;
-    background: var(--marca);
+    background: var(--cor-barra);
     border-radius: 999px;
-    transition: width 0.3s;
+    transition: width 0.3s var(--curva);
   }
   .destaque-vermelho
   {
-    color: var(--vermelho) !important;
+    color: var(--vermelho);
   }
   .card-kpi.alerta
   {
-    border-color: rgba(239, 68, 68, 0.4);
-    background: rgba(239, 68, 68, 0.03);
-  }
-
-  /* 4 ATALHOS RÁPIDOS */
-  .grade-atalhos
-  {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 12px;
-  }
-  .card-atalho
-  {
-    background: var(--superficie-2);
-    border: 1px solid var(--borda);
-    border-radius: var(--raio);
-    padding: 12px 14px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    text-decoration: none;
-    color: var(--texto);
-    transition: transform 0.15s, border-color 0.15s, background 0.15s;
-  }
-  .card-atalho:hover
-  {
-    transform: translateY(-2px);
-    border-color: var(--marca);
-    background: var(--superficie);
-  }
-  .atalho-icone
-  {
-    font-size: 1.5rem;
-    line-height: 1;
-    flex: none;
-  }
-  .atalho-info
-  {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .atalho-info strong
-  {
-    font-size: 0.9rem;
-    color: var(--texto);
-  }
-  .atalho-info span
-  {
-    font-size: 0.76rem;
-    color: var(--suave);
+    border-color: var(--vermelho);
   }
 
   /* GRADE DUPLA */
   .grade-dupla
   {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
     gap: 16px;
   }
   .painel-secao
   {
+    margin-top: 0;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -579,17 +702,18 @@
   {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: flex-end;
     border-bottom: 1px solid var(--borda);
     padding-bottom: 8px;
   }
   .secao-cabecalho h2
   {
-    margin: 0;
+    margin: 2px 0 0;
     font-size: 1.05rem;
   }
   .link-subtil
   {
+    font-family: var(--fonte-maquina);
     font-size: 0.78rem;
     color: var(--marca);
     text-decoration: none;
@@ -599,7 +723,6 @@
     text-decoration: underline;
   }
 
-  /* ESTADO LIMPO */
   .estado-limpo
   {
     display: flex;
@@ -609,18 +732,14 @@
     padding: 24px 12px;
     gap: 6px;
   }
-  .icone-ok
-  {
-    font-size: 1.8rem;
-  }
   .estado-limpo p
   {
     margin: 0;
-    font-size: 0.92rem;
+    font-size: 0.9rem;
     color: var(--texto);
   }
 
-  /* LISTA DE DEMANDAS */
+  /* LISTA DE DEMANDAS (SEM NOMES DE PESSOAS) */
   .lista-demandas
   {
     display: flex;
@@ -631,7 +750,7 @@
   {
     background: var(--superficie-2);
     border: 1px solid var(--borda);
-    border-left: 3px solid var(--suave);
+    border-left: 3px solid var(--cor-barra);
     border-radius: var(--raio-pequeno);
     padding: 8px 10px;
     display: flex;
@@ -641,7 +760,7 @@
   .item-demanda.urgente
   {
     border-left-color: var(--vermelho);
-    background: rgba(239, 68, 68, 0.04);
+    background: var(--vermelho-fundo);
   }
   .demanda-topo
   {
@@ -656,6 +775,16 @@
     font-weight: 700;
     color: var(--texto);
   }
+  .demanda-frente
+  {
+    font-family: var(--fonte-maquina);
+    font-size: 0.7rem;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    color: var(--suave);
+  }
   .demanda-etapa
   {
     color: var(--suave);
@@ -663,23 +792,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .tag-ritmo
-  {
-    font-size: 0.7rem;
-    font-weight: 600;
-    padding: 1px 6px;
-    border-radius: 999px;
-  }
-  .tag-ritmo.atrasado
-  {
-    background: rgba(239, 68, 68, 0.15);
-    color: var(--vermelho);
-  }
-  .tag-ritmo.risco
-  {
-    background: rgba(245, 158, 11, 0.15);
-    color: #f59e0b;
   }
   .demanda-titulo
   {
@@ -690,12 +802,12 @@
   .demanda-meta
   {
     display: flex;
-    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
     font-size: 0.74rem;
     color: var(--suave);
   }
 
-  /* VENCIMENTOS */
   .bloco-vencimentos
   {
     margin-top: 6px;
@@ -705,12 +817,6 @@
     flex-direction: column;
     gap: 6px;
   }
-  .vencimentos-rotulo
-  {
-    font-size: 0.76rem;
-    color: var(--suave);
-    font-weight: 500;
-  }
   .vencimentos-chips
   {
     display: flex;
@@ -719,6 +825,7 @@
   }
   .chip-vencimento
   {
+    font-family: var(--fonte-maquina);
     font-size: 0.74rem;
     padding: 2px 7px;
     background: var(--superficie-2);
@@ -731,38 +838,87 @@
     color: var(--texto);
   }
 
-  /* LISTA TIME */
+  /* LISTA TIME EXPANSÍVEL */
   .lista-time
   {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
   }
   .item-pessoa
   {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
     background: var(--superficie-2);
     border: 1px solid var(--borda);
     border-radius: var(--raio-pequeno);
-    padding: 8px 10px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .item-pessoa:hover, .item-pessoa.expandida
+  {
+    border-color: var(--borda-forte);
+  }
+  .pessoa-cabecalho-clicavel
+  {
+    padding: 9px 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    cursor: pointer;
   }
   .pessoa-linha-topo
   {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
   }
-  .pessoa-linha-topo strong
-  {
-    font-size: 0.86rem;
-  }
-  .pessoa-acoes
+  .pessoa-nome-grupo
   {
     display: flex;
     align-items: center;
     gap: 6px;
+  }
+  .seta-expansao
+  {
+    font-size: 0.75rem;
+    color: var(--marca);
+    transition: transform 0.15s;
+    display: inline-block;
+  }
+  .seta-expansao.aberta
+  {
+    transform: rotate(90deg);
+  }
+  .pessoa-linha-topo strong
+  {
+    font-size: 0.88rem;
+  }
+  .pessoa-acoes
+  {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+  }
+  .badge-rendimento
+  {
+    font-family: var(--fonte-maquina);
+    font-size: 0.7rem;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--marca-clara);
+    color: var(--marca);
+    font-weight: 700;
+  }
+  .badge-acumulado
+  {
+    font-family: var(--fonte-maquina);
+    font-size: 0.7rem;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    color: var(--suave);
   }
   .pessoa-contagem
   {
@@ -778,7 +934,6 @@
     border: 1px solid var(--borda);
     border-radius: 3px;
     color: var(--suave);
-    cursor: pointer;
   }
   .btn-1a1:hover
   {
@@ -791,11 +946,11 @@
     height: 6px;
     border-radius: 999px;
     overflow: hidden;
-    background: var(--superficie);
+    background: var(--fundo-barra);
   }
-  .ritmo-verde { background: #10b981; }
-  .ritmo-amarelo { background: #f59e0b; }
-  .ritmo-vermelho { background: #ef4444; }
+  .ritmo-verde { background: var(--cor-barra); }
+  .ritmo-amarelo { background: var(--amarelo); }
+  .ritmo-vermelho { background: var(--vermelho); }
   .ritmo-vazio { flex: 1; background: var(--borda); }
 
   .pessoa-rodape
@@ -804,20 +959,135 @@
     justify-content: space-between;
     font-size: 0.72rem;
   }
-  .ritmo-texto .txt-verde { color: #10b981; font-weight: 500; }
-  .ritmo-texto .txt-amarelo { color: #f59e0b; font-weight: 500; }
-  .ritmo-texto .txt-vermelho { color: #ef4444; font-weight: 500; }
+  .ritmo-texto .txt-verde { color: var(--verde); font-weight: 600; }
+  .ritmo-texto .txt-amarelo { color: var(--amarelo); font-weight: 600; }
+  .ritmo-texto .txt-vermelho { color: var(--vermelho); font-weight: 600; }
+
+  /* PAINEL EXPANDIDO DA PESSOA */
+  .pessoa-detalhes-expandido
+  {
+    padding: 10px 12px 12px;
+    background: var(--superficie);
+    border-top: 1px solid var(--borda);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 0.8rem;
+  }
+  .bloco-detalhe-pessoa
+  {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .lista-tarefas-pessoa, .lista-sugestoes-pessoa
+  {
+    margin: 2px 0 0;
+    padding-left: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    line-height: 1.35;
+  }
+  .meta-inline
+  {
+    color: var(--suave);
+    font-size: 0.75rem;
+  }
+  .grade-mini-detalhes
+  {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  .chips-detalhe
+  {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 3px;
+  }
+  .chip-detalhe
+  {
+    font-family: var(--fonte-maquina);
+    font-size: 0.72rem;
+    padding: 2px 6px;
+    background: var(--superficie-2);
+    border: 1px solid var(--borda);
+    border-radius: 3px;
+    color: var(--texto);
+  }
+  .texto-destaque-detalhe
+  {
+    margin: 3px 0 0;
+    font-weight: 600;
+    color: var(--texto);
+    font-size: 0.8rem;
+  }
+  .barras-rendimento
+  {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 3px;
+  }
+  .linha-rend
+  {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.74rem;
+    color: var(--suave);
+  }
+  .linha-rend b
+  {
+    color: var(--texto);
+  }
+  .sugestoes-apoio
+  {
+    background: var(--superficie-2);
+    padding: 8px 10px;
+    border-radius: var(--raio-pequeno);
+    border-left: 2px solid var(--cor-barra);
+  }
+  .dica-curta
+  {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--suave);
+  }
+
+  .adicionar-pessoa-rodape
+  {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--borda);
+  }
+  .adicionar-pessoa-rodape input
+  {
+    flex: 1;
+    font-size: 0.8rem;
+    padding: 5px 8px;
+  }
+  .adicionar-pessoa-rodape button
+  {
+    font-size: 0.78rem;
+    padding: 5px 10px;
+  }
 
   /* REGISTRO COMPACTO */
   .registro-compacto
   {
+    margin-top: 0;
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
     gap: 12px;
     padding: 12px 16px;
-    border-left: 3px solid var(--marca);
+    border-left: 3px solid var(--cor-barra);
   }
   .registro-conteudo
   {
@@ -826,13 +1096,6 @@
     gap: 2px;
     flex: 1;
     min-width: 250px;
-  }
-  .registro-etiqueta
-  {
-    font-family: var(--fonte-maquina);
-    font-size: 0.72rem;
-    color: var(--suave);
-    text-transform: uppercase;
   }
   .registro-motivo
   {
@@ -844,27 +1107,13 @@
   .registro-botoes
   {
     display: flex;
-    gap: 6px;
+    gap: 8px;
   }
-  .btn-secundario
-  {
-    font-size: 0.8rem;
-    padding: 5px 10px;
-    background: var(--superficie-2);
-    border: 1px solid var(--borda);
-    border-radius: var(--raio-pequeno);
-    color: var(--texto);
-    text-decoration: none;
-    font-weight: 500;
-  }
-  .btn-secundario:hover
-  {
-    border-color: var(--borda-forte);
-  }
-  .btn-secundario.destaque
+  .botao.destaque
   {
     background: var(--marca-clara);
     border-color: var(--marca);
     color: var(--marca);
+    font-weight: 700;
   }
 </style>

@@ -11,7 +11,7 @@
   <table>
     <thead>
       <tr>
-        <th>Card</th><th>Título</th><th>Pessoa (etapa atual)</th><th>Etapa</th><th>Etapas</th>
+        <th>Card</th><th>Título</th><th>Pessoa (etapa atual)</th><th>Etapa</th><th>Comentário</th>
         <th>Início</th><th>Previsão</th><th>Vencimento</th><th>Ritmo</th><th>Situação</th><th>Status do card</th><th>Conferir</th><th></th>
       </tr>
     </thead>
@@ -26,13 +26,13 @@
               <option value={undefined}>-</option>
               {#each pessoas as p (p.id)}<option value={p.id}>{p.nome}</option>{/each}
               {#if card.responsavelEtapaAtual && !pessoas.some((p) => p.id === card.responsavelEtapaAtual)}
-                <option value={card.responsavelEtapaAtual}>{card.responsavelEtapaAtual} (não cadastrada)</option>
+                <option value={card.responsavelEtapaAtual}>{card.responsavelEtapaAtual}</option>
               {/if}
             </select>
           </td>
           <td><input bind:value={card.etapaAtual} /></td>
-          <td class="etapas">
-            <input type="number" class="mini" bind:value={card.etapasConcluidas} />/<input type="number" class="mini" bind:value={card.etapasTotal} />
+          <td>
+            <input class="comentario-card" bind:value={card.comentario} placeholder="Adicionar comentário" />
           </td>
           <td><input type="date" bind:value={card.inicio} /></td>
           <td><input type="date" bind:value={card.previsao} /></td>
@@ -82,13 +82,10 @@
   {
     width: 90px;
   }
-  .mini
+  .comentario-card
   {
-    width: 52px;
-  }
-  .etapas
-  {
-    white-space: nowrap;
+    min-width: 170px;
+    width: 100%;
   }
   .conferir
   {

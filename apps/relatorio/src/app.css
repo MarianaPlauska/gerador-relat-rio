@@ -40,8 +40,10 @@
   --curva: var(--ease-3);
   --fonte-maquina: "Courier Prime", "Courier New", monospace;
   --fonte-texto: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2720%27%20height%3D%2722%27%20viewBox%3D%270%200%2026%2028%27%3E%3Cpath%20d%3D%27M3%202%20L3%2021%20L8%2016%20L12%2025%20L16%2023.5%20L12%2015%20L19%2015%20Z%27%20fill%3D%27%2310141a%27%20stroke%3D%27%234cc38a%27%20stroke-width%3D%272%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E") 2 2, auto;
-  --cursor-clique: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2720%27%20height%3D%2722%27%20viewBox%3D%270%200%2026%2028%27%3E%3Cpath%20d%3D%27M3%202%20L3%2021%20L8%2016%20L12%2025%20L16%2023.5%20L12%2015%20L19%2015%20Z%27%20fill%3D%27%234cc38a%27%20stroke%3D%27%2310141a%27%20stroke-width%3D%272%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E") 2 2, pointer;
+  --cor-barra: #5b9e84;
+  --fundo-barra: #1e2530;
+  --cursor: default;
+  --cursor-clique: pointer;
 }
 
 :root[data-tema='claro']
@@ -72,8 +74,10 @@
   --grade-fundo: rgb(14 19 17 / 3.5%);
   --sombra: 0 1px 2px rgb(14 19 17 / 5%), 0 4px 16px rgb(14 19 17 / 7%);
   --brilho: 0 0 0 1px rgb(18 164 84 / 35%), 0 0 0 4px rgb(18 164 84 / 8%);
-  --cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2720%27%20height%3D%2722%27%20viewBox%3D%270%200%2026%2028%27%3E%3Cpath%20d%3D%27M3%202%20L3%2021%20L8%2016%20L12%2025%20L16%2023.5%20L12%2015%20L19%2015%20Z%27%20fill%3D%27%2310141a%27%20stroke%3D%27%2312a454%27%20stroke-width%3D%272%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E") 2 2, auto;
-  --cursor-clique: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2720%27%20height%3D%2722%27%20viewBox%3D%270%200%2026%2028%27%3E%3Cpath%20d%3D%27M3%202%20L3%2021%20L8%2016%20L12%2025%20L16%2023.5%20L12%2015%20L19%2015%20Z%27%20fill%3D%27%2312a454%27%20stroke%3D%27%2310141a%27%20stroke-width%3D%272%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E") 2 2, pointer;
+  --cor-barra: #12a454;
+  --fundo-barra: #dceee3;
+  --cursor: default;
+  --cursor-clique: pointer;
 }
 
 *
@@ -83,12 +87,39 @@
 
 html
 {
-  cursor: var(--cursor);
+  cursor: default;
 }
 
-a, select, label, summary, input[type="checkbox"], input[type="radio"]
+a, button:not(:disabled), .botao, select, summary, [role="button"], [role="tab"], [role="menuitem"], input[type="checkbox"], input[type="radio"], label:has(input[type="file"]), label:has(input[type="checkbox"]), label:has(input[type="radio"])
 {
-  cursor: var(--cursor-clique);
+  cursor: pointer;
+}
+
+progress
+{
+  appearance: none;
+  -webkit-appearance: none;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--fundo-barra);
+  border: 1px solid var(--borda);
+  overflow: hidden;
+}
+progress::-webkit-progress-bar
+{
+  background: var(--fundo-barra);
+  border-radius: 999px;
+}
+progress::-webkit-progress-value
+{
+  background: var(--cor-barra);
+  border-radius: 999px;
+  transition: width 0.25s var(--curva);
+}
+progress::-moz-progress-bar
+{
+  background: var(--cor-barra);
+  border-radius: 999px;
 }
 
 body

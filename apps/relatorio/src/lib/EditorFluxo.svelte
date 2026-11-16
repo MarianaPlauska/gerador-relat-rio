@@ -281,10 +281,10 @@
       <span class="badge-status">Modo Diagrama</span>
       {#if lacunas.length > 0}
         <button class="badge-lacuna alerta" onclick={() => selecionarNo(lacunas[0]!.noId)} title="Clique para ir até o passo incompleto">
-          ⚠️ {lacunas.length} {lacunas.length === 1 ? 'lacuna' : 'lacunas'}
+          ! {lacunas.length} {lacunas.length === 1 ? 'lacuna' : 'lacunas'}
         </button>
       {:else}
-        <span class="badge-lacuna sucesso">✓ 0 lacunas</span>
+        <span class="badge-lacuna sucesso">0 lacunas</span>
       {/if}
     </div>
 
@@ -369,7 +369,7 @@
           ondragstart={(e) => e.dataTransfer?.setData('application/orbisos-no', 'nota')}
           onclick={() => adicionar('nota')}
         >
-          <span class="icone-forma forma-nota">📝</span>
+          <span class="icone-forma forma-nota">#</span>
           <small>Nota</small>
         </button>
       </div>
@@ -420,9 +420,9 @@
 
             {#if saidasDoAtual.length === 0}
               {#if n.data.tipo === 'fim'}
-                <button class="player-btn-concluir" onclick={fecharPercurso}>✓ Processo Concluído</button>
+                <button class="player-btn-concluir" onclick={fecharPercurso}>Processo Concluído</button>
               {:else}
-                <span class="player-sem-saida">⚠️ Fim do caminho (sem próximo passo conectado)</span>
+                <span class="player-sem-saida">Fim do caminho (sem próximo passo conectado)</span>
               {/if}
             {:else}
               <div class="player-opcoes">
@@ -520,7 +520,7 @@
                     {:else}
                       <span class="conexao-texto-segue">Segue para:</span>
                     {/if}
-                    <button class="conexao-btn-remover" onclick={() => excluirAresta(s.id)} title="Remover ligação">🗑</button>
+                    <button class="conexao-btn-remover" onclick={() => excluirAresta(s.id)} title="Remover ligação">remover</button>
                   </div>
 
                   <select class="conexao-select" value={s.target} onchange={(e) => mudarDestino(s.id, e.currentTarget.value)}>
@@ -546,7 +546,7 @@
             ▶ Percorrer daqui
           </button>
           <button class="btn-excluir-passo" onclick={() => deleteElements({ nodes: [{ id: n.id }] })}>
-            🗑 Excluir passo
+            Excluir passo
           </button>
         </div>
       {:else if arestaSel.length === 1 && noSel.length === 0}
@@ -577,12 +577,11 @@
 
         <div class="inspector-rodape">
           <button class="btn-excluir-passo" onclick={() => deleteElements({ edges: [{ id: e.id }] })}>
-            🗑 Excluir ligação
+            Excluir ligação
           </button>
         </div>
       {:else}
         <div class="inspector-placeholder">
-          <div class="placeholder-icone">🔍</div>
           <h4>Inspeção de Passo</h4>
           <p>Clique em qualquer etapa do fluxo para editar o tipo, o texto, as orientações de percurso e os destinos.</p>
 
@@ -598,7 +597,7 @@
             <div class="resumo-linha">
               <span>Status de integridade:</span>
               <strong class:erro={lacunas.length > 0} class:sucesso={lacunas.length === 0}>
-                {lacunas.length === 0 ? '✓ Sem lacunas' : `⚠️ ${lacunas.length} lacunas`}
+                {lacunas.length === 0 ? 'Sem lacunas' : `${lacunas.length} lacunas`}
               </strong>
             </div>
           </div>
@@ -1251,11 +1250,6 @@
     gap: 8px;
     padding-top: 20px;
     color: var(--suave);
-  }
-  .placeholder-icone
-  {
-    font-size: 1.8rem;
-    opacity: 0.6;
   }
   .inspector-placeholder h4
   {

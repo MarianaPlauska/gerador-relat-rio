@@ -12,6 +12,7 @@ export interface Pessoa
   id: string;
   nome: string;
   capacidadeHorasSemana: number;
+  pastas?: string[] | undefined;
 }
 
 // tudo opcional porque cada tela do painel mostra só parte do card
@@ -47,6 +48,7 @@ export interface CardSnapshot
   horasAteConcluir?: number;
   // do card aberto: a lista de etapas
   etapas?: EtapaCard[];
+  comentario?: string | undefined;
   origens: OrigemLeitura[];
   avisosLeitura?: string[];
 }
@@ -147,6 +149,7 @@ export interface CapturaLida
   naoReconhecido?: string[] | undefined;
   repetidos?: { codigo: string; mudou: string[] }[] | undefined;
   novos?: string[] | undefined;
+  porPessoa?: { pessoa: string; tarefas: string[] }[] | undefined;
 }
 
 // uma entrada do diário da pasta: prints + comentários unidos em um texto, guardada com dia e motivo

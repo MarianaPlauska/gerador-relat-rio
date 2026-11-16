@@ -46,4 +46,49 @@ describe('interpretarAnotacao', () =>
     expect(r.avisos.length).toBeGreaterThan(0);
     expect(r.sugestoes.some((s) => s.includes('DEV-01'))).toBe(true);
   });
+
+  it('agrupa tarefas por pessoa sem repetir nome e calcula rendimento semanal e acumulado por projeto', async () =>
+  {
+    const { agruparPorPessoa, analisarTimeNoProjeto, pessoasDoProjeto } = await import('./complemento');
+    const pessoas = [
+      { id: 'mariana-coutinho', nome: 'Mariana Coutinho', capacidadeHorasSemana: 40, pastas: ['DEV'] },
+      { id: 'rodrigo-cinelli', nome: 'Rodrigo Cinelli', capacidadeHorasSemana: 40, pastas: ['DEV'] },
+      { id: 'ana-silva', nome: 'Ana Silva', capacidadeHorasSemana: 40, pastas: ['COMERCIAL'] },
+    ];
+    const cardsDev = [
+      { codigo: 'DEV-10', titulo: 'Tela de login', etapaAtual: 'Homologação', sistema: 'Kitu Sistema', responsavelEtapaAtual: 'mariana-coutinho', responsaveis: ['mariana-coutinho'], ritmoPainel: 'no_ritmo' as const, previsao: '2026-11-17', origens: ['em_execucao'] },
+      { codigo: 'DEV-11', titulo: 'Ajuste de API', etapaAtual: 'Testes', sistema: 'SST-Web', responsavelEtapaAtual: 'mariana-coutinho', responsaveis: ['mariana-coutinho'], ritmoPainel: 'no_ritmo' as const, previsao: '2026-11-18', origens: ['em_execucao'] },
+      { codigo: 'DEV-12', titulo: 'Migração banco', etapaAtual: 'Desenvolvimento', sistema: 'Kitu Sistema', responsavelEtapaAtual: 'rodrigo-cinelli', responsaveis: ['rodrigo-cinelli'], ritmoPainel: 'atrasado' as const, previsao: '2026-11-20', origens: ['em_execucao'] },
+    ];
+
+    const agrupado = agruparPorPessoa(cardsDev, pessoas);
+    expect(agrupado).toHaveLength(2);
+    expect(agrupado[0]!.pessoa).toBe('Mariana Coutinho');
+    expect(agrupado[0]!.tarefas).toHaveLength(2);
+
+    // Projeto COMERCIAL só traz Ana Silva + quem aparecer nos cards de COMERCIAL
+    const eqComercial = pessoasDoProjeto(pessoas, [{ codigo: 'COM-01', responsavelEtapaAtual: 'Carlos Souza', responsaveis: ['Carlos Souza'], origens: ['em_execucao'] }], 'COMERCIAL');
+    expect(eqComercial.map((p) => p.nome)).toEqual(['Ana Silva', 'Carlos Souza']);
+
+    const analise = analisarTimeNoProjeto({
+      pessoas,
+      fotos: [
+        { data: '2026-11-09', pasta: 'DEV', totais: {}, cards: [{ codigo: 'DEV-01', responsavelEtapaAtual: 'mariana-coutinho', responsaveis: ['mariana-coutinho'], ritmoPainel: 'no_ritmo', origens: ['em_execucao'] }] },
+        { data: '2026-11-16', pasta: 'DEV', totais: {}, cards: cardsDev },
+      ],
+      planos: [],
+      pasta: 'DEV',
+      semanaInicio: '2026-11-16',
+      semanaFim: '2026-11-20',
+      hoje: '2026-11-16',
+    });
+
+    const mariana = analise.find((a) => a.pessoa.id === 'mariana-coutinho')!;
+    expect(mariana.etapasEmAndamento).toEqual(['Homologação', 'Testes']);
+    expect(mariana.frentes).toEqual(['Kitu Sistema', 'SST-Web']);
+    expect(mariana.livreCedo).toBe(true);
+    expect(mariana.sugestoesAjuda.some((s) => s.includes('Rodrigo Cinelli'))).toBe(true);
+    expect(mariana.rendimentoSemanaPct).toBeGreaterThan(50);
+    expect(mariana.acumuladoSemanas.semanasAtivas).toBe(2);
+  });
 });

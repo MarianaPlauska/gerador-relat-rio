@@ -77,13 +77,13 @@
     {
       reagindo = true;
       const frases = [
-        'Olá Mariana! Painel pronto.',
-        'Supervisão 100% no seu navegador!',
-        'Cobrinha alimentada com sucesso!',
+        'Painel pronto e sincronizado.',
+        'Supervisão 100% no seu navegador.',
+        'Cobrinha de commits concluída.',
         'Semáforo da semana calculado.',
-        'Tudo sob controle por aqui! ✨',
+        'Tudo sob controle por aqui.',
       ];
-      fala = frases[Math.floor(Math.random() * frases.length)] ?? 'Olá!';
+      fala = frases[Math.floor(Math.random() * frases.length)] ?? 'Pronto!';
       setTimeout(() => (reagindo = false), 600);
       setTimeout(() => (fala = null), 3500);
     }
@@ -104,7 +104,7 @@
 
   {#if fase === 'cobrinha'}
     <!-- FASE 1: COBRINHA DO GITHUB -->
-    <div class="caixa-cobrinha" title="Cobrinha do GitHub comendo os commits...">
+    <div class="caixa-cobrinha" title="Cobrinha do GitHub percorrendo os commits...">
       <div class="grade-commits">
         {#each gradeInicial as linha, r}
           <div class="linha-commits">
@@ -121,7 +121,7 @@
           </div>
         {/each}
       </div>
-      <span class="legenda-cobrinha">git activity 🐍</span>
+      <span class="legenda-cobrinha">git activity</span>
     </div>
   {:else}
     <!-- FASE 2: O BICHINHO / ROSTINHO TECH (ORBI) -->
@@ -129,7 +129,7 @@
       class="bichinho-botao"
       class:reagindo
       onclick={clicarMascote}
-      title="OrbisOS Mascot · Clique para interagir ou reiniciar a cobrinha"
+      title="Orbi · Clique para interagir"
       aria-label="Mascote Orbi"
     >
       <div class="bichinho-corpo">
@@ -137,7 +137,6 @@
           <div class="antena-luz"></div>
         </div>
         <div class="rosto">
-          <!-- Olhos expressivos -->
           <div class="olhos" class:fechados={piscando}>
             <div class="olho esquerdo">
               <div class="brilho"></div>
@@ -146,18 +145,22 @@
               <div class="brilho"></div>
             </div>
           </div>
-          <!-- Bochechas rosadas -->
           <div class="bochechas">
             <span class="bochecha"></span>
             <span class="bochecha"></span>
           </div>
-          <!-- Boquinha sorrindo -->
           <div class="boca" class:aberta={reagindo}></div>
         </div>
       </div>
     </button>
-    <button class="btn-reiniciar-cobrinha" onclick={iniciarCobrinha} title="Ver a cobrinha do GitHub novamente">
-      🐍
+    <button class="btn-reiniciar-cobrinha" onclick={iniciarCobrinha} title="Animar cobrinha do GitHub novamente" aria-label="Animar cobrinha novamente">
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+        <rect x="1" y="1" width="3" height="3" rx="0.6" fill="currentColor" opacity="0.45" />
+        <rect x="5" y="1" width="3" height="3" rx="0.6" fill="currentColor" />
+        <rect x="5" y="5" width="3" height="3" rx="0.6" fill="currentColor" />
+        <rect x="9" y="5" width="2" height="3" rx="0.6" fill="currentColor" opacity="0.7" />
+        <rect x="1" y="8" width="3" height="3" rx="0.6" fill="currentColor" opacity="0.3" />
+      </svg>
     </button>
   {/if}
 </div>

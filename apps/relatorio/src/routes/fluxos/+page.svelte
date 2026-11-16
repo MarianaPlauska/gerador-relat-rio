@@ -201,13 +201,13 @@
     <section class="cartao criador-fluxos">
       <div class="abas-fontes">
         <button class="aba-btn" class:ativa={abaAtiva === 'texto'} onclick={() => (abaAtiva = 'texto')}>
-          ✍️ Texto solto (primeiro)
+          Texto solto (primeiro)
         </button>
         <button class="aba-btn" class:ativa={abaAtiva === 'semana'} onclick={() => (abaAtiva = 'semana')}>
-          📅 Do dia / Da semana ({dados.planos.length} semanas, {cardsHoje.length} cards hoje)
+          Do dia / Da semana ({dados.planos.length} semanas, {cardsHoje.length} cards hoje)
         </button>
         <button class="aba-btn" class:ativa={abaAtiva === 'relatorios'} onclick={() => (abaAtiva = 'relatorios')}>
-          📑 Dos relatórios / Diário ({dados.registros.length} registros, {dados.listas.length} listas)
+          Dos relatórios / Diário ({dados.registros.length} registros, {dados.listas.length} listas)
         </button>
       </div>
 
@@ -233,11 +233,11 @@
           ></textarea>
 
           <p class="dica-sintaxe">
-            💡 <b>Dica de formatação:</b> use <code>// orientações</code> para adicionar anotações que aparecem ao <i>Percorrer</i>. Para decisões condicionais: <code>Pergunta? sim: Passo A / não: Passo B</code>.
+            <b>Dica de formatação:</b> use <code>// orientações</code> para adicionar anotações que aparecem ao <i>Percorrer</i>. Para decisões condicionais: <code>Pergunta? sim: Passo A / não: Passo B</code>.
           </p>
 
           <div class="acoes-criador">
-            <button class="principal grande" onclick={montarTexto}>✨ Montar fluxo a partir do texto</button>
+            <button class="principal grande" onclick={montarTexto}>Montar fluxo a partir do texto</button>
             <button onclick={copiarPedido}>{pedidoCopiado ? 'Pedido copiado!' : 'Copiar pedido para IA'}</button>
             <button class="neutro" onclick={() => guardar(novoFluxograma(nome || 'Fluxo em branco'))}>Fluxo em branco</button>
           </div>
@@ -251,7 +251,7 @@
           <div class="grade-fontes">
             <!-- OPÇÃO SEMANA -->
             <div class="card-fonte">
-              <div class="fonte-icone">📅</div>
+              <span class="etiqueta">Semana</span>
               <h3>Plano da Semana</h3>
               <p>Mapeia as entregas planejadas da semana, agrupadas por pessoa com prazos nos detalhes de cada etapa.</p>
 
@@ -274,7 +274,7 @@
 
             <!-- OPÇÃO DEMANDAS DE HOJE -->
             <div class="card-fonte">
-              <div class="fonte-icone">⚡</div>
+              <span class="etiqueta">Painel do dia</span>
               <h3>Demandas de Hoje</h3>
               <p>Mapeia os cards prioritários do dia (em execução, em risco ou atrasados) com responsáveis e prazos nos detalhes.</p>
 
@@ -283,7 +283,7 @@
               </div>
 
               <button class="principal" onclick={gerarDosCardsHoje} disabled={!cardsHoje.length}>
-                ✨ Gerar fluxo das demandas de hoje
+                Gerar fluxo das demandas de hoje
               </button>
             </div>
           </div>
@@ -297,7 +297,7 @@
           <div class="grade-fontes">
             <!-- REGISTROS DO DIÁRIO DO PAINEL -->
             <div class="card-fonte">
-              <div class="fonte-icone">📋</div>
+              <span class="etiqueta">Diário</span>
               <h3>Diário do Painel</h3>
               <p>Converte o motivo do registro, as imagens conferidas e os comentários em etapas sequenciais ricas.</p>
 
@@ -317,7 +317,7 @@
 
             <!-- LISTAS DE CONFERÊNCIA -->
             <div class="card-fonte">
-              <div class="fonte-icone">✅</div>
+              <span class="etiqueta">Checklists</span>
               <h3>Checklists / Listas</h3>
               <p>Transforma as etapas cadastradas em uma lista de checagem em um fluxo do início ao fim.</p>
 
@@ -562,10 +562,6 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-  }
-  .fonte-icone
-  {
-    font-size: 1.6rem;
   }
   .card-fonte h3
   {

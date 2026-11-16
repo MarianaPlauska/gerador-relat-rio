@@ -1,8 +1,8 @@
 <script lang="ts">
   import
   {
-    agoraLocal, compararComAnteriores, detectarOrigem, ehCsvDeDemandas, fotoVazia, idCurto, lerCards, lerCsvDemandas, lerOndas, lerTotais,
-    linhasNaoReconhecidas, mesclarNaFoto, nomesTotais, sugerirDaCaptura, unirCapturas,
+    agruparPorPessoa, agoraLocal, compararComAnteriores, detectarOrigem, ehCsvDeDemandas, fotoVazia, idCurto, lerCards, lerCsvDemandas, lerOndas, lerTotais,
+    linhasNaoReconhecidas, mesclarNaFoto, nomesTotais, pessoasDoProjeto, sugerirDaCaptura, unirCapturas,
     type CapturaLida, type CardSnapshot, type Onda, type OrigemLeitura, type RegistroPainel, type Snapshot, type TotaisPainel,
   } from '@supervisao/core';
   import { goto } from '$app/navigation';
@@ -81,9 +81,9 @@
   let cardsLidos = $state<CardSnapshot[]>([]);
   let ondasLidas = $state<Onda[]>([]);
   let motivo = $state('');
-  let observacao = $state('');
   let textoFinal = $state('');
   let editouTexto = $state(false);
+  let novaPessoaNome = $state('');
 
   // diário
   let busca = $state('');
@@ -92,7 +92,7 @@
 
   $effect(() => salvar($state.snapshot(dados)));
 
-  const pastas = $derived([...new Set([dados.prefixo || 'DEV', ...dados.registros.map((r) => r.pasta), ...dados.fotos.map((f) => f.pasta).filter((p): p is string => !!p), pastaAtual])].filter(Boolean));
+  const pastas = $derived([...new Set([dados.prefixo || 'DEV', ...dados.registros.map((r) => r.pasta), ...dados.fotos.map((f) => f.pasta).filter((p): p is string => !!p), ...(dados.pessoas.flatMap((p) => p.pastas ?? [])), pastaAtual])].filter(Boolean));
   const registrosDaPasta = $derived([...dados.registros].filter((r) => r.pasta === pastaAtual).sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm)));
   const registrosFiltrados = $derived.by(() =>
   {
@@ -106,9 +106,11 @@
   const fotoNumeros = $derived<Snapshot>(dados.fotos[indiceFotoNumeros] ?? { ...fotoVazia(dataNumeros), pasta: pastaAtual });
   const chavesLidas = $derived(Object.keys(totaisLidos) as ChaveTotal[]);
   const avisosCards = $derived(cardsLidos.filter((c) => c.avisosLeitura?.length).length);
-  const unido = $derived(unirCapturas($state.snapshot(capturas) as CapturaLida[], { motivo, observacao }));
+  const unido = $derived(unirCapturas($state.snapshot(capturas) as CapturaLida[], { motivo }));
   const comentados = $derived(capturas.filter((c) => c.comentario?.trim()).length);
-  const podeSalvar = $derived(capturas.length > 0 || !!observacao.trim() || !!textoFinal.trim());
+  const podeSalvar = $derived(capturas.length > 0 || !!motivo.trim() || !!textoFinal.trim());
+  const porPessoaConsolidado = $derived(agruparPorPessoa(cardsLidos, dados.pessoas));
+  const pessoasDaPasta = $derived(pessoasDoProjeto(dados.pessoas, [...cardsLidos, ...(fotoBase?.cards ?? [])], pastaAtual));
 
   // o texto final acompanha os comentários até a supervisora mexer nele
   $effect(() =>
@@ -116,16 +118,36 @@
     if (!editouTexto) textoFinal = unido.texto;
   });
 
+  function adicionarPessoaNaPasta()
+  {
+    const nome = novaPessoaNome.trim();
+    if (!nome) return;
+    const id = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || idCurto();
+    const existente = dados.pessoas.find((p) => p.id === id || p.nome.toLowerCase() === nome.toLowerCase());
+    if (existente)
+    {
+      const pastasAtuais = existente.pastas ?? (pastaAtual === 'DEV' ? ['DEV'] : ['DEV']);
+      if (!pastasAtuais.includes(pastaAtual)) existente.pastas = [...pastasAtuais, pastaAtual];
+    }
+    else
+    {
+      dados.pessoas = [...dados.pessoas, { id, nome, capacidadeHorasSemana: 40, pastas: [pastaAtual] }];
+    }
+    novaPessoaNome = '';
+    recalcular();
+  }
+
   function analisar(conteudo: string, origemForcada: OrigemLeitura | undefined, anteriores: CardSnapshot[])
   {
     const origem = origemForcada ?? detectarOrigem(conteudo);
-    const csv = ehCsvDeDemandas(conteudo) ? lerCsvDemandas(conteudo, { prefixo: dados.prefixo, pessoas: dados.pessoas }) : undefined;
+    const csv = ehCsvDeDemandas(conteudo) ? lerCsvDemandas(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas }) : undefined;
     const totais = csv ? {} : lerTotais(conteudo);
-    const cards = csv ? csv.cards : lerCards(conteudo, { prefixo: dados.prefixo, pessoas: dados.pessoas, origem, hoje: dataRegistro });
+    const cards = csv ? csv.cards : lerCards(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas, origem, hoje: dataRegistro });
     const ondas = lerOndas(conteudo);
     const comp = compararComAnteriores(cards, anteriores);
     const { avisos, sugestoes } = sugerirDaCaptura({ origem, totais, cards, ondas });
-    return { origem, totais, cards, ondas, avisos, sugestoes, naoReconhecido: linhasNaoReconhecidas(conteudo, dados.prefixo), repetidos: comp.repetidos, novos: comp.novos };
+    const porPessoa = agruparPorPessoa(cards, dados.pessoas).map(({ pessoa, tarefas }) => ({ pessoa, tarefas }));
+    return { origem, totais, cards, ondas, avisos, sugestoes, naoReconhecido: linhasNaoReconhecidas(conteudo, pastaAtual), repetidos: comp.repetidos, novos: comp.novos, porPessoa };
   }
 
   function juntar(t: TotaisPainel, c: CardSnapshot[], novoT: TotaisPainel, novoC: CardSnapshot[])
@@ -142,7 +164,7 @@
       {
         id: idCurto(), nome: `${nome} · ${nomesOrigem[a.origem]}`, origem: a.origem, texto: conteudo, ...(imagemDataUrl ? { imagemDataUrl } : {}),
         totais: Object.keys(a.totais) as ChaveTotal[], cards: a.cards.map((c) => c.codigo), ondas: a.ondas.length, avisos: a.avisos, sugestoes: a.sugestoes,
-        comentario: '', naoReconhecido: a.naoReconhecido, repetidos: a.repetidos, novos: a.novos,
+        comentario: '', naoReconhecido: a.naoReconhecido, repetidos: a.repetidos, novos: a.novos, porPessoa: a.porPessoa,
       },
     ];
     const j = juntar($state.snapshot(totaisLidos), $state.snapshot(cardsLidos), a.totais, a.cards);
@@ -165,7 +187,7 @@
       t = j.totais;
       c = j.cards;
       if (a.ondas.length) o = a.ondas;
-      return { ...cap, totais: Object.keys(a.totais) as ChaveTotal[], cards: a.cards.map((x) => x.codigo), ondas: a.ondas.length, avisos: a.avisos, sugestoes: a.sugestoes, naoReconhecido: a.naoReconhecido, repetidos: a.repetidos, novos: a.novos };
+      return { ...cap, totais: Object.keys(a.totais) as ChaveTotal[], cards: a.cards.map((x) => x.codigo), ondas: a.ondas.length, avisos: a.avisos, sugestoes: a.sugestoes, naoReconhecido: a.naoReconhecido, repetidos: a.repetidos, novos: a.novos, porPessoa: a.porPessoa };
     });
     totaisLidos = t;
     cardsLidos = c;
@@ -232,13 +254,22 @@
     cardsLidos = [];
     ondasLidas = [];
     motivo = '';
-    observacao = '';
     textoFinal = '';
     editouTexto = false;
   }
 
   function salvarRegistro(emitir = false)
   {
+    // garante que novas pessoas lidas nos cards deste projeto fiquem salvas na equipe do projeto
+    const descobertas = pessoasDoProjeto(dados.pessoas, cardsLidos, pastaAtual);
+    for (const p of descobertas)
+    {
+      if (!dados.pessoas.some((x) => x.id === p.id))
+      {
+        dados.pessoas = [...dados.pessoas, p];
+      }
+    }
+
     const registro: RegistroPainel = {
       id: idCurto(),
       pasta: pastaAtual,
@@ -264,7 +295,7 @@
       emitirRelatorio([registro.id]);
       return;
     }
-    aviso = `Guardado no diário da pasta ${pastaAtual} (${dataMedia(registro.data)}).`;
+    aviso = `Guardado no diário do projeto ${pastaAtual} (${dataMedia(registro.data)}).`;
     aba = 'diario';
   }
 
@@ -324,24 +355,35 @@
 </script>
 
 <main>
-  <span class="prompt">&gt; diário do painel · pasta {pastaAtual}</span>
+  <span class="prompt">&gt; diário do painel · projeto {pastaAtual}</span>
   <header>
     <div>
       <h1>Diário do painel<span class="cursor">_</span></h1>
-      <p class="dica sub">Vá guardando prints e comentários ao longo dos dias. Nada precisa virar relatório agora: no dia de montar, você escolhe o que entra.</p>
+      <p class="dica sub">Guarde prints e comentários por projeto. As pessoas e tarefas são agrupadas automaticamente sem repetição.</p>
     </div>
     <div class="topo-controles">
-      <label>Pasta
+      <label>Projeto
         <select bind:value={pastaAtual}>{#each pastas as p (p)}<option value={p}>{p}</option>{/each}</select>
       </label>
-      <input class="curto" bind:value={novaPasta} placeholder="Nova pasta" onkeydown={(e) => e.key === 'Enter' && criarPasta()} />
-      <button onclick={criarPasta} disabled={!novaPasta.trim()}>+ Pasta</button>
+      <input class="curto" bind:value={novaPasta} placeholder="Novo projeto" onkeydown={(e) => e.key === 'Enter' && criarPasta()} />
+      <button onclick={criarPasta} disabled={!novaPasta.trim()}>+ Projeto</button>
     </div>
   </header>
 
+  <div class="barra-equipe-projeto">
+    <span class="etiqueta">Equipe ({pastaAtual}):</span>
+    {#each pessoasDaPasta as p (p.id)}
+      <span class="pilula">{p.nome}</span>
+    {/each}
+    <div class="add-pessoa-inline">
+      <input bind:value={novaPessoaNome} placeholder="Adicionar pessoa ao projeto" onkeydown={(e) => e.key === 'Enter' && adicionarPessoaNaPasta()} />
+      <button onclick={adicionarPessoaNaPasta} disabled={!novaPessoaNome.trim()}>+ Pessoa</button>
+    </div>
+  </div>
+
   <div class="abas" role="tablist">
     <button role="tab" aria-selected={aba === 'novo'} class:ativa={aba === 'novo'} onclick={() => (aba = 'novo')}>Novo registro{capturas.length ? ` (${capturas.length} ${capturas.length === 1 ? 'print' : 'prints'})` : ''}</button>
-    <button role="tab" aria-selected={aba === 'diario'} class:ativa={aba === 'diario'} onclick={() => (aba = 'diario')}>Diário da pasta {pastaAtual} ({registrosDaPasta.length})</button>
+    <button role="tab" aria-selected={aba === 'diario'} class:ativa={aba === 'diario'} onclick={() => (aba = 'diario')}>Diário do projeto {pastaAtual} ({registrosDaPasta.length})</button>
   </div>
 
   {#if aviso}<p class="aviso">{aviso}</p>{/if}
@@ -403,7 +445,19 @@
     {#if capturas.length}
       <section class="cartao passo" class:feito={comentados > 0}>
         <h2><span class="num">{comentados ? '✓' : '2'}</span> Confira e comente cada print <small>({comentados}/{capturas.length} comentados)</small></h2>
-        <p class="dica">À esquerda está o print; à direita, o que foi entendido dele e o seu comentário. O que já tinha aparecido antes vem marcado como repetido, com o que mudou.</p>
+        <p class="dica">À esquerda está o print; à direita, o que foi entendido dele, a divisão por pessoa sem repetir nomes e o seu comentário.</p>
+
+        {#if porPessoaConsolidado.length}
+          <div class="resumo-por-pessoa">
+            <span class="etiqueta">Divisão por pessoa neste envio:</span>
+            <ul class="lista-por-pessoa">
+              {#each porPessoaConsolidado as grupo (grupo.pessoaId)}
+                <li><b>{grupo.pessoa}</b> &rarr; {grupo.tarefas.join(', ')}</li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+
         {#each capturas as cap, idx (cap.id)}
           <article class="captura">
             <div class="img">
@@ -455,7 +509,7 @@
                             {/each}
                           </optgroup>
                         {/if}
-                        <option value="__nova__">＋ Criar nova opção...</option>
+                        <option value="__nova__">+ Criar nova opção...</option>
                       </select>
                     </label>
                     <button
@@ -463,20 +517,27 @@
                       onclick={() => { criandoOpcaoPara = cap.id; textoNovaOpcao = ''; }}
                       title="Criar nova opção personalizada de classificação"
                     >
-                      ＋
+                      +
                     </button>
                     <button class="link perigo" onclick={() => removerCaptura(cap.id)}>remover</button>
                   {/if}
                 </span>
               </div>
               <div class="chips">
-                <span class="pilula">{cap.cards.length} cards{cap.cards.length ? `: ${cap.cards.slice(0, 6).join(', ')}${cap.cards.length > 6 ? '…' : ''}` : ''}</span>
+                <span class="pilula">{cap.cards.length} cards{cap.cards.length ? `: ${cap.cards.slice(0, 6).join(', ')}${cap.cards.length > 6 ? '...' : ''}` : ''}</span>
                 <span class="pilula">{cap.totais.length} indicadores</span>
                 {#if cap.ondas}<span class="pilula">{cap.ondas} ondas</span>{/if}
                 {#if cap.novos?.length}<span class="pilula novo">{cap.novos.length} novos</span>{/if}
                 {#if cap.repetidos?.length}<span class="pilula repetido">{cap.repetidos.length} já vistos</span>{/if}
               </div>
-              {#if cap.avisos.length}<p class="alerta">⚠ {cap.avisos.join(' ')}</p>{/if}
+              {#if cap.porPessoa?.length}
+                <div class="por-pessoa-print">
+                  {#each cap.porPessoa as gp (gp.pessoa)}
+                    <span class="item-pessoa-print"><b>{gp.pessoa}</b> &rarr; {gp.tarefas.join(', ')}</span>
+                  {/each}
+                </div>
+              {/if}
+              {#if cap.avisos.length}<p class="alerta">[Atenção] {cap.avisos.join(' ')}</p>{/if}
               {#if cap.repetidos?.some((r) => r.mudou.length)}
                 <p class="mudou"><b>Mudou desde antes:</b> {cap.repetidos.filter((r) => r.mudou.length).slice(0, 5).map((r) => `${r.codigo} (${r.mudou.join('; ')})`).join(' | ')}</p>
               {/if}
@@ -508,31 +569,28 @@
               {/each}
             </tbody></table>
           {/if}
-          {#if cardsLidos.length}<TabelaCards bind:cards={cardsLidos} pessoas={dados.pessoas} />{/if}
+          {#if cardsLidos.length}<TabelaCards bind:cards={cardsLidos} pessoas={pessoasDaPasta} />{/if}
         </details>
       </section>
     {/if}
 
     <section class="cartao passo" class:feito={!!motivo.trim()}>
-      <h2><span class="num">{motivo.trim() ? '✓' : capturas.length ? '3' : '2'}</span> Motivo e texto final</h2>
+      <h2><span class="num">{motivo.trim() ? '✓' : capturas.length ? '3' : '2'}</span> Motivo e resumo do registro</h2>
       <div class="duas">
         <label>Motivo ou título deste registro <input bind:value={motivo} placeholder="Ex.: Fechamento da Onda 1, fila travada em homologação" /></label>
         <label>Dia do registro <input type="date" bind:value={dataRegistro} /></label>
       </div>
-      <label class="bloco">Observação geral (opcional)
-        <textarea rows="2" bind:value={observacao} placeholder="Algo que vale para todos os prints"></textarea>
-      </label>
       <label class="bloco">
-        <span class="linha-entre">Texto final (prints + comentários unidos){#if editouTexto}<button class="link" onclick={() => (editouTexto = false)}>refazer a partir dos comentários</button>{/if}</span>
-        <textarea rows="7" value={textoFinal} oninput={(e) => { textoFinal = e.currentTarget.value; editouTexto = true; }} placeholder="Ele monta sozinho conforme você comenta os prints. Você pode ajustar."></textarea>
+        <span class="linha-entre">Texto do registro (prints e comentários unidos){#if editouTexto}<button class="link" onclick={() => (editouTexto = false)}>refazer a partir dos comentários</button>{/if}</span>
+        <textarea rows="5" value={textoFinal} oninput={(e) => { textoFinal = e.currentTarget.value; editouTexto = true; }} placeholder="Montado automaticamente conforme você comenta os prints, ou digite livremente aqui."></textarea>
       </label>
     </section>
 
     <section class="cartao passo">
       <h2><span class="num">{capturas.length ? '4' : '3'}</span> Guardar no diário</h2>
-      <div class="linha">
-        <button class="principal" onclick={() => salvarRegistro(false)} disabled={!podeSalvar}>Guardar na pasta {pastaAtual}</button>
-        <button class="link" onclick={() => salvarRegistro(true)} disabled={!podeSalvar}>guardar e emitir PDF deste registro (opcional)</button>
+      <div class="linha acoes-guardar">
+        <button class="principal" onclick={() => salvarRegistro(false)} disabled={!podeSalvar}>Guardar no projeto {pastaAtual}</button>
+        <button class="botao-pdf-destaque" onclick={() => salvarRegistro(true)} disabled={!podeSalvar}>Guardar e emitir PDF deste registro</button>
         {#if podeSalvar}<button class="link perigo" onclick={limpar}>descartar</button>{/if}
       </div>
     </section>
@@ -640,6 +698,22 @@
   .linha-nova-opcao { display: flex; align-items: center; gap: 6px; background: var(--superficie); padding: 3px 6px; border: 1px solid var(--marca); border-radius: 4px; }
   .input-nova-opcao { font-size: 0.78rem; padding: 3px 6px; border: 1px solid var(--borda); border-radius: 3px; min-width: 150px; background: var(--fundo); color: var(--texto); }
   .btn-salvar-opcao { font-size: 0.74rem; padding: 3px 8px; background: var(--marca); color: var(--sobre-marca); border: none; border-radius: 3px; cursor: pointer; font-weight: 600; }
+
+  /* EQUIPE DO PROJETO E AGRUPAMENTO POR PESSOA */
+  .barra-equipe-projeto { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; margin-bottom: 12px; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-pequeno); }
+  .barra-equipe-projeto .pilula { background: var(--superficie-2); border: 1px solid var(--borda); color: var(--texto); }
+  .add-pessoa-inline { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .add-pessoa-inline input { font-size: 0.8rem; padding: 3px 8px; width: 190px; }
+  .add-pessoa-inline button { font-size: 0.78rem; padding: 3px 8px; }
+  .resumo-por-pessoa { background: var(--superficie-2); border: 1px solid var(--borda); border-left: 3px solid var(--marca); border-radius: var(--raio-pequeno); padding: 10px 14px; margin: 10px 0; }
+  .lista-por-pessoa { margin: 6px 0 0; padding-left: 18px; font-size: 0.85rem; line-height: 1.45; }
+  .por-pessoa-print { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; padding: 6px 10px; background: var(--superficie); border-radius: 4px; border: 1px solid var(--borda); font-size: 0.82rem; }
+  .item-pessoa-print { color: var(--texto); }
+
+  /* BOTÃO DE GUARDAR E EMITIR PDF NÍTIDO E EM DESTAQUE */
+  .acoes-guardar { gap: 12px; }
+  .botao-pdf-destaque { background: var(--marca-clara); border: 1.5px solid var(--marca); color: var(--marca); font-weight: 700; padding: var(--size-2) var(--size-4); cursor: pointer; }
+  .botao-pdf-destaque:hover:not(:disabled) { background: var(--marca); color: var(--sobre-marca); }
   .captura { display: grid; grid-template-columns: minmax(180px, 280px) 1fr; gap: 14px; padding: 12px; margin: 10px 0; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie-2); }
   .img img { width: 100%; max-height: 240px; object-fit: contain; border-radius: 6px; border: 1px solid var(--borda); background: var(--fundo); }
   .sem-img { height: 100px; display: grid; place-items: center; border: 1px dashed var(--borda); border-radius: 6px; color: var(--suave); }
