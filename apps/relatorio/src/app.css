@@ -5,43 +5,43 @@
 @import 'open-props/shadows';
 @import 'open-props/easings';
 
-/* escuro é o padrão */
+/* escuro tecnológico (carbono-esmeralda): sem tom azulado e sem preto chapado cansativo, destacando a grade de quadrados */
 :root
 {
   color-scheme: dark;
-  --fundo: #232a36;
-  --superficie: #2c3442;
-  --superficie-2: #353f4f;
-  --borda: #425064;
-  --borda-forte: #5a6a80;
-  --texto: #eef2f7;
-  --suave: #b4bfce;
-  --marca: #4cc38a;
-  --sobre-marca: #06231a;
-  --marca-escura: #10141a;
-  --barra: #1b222d;
-  --marca-clara: rgb(76 195 138 / 14%);
-  --verde: #5fcf98;
-  --verde-fundo: rgb(95 207 152 / 12%);
+  --fundo: #121715;
+  --superficie: #18201d;
+  --superficie-2: #1f2a26;
+  --borda: #2b3a34;
+  --borda-forte: #3c5249;
+  --texto: #ebf2ee;
+  --suave: #9cb0a7;
+  --marca: #3dd68c;
+  --sobre-marca: #052014;
+  --marca-escura: #0c110f;
+  --barra: #0e1311;
+  --marca-clara: rgb(61 214 140 / 14%);
+  --verde: #4ce09a;
+  --verde-fundo: rgb(76 224 154 / 13%);
   --amarelo: #f2c14e;
   --amarelo-fundo: rgb(242 193 78 / 13%);
   --laranja: #f39c4f;
   --laranja-fundo: rgb(243 156 79 / 14%);
   --vermelho: #ff6f61;
   --vermelho-fundo: rgb(255 111 97 / 13%);
-  --azul: #6aa8ff;
-  --azul-fundo: rgb(106 168 255 / 13%);
-  --grade-fundo: rgb(255 255 255 / 4.5%);
-  --sombra: 0 0 0 1px rgb(0 0 0 / 18%), 0 6px 18px rgb(0 0 0 / 22%);
-  --brilho: 0 0 0 1px rgb(76 195 138 / 30%), 0 0 24px rgb(76 195 138 / 10%);
+  --azul: #5ec2b7;
+  --azul-fundo: rgb(94 194 183 / 13%);
+  --grade-fundo: rgb(61 214 140 / 8.5%);
+  --sombra: 0 0 0 1px rgb(0 0 0 / 28%), 0 8px 22px rgb(0 0 0 / 32%);
+  --brilho: 0 0 0 1px rgb(61 214 140 / 35%), 0 0 24px rgb(61 214 140 / 12%);
   --raio: var(--radius-3);
   --raio-pequeno: var(--radius-2);
   --espaco: var(--size-5);
   --curva: var(--ease-3);
   --fonte-maquina: "Courier Prime", "Courier New", monospace;
   --fonte-texto: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --cor-barra: #5b9e84;
-  --fundo-barra: #1e2530;
+  --cor-barra: #3dd68c;
+  --fundo-barra: #151d1a;
   --cursor: default;
   --cursor-clique: pointer;
 }
@@ -127,9 +127,13 @@ body
   margin: 0;
   font-family: var(--fonte-texto);
   background-color: var(--fundo);
-  background-image: linear-gradient(var(--grade-fundo) 1px, transparent 1px), linear-gradient(90deg, var(--grade-fundo) 1px, transparent 1px);
-  background-size: 28px 28px;
-  background-position: -1px -1px;
+  background-image:
+    linear-gradient(var(--grade-fundo) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grade-fundo) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% 0%, rgb(61 214 140 / 6%), transparent 70%);
+  background-size: 28px 28px, 28px 28px, 100% 640px;
+  background-position: -1px -1px, -1px -1px, 0 0;
+  background-repeat: repeat, repeat, no-repeat;
   color: var(--texto);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;

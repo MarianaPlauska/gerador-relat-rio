@@ -120,4 +120,22 @@ Registro de diretrizes visuais, regras de negocio e funcionalidades implementada
 6. **Calculo Automatico de Indicadores, Pontos de Atencao, Gargalos e Grafico em Linha**:
    - Calcula automaticamente os indicadores da pasta (`em risco`, `atrasadas`, `media de horas por demanda`, `tempo mediano por etapa`, `etapas concluidas`), reorganiza por prioridades, aponta onde estao demorando mais e plota um **Grafico em Linha SVG interativo** comparando Tempo Estipulado (h) vs Tempo Rodando/Consumido (h).
 
+## 8. Modularizacao de Arquivos Reutilizaveis e Tema Escuro Carbono-Esmeralda
+
+1. **Divisao e Modularizacao do Core (`@supervisao/core`)**:
+   - `packages/core/src/leitor/vetor.ts`: utilitarios puros de vetorizacao de texto, similaridade de cosseno e extracao de assunto.
+   - `packages/core/src/leitor/etapas-auto.ts`: geracao automatica de etapas descritas, estimativa de horas, impacto na semana e organizador multicriterio.
+   - `packages/core/src/leitor/metricas-auto.ts`: motor automatico de KPIs, gargalos de demora, pontos de atencao e serie de grafico em linha.
+   - `packages/core/src/leitor/equipe-analise.ts`: agrupamento sem repeticao de nomes, gestao de equipe por projeto, historico de remocao (Dia X ao Dia Y) e analise probabilistica.
+2. **Componentes Reutilizaveis de Painel (`apps/relatorio/src/lib/painel/`)**:
+   - `GraficoLinhaDemandas.svelte`: grafico em linha SVG reutilizavel.
+   - `PainelMetricasAutomaticas.svelte`: painel de KPIs automaticos, pontos de atencao, gargalos e grafico.
+   - `InspetorTarefaCard.svelte`: inspetor unificado para painel lateral a direita e modal detalhado da tarefa.
+   - `ModalCapturaAmpliada.svelte`: modal ampliado de print e OCR.
+   - `ModalGerenciarEquipe.svelte`: modal de gerenciamento de pessoas, batimento de rendimento e alerta de remocao preservando historico.
+3. **Tema Escuro Carbono-Esmeralda com Grade de Quadrados Visivel (`app.css`)**:
+   - Substituido o tom azulado por uma paleta escura carbono-esmeralda (`--fundo: #121715`, `--superficie: #18201d`, `--superficie-2: #1f2a26`, `--borda: #2b3a34`, `--marca: #3dd68c`) alinhada ao verde tecnologico do OrbisOS.
+   - A grade de quadrados de `28px x 28px` no fundo (`--grade-fundo: rgb(61 214 140 / 8.5%)`) foi realcada com linhas esmeralda sutis e brilho radial tecnologico para que os quadrados fiquem nitidos sobre o fundo escuro sem cansar a vista.
+
+
 
