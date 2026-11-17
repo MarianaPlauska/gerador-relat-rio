@@ -62,11 +62,13 @@
   </div>
 </div>
 
-<GraficoLinhaDemandas
-  serie={metricas.serieGraficoLinha}
-  {...(tituloGrafico ? { titulo: tituloGrafico } : {})}
-  {...(aoSelecionarCard ? { aoClicarPonto: aoSelecionarCard } : {})}
-/>
+{#if metricas.serieGraficoLinha && metricas.serieGraficoLinha.length > 0}
+  <GraficoLinhaDemandas
+    serie={metricas.serieGraficoLinha}
+    {...(tituloGrafico ? { titulo: tituloGrafico } : {})}
+    {...(aoSelecionarCard ? { aoClicarPonto: aoSelecionarCard } : {})}
+  />
+{/if}
 
 <style>
   .kpis-auto-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 10px 0; }

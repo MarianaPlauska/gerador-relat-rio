@@ -421,3 +421,103 @@ W Prioridade 5'=—=01/11/27 31/01/28 2 (e) 0% 07/01/28 e Não iniciada`);
     expect(mesclarNaFoto(fotoVazia('2026-11-10'), {}, [], ondas).ondas).toHaveLength(1);
   });
 });
+
+describe('leitura de demandas das imagens reais do painel (DEV-289, DEV-274, DEV-280)', () =>
+{
+  const textoPrintMariana = `
+DEV-289
+• Crítico
+17/11/26
+—
+Suporte Kitu
+Crítica
+Outros — Erro cadastro de candidatos/funcionários • Kitu Sistema > Funcionários Descrição do solicitante: Ao...
+Mariana Coutinho
+15 min
+• Em andamento
+
+DEV-288
+• Crítico
+17/11/26
+—
+Suporte Kitu
+Crítica
+Erro no sistema e NÃO consigo seguir • Kitu Sistema > Agendamento Descrição do solicitante: Agendamento d...
+Mariana Coutinho
+20 min
+• Em andamento
+`;
+
+  const textoPrintDevs = `
+DEV-274
+18/11/26
+—
+Kitu Sistema
+Ajuste no BD: Fazer as seguintes validações: se mesmo cpf, então passar para o próximo campo; Se matrícula...
+Rodrigo Cinelli
+0 min
+• Em andamento
+
+DEV-280
+17/11/26
+—
+Kitu Sistema
+Baixa
+Na página de clientes, não está buscando de fato pelo nome fantasia ou qualquer informação que case na...
+Douglas Cerqueira
+0 min
+• Novo
+`;
+
+  it('lê DEV-289 com descrição completa, prioridade Crítica e tempo', () =>
+  {
+    const cards = lerCards(textoPrintMariana, { prefixo: 'DEV', pessoas: pessoasExemplo, origem: 'demandas' });
+    expect(cards).toHaveLength(2);
+    expect(cards[0]).toMatchObject({
+      codigo: 'DEV-289',
+      abertura: '2026-11-17',
+      sistema: 'Suporte Kitu',
+      prioridadeCard: 'Crítica',
+      criticidade: 3,
+      titulo: 'Outros — Erro cadastro de candidatos/funcionários • Kitu Sistema > Funcionários Descrição do solicitante: Ao...',
+      descricaoCompleta: 'Outros — Erro cadastro de candidatos/funcionários • Kitu Sistema > Funcionários Descrição do solicitante: Ao...',
+      responsaveis: ['mariana-coutinho'],
+      responsavelEtapaAtual: 'mariana-coutinho',
+      tempoTotalMin: 15,
+      statusCard: 'Em andamento',
+      situacao: 'em_execucao',
+    });
+    expect(cards[1]).toMatchObject({
+      codigo: 'DEV-288',
+      prioridadeCard: 'Crítica',
+      tempoTotalMin: 20,
+      responsaveis: ['mariana-coutinho'],
+    });
+  });
+
+  it('lê DEV-274 e DEV-280 separando descrição, sistema e responsáveis', () =>
+  {
+    const cards = lerCards(textoPrintDevs, { prefixo: 'DEV', pessoas: pessoasExemplo, origem: 'demandas' });
+    expect(cards).toHaveLength(2);
+    expect(cards[0]).toMatchObject({
+      codigo: 'DEV-274',
+      abertura: '2026-11-18',
+      sistema: 'Kitu Sistema',
+      titulo: 'Ajuste no BD: Fazer as seguintes validações: se mesmo cpf, então passar para o próximo campo; Se matrícula...',
+      descricaoCompleta: 'Ajuste no BD: Fazer as seguintes validações: se mesmo cpf, então passar para o próximo campo; Se matrícula...',
+      responsaveis: ['rodrigo-cinelli'],
+      statusCard: 'Em andamento',
+      situacao: 'em_execucao',
+    });
+    expect(cards[1]).toMatchObject({
+      codigo: 'DEV-280',
+      prioridadeCard: 'Baixa',
+      criticidade: 1,
+      titulo: 'Na página de clientes, não está buscando de fato pelo nome fantasia ou qualquer informação que case na...',
+      descricaoCompleta: 'Na página de clientes, não está buscando de fato pelo nome fantasia ou qualquer informação que case na...',
+      responsaveis: ['douglas-cerqueira'],
+      statusCard: 'Novo',
+      situacao: 'a_iniciar',
+    });
+  });
+});

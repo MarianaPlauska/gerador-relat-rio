@@ -371,6 +371,9 @@
                 <div class="pessoa-nome-grupo">
                   <span class="seta-expansao" class:aberta={expandida}>&#9656;</span>
                   <strong>{p.pessoa.nome}</strong>
+                  {#if p.estagioCritico}
+                    <span class="badge-alerta-critico" title={p.motivoEstagioCritico}>[Sobrecarga crítica]</span>
+                  {/if}
                 </div>
                 <div class="pessoa-acoes">
                   <span class="badge-acumulado" title="Tempo estipulado na semana / Capacidade semanal">
@@ -951,6 +954,17 @@
     border-radius: 999px;
     background: var(--marca-clara);
     color: var(--marca);
+    font-weight: 700;
+  }
+  .badge-alerta-critico
+  {
+    font-family: var(--fonte-maquina);
+    font-size: 0.68rem;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--vermelho-fundo);
+    color: var(--vermelho);
+    border: 1px solid var(--vermelho);
     font-weight: 700;
   }
   .badge-acumulado

@@ -870,6 +870,9 @@
                         <span class="seta-arvore">{aberta ? '▾' : '▸'}</span>
                         <b>{p.pessoa.nome}</b>
                         <small>({p.total} {p.total === 1 ? 'tarefa' : 'tarefas'})</small>
+                        {#if p.estagioCritico}
+                          <span class="pilula perigo-sobrecarga" title={p.motivoEstagioCritico}>[Sobrecarga crítica]</span>
+                        {/if}
                       </span>
                       <span class="metricas-pessoa-arvore">
                         <span class="pilula">{p.horasEstipuladasSemana}h / {p.capacidadeHorasSemana}h</span>
@@ -1127,7 +1130,7 @@
           </article>
         {/each}
 
-        <details class="conferir painel-inteligencia-auto" open>
+        <details class="conferir painel-inteligencia-auto">
           <summary>
             Indicadores calculados, prioridades, gargalos, gráfico em linha e checklist de etapas ({cardsLidos.length} demandas · {metricasEnvio.etapasConcluidasCount}/{metricasEnvio.etapasTotalCount} etapas concluídas · {metricasEnvio.totais.ritmoEmRisco ?? 0} em risco)
           </summary>
@@ -1393,7 +1396,38 @@
   .organizador-select { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--suave); }
   .organizador-select select { font-size: 0.75rem; padding: 2px 6px; max-width: 210px; }
 
-  .lista-tarefas-resumo, .lista-pessoas-arvore { display: flex; flex-direction: column; gap: 10px; max-height: 580px; overflow-y: auto; padding-right: 4px; }
+  .lista-tarefas-resumo, .lista-pessoas-arvore {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 440px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--borda-forte) var(--superficie);
+  }
+  .lista-tarefas-resumo::-webkit-scrollbar, .lista-pessoas-arvore::-webkit-scrollbar {
+    width: 6px;
+  }
+  .lista-tarefas-resumo::-webkit-scrollbar-track, .lista-pessoas-arvore::-webkit-scrollbar-track {
+    background: var(--superficie);
+    border-radius: 4px;
+  }
+  .lista-tarefas-resumo::-webkit-scrollbar-thumb, .lista-pessoas-arvore::-webkit-scrollbar-thumb {
+    background: var(--borda-forte);
+    border-radius: 4px;
+  }
+  .lista-tarefas-resumo::-webkit-scrollbar-thumb:hover, .lista-pessoas-arvore::-webkit-scrollbar-thumb:hover {
+    background: var(--marca);
+  }
+  .pilula.perigo-sobrecarga {
+    background: var(--vermelho-fundo);
+    color: var(--vermelho);
+    border: 1px solid var(--vermelho);
+    font-weight: 700;
+    font-size: 0.7rem;
+  }
   .item-tarefa-resumo { flex-shrink: 0; width: 100%; text-align: left; background: var(--superficie); border: 1px solid var(--borda); border-left: 3px solid var(--cor-barra); border-radius: 6px; padding: 9px 12px; font-size: 0.82rem; display: flex; flex-direction: column; gap: 4px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
   .item-tarefa-resumo:hover, .item-tarefa-resumo.selecionado { border-color: var(--marca); border-left-color: var(--marca); background: var(--marca-clara); }
   .assunto-tarefa { color: var(--texto); line-height: 1.35; font-weight: 500; }

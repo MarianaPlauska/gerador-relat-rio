@@ -105,12 +105,12 @@ function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[]): CardSnap
   if (comeca) card.planejadoPara = lerDatas(comeca[1]!).datas[0];
 
   // captura selo de prioridade (Baixa, Média, Alta, Crítica, Urgente)
-  const prioMatch = trecho.match(/\b(cr[ií]tica|urgente|alta|m[eé]dia|baixa)\b/i);
+  const prioMatch = trecho.match(/\b(cr[ií]tica|cr[ií]tico|urgente|alta|m[eé]dia|baixa)\b/i);
   if (prioMatch)
   {
     const pTxt = semAcento(prioMatch[1]!).toLowerCase();
-    card.prioridadeCard = pTxt === 'critica' ? 'Crítica' : pTxt === 'media' ? 'Média' : pTxt[0]!.toUpperCase() + pTxt.slice(1);
-    card.criticidade = pTxt === 'critica' || pTxt === 'urgente' ? 3 : pTxt === 'alta' ? 2 : 1;
+    card.prioridadeCard = (pTxt === 'critica' || pTxt === 'critico') ? 'Crítica' : pTxt === 'media' ? 'Média' : pTxt[0]!.toUpperCase() + pTxt.slice(1);
+    card.criticidade = (pTxt === 'critica' || pTxt === 'critico' || pTxt === 'urgente') ? 3 : pTxt === 'alta' ? 2 : 1;
   }
 
   // o status vem depois do tempo; antes dele "novo" pode ser parte da descrição
@@ -139,30 +139,76 @@ function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[]): CardSnap
 
   if (trecho.includes('\t'))
   {
-    const celulas = trecho.split(/\t|\r?\n/).map((c) => c.trim());
+    const celulas = trecho.split(/\t|\r?\n/).map((c) => c.trim()).filter(Boolean);
     const i = celulas.findIndex((c) => RE_TIPO.test(c));
-    if (i >= 0) card.titulo = celulas[i + 1] || undefined;
-    return card;
+    if (i >= 0 && celulas[i + 1])
+    {
+      const d = celulas[i + 1]!;
+      card.titulo = d;
+      card.descricaoCompleta = d;
+      return card;
+    }
   }
 
-  // imagem: a 1a linha tem tipo, começo da descrição, nome e tempo; a 2a tem a abertura, o resto da descrição e o sobrenome
+  // imagem: extrai todas as linhas que compõem a descrição da tarefa, descartando linhas puras de metadados
   const linhas = trecho.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const primeira = linhas[0] ?? '';
-  const tipo = primeira.match(RE_TIPO);
-  let comeco = tipo ? primeira.slice(tipo.index! + tipo[0].length) : primeira;
-  const corte = comeco.search(RE_TEMPO);
-  if (corte >= 0) comeco = comeco.slice(0, corte);
-  let resto = (linhas[1] ?? '').replace(/^\d{2}\/\d{2}\/\d{2,4}\s*/, '').replace(/^(baixa|m[eé]dia|alta|cr[ií]tica|urgente)\s+/i, '');
-  for (const p of achadas)
+
+  const ehLinhaMetadadosPura = (l: string): boolean =>
   {
-    const partes = p.nome.split(' ');
-    const reCompleto = new RegExp(`\\s*\\b${p.nome}\\b\\s*$`, 'i');
-    const rePrimeiro = new RegExp(`\\s*\\b${partes[0]}\\b\\s*$`, 'i');
-    const reSobrenome = new RegExp(`\\s*\\b${partes.slice(1).join(' ')}\\b\\s*$`, 'i');
-    comeco = comeco.replace(reCompleto, '').replace(rePrimeiro, '').replace(reSobrenome, '');
-    resto = resto.replace(reCompleto, '').replace(reSobrenome, '').replace(rePrimeiro, '');
+    if (/^(\d{2}\/\d{2}\/\d{2,4}|come[cç]a\s+\d{2}\/\d{2}\/\d{2,4})$/i.test(l)) return true;
+    if (/^[—–\-+=._·•\s]+$/.test(l)) return true;
+    if (/^[•·-]?\s*(cr[ií]tic[ao]|urgente|alta|m[eé]dia|baixa)\s*$/i.test(l)) return true;
+    if (/^(Kitu Sistema|Suporte Kitu|Outras Aplica[cç][oõ]es ou de Terceiros|Direcionamento)\s*$/i.test(l)) return true;
+    if (/^[O0o\d][\d,.]*\s*(?:min|h|d)$/i.test(l)) return true;
+    if (/^[•·-]?\s*(em andamento|novo|resolvido|planejado|cancelado)\s*$/i.test(l)) return true;
+    if (/^(id|solicitante|tipo|descri[cç][aã]o|respons[aá]vel|tempo|status|sat\.?)$/i.test(semAcento(l))) return true;
+    if (achadas.some((p) => semAcento(l).toLowerCase() === semAcento(p.nome).toLowerCase())) return true;
+    return false;
+  };
+
+  const linhasUteis = linhas.filter((l) => !ehLinhaMetadadosPura(l));
+
+  const limparLinha = (linha: string): string =>
+  {
+    let l = linha;
+    const mTipo = l.match(RE_TIPO);
+    if (mTipo && l.indexOf(mTipo[0]) < 15)
+    {
+      l = l.slice(l.indexOf(mTipo[0]) + mTipo[0].length);
+    }
+    // Remove datas e selos de prioridade no início em qualquer ordem
+    l = l.replace(/^(\d{2}\/\d{2}\/\d{2,4}\s*|[•·-]?\s*(?:cr[ií]tic[ao]|urgente|alta|m[eé]dia|baixa)\s+)+/i, '');
+    const cTempo = l.search(RE_TEMPO);
+    if (cTempo >= 0)
+    {
+      l = l.slice(0, cTempo);
+    }
+    for (const p of achadas)
+    {
+      const partes = p.nome.split(' ');
+      const reCompletoFim = new RegExp(`\\s*\\b${p.nome}\\b\\s*$`, 'i');
+      const rePrimeiroFim = new RegExp(`\\s*\\b${partes[0]}\\b\\s*$`, 'i');
+      const reSobrenomeFim = new RegExp(`\\s*\\b${partes.slice(1).join(' ')}\\b\\s*$`, 'i');
+      const reCompletoIni = new RegExp(`^\\s*\\b${p.nome}\\b\\s*`, 'i');
+      const rePrimeiroIni = new RegExp(`^\\s*\\b${partes[0]}\\b\\s*`, 'i');
+      const reSobrenomeIni = new RegExp(`^\\s*\\b${partes.slice(1).join(' ')}\\b\\s*`, 'i');
+
+      l = l.replace(reCompletoFim, '').replace(reSobrenomeFim, '').replace(rePrimeiroFim, '');
+      l = l.replace(reCompletoIni, '').replace(rePrimeiroIni, '').replace(reSobrenomeIni, '');
+    }
+    l = l.replace(/^[—–\-+=_·•\s]+|[—–\-+=_·•\s]+$/g, '').trim();
+    return l;
+  };
+
+  const partesDescricao = linhasUteis.map(limparLinha).filter(Boolean);
+  const textoDescricao = partesDescricao.join(' ').replace(/\s{2,}/g, ' ').trim();
+
+  if (textoDescricao)
+  {
+    card.titulo = textoDescricao;
+    card.descricaoCompleta = textoDescricao;
   }
-  card.titulo = `${comeco.trim()} ${resto.trim()}`.replace(/\s{2,}/g, ' ').trim() || undefined;
+
   return card;
 }
 
@@ -279,19 +325,19 @@ function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
   }
 
   // Extrai "O QUE FOI PEDIDO" (Imagem 2)
-  const mPedido = texto.match(/o que foi pedido(?:\s+editar)?\s*\r?\n([\s\S]+?)(?=\r?\n\s*(?:Etapas\b|\d+\s+de\s+\d+\s+conclu[ií]das|#\s+ETAPA)|$)/i);
+  const mPedido = texto.match(/o que foi pedido\b[^\n]*\r?\n([\s\S]+?)(?=\r?\n\s*(?:Etapas\b|\d+\s+de\s+\d+\s+conclu[ií]das|#\s*ETAPA\b|TIME\b|ABERTURA\b)|$)/i);
   if (mPedido)
   {
     const limpo = mPedido[1]!
       .split(/\r?\n/)
-      .map((l) => l.replace(/^\s*editar\s*$/i, '').trim())
+      .map((l) => l.replace(/^\s*\[?editar\]?\s*$/i, '').trim())
       .filter(Boolean)
       .join('\n')
       .trim();
     if (limpo.length > 3)
     {
       card.descricaoCompleta = limpo;
-      card.fontesCorrelacionadas = [...(card.fontesCorrelacionadas ?? []), 'pedido'];
+      card.fontesCorrelacionadas = [...new Set([...(card.fontesCorrelacionadas ?? []), 'pedido'])];
       if (!card.titulo)
       {
         const primeiraLinha = limpo.split(/\r?\n/)[0]!;

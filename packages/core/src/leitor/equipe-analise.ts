@@ -172,6 +172,8 @@ export interface ResumoPessoaProjeto
   nivelDemora: 'baixo' | 'moderado' | 'alto';
   motivoDemora: string;
   horasRodandoMax: number;
+  estagioCritico?: boolean;
+  motivoEstagioCritico?: string;
   probabilidadeMaisServicosPct: number;
   servicosExtrasSugeridos: number;
   acumuladoSemanas: {
@@ -416,6 +418,21 @@ export function analisarTimeNoProjeto(opcoes: {
 
     const folgaRatio = Math.max(0, (capacidadeHorasSemana - horasEstipuladasSemana) / capacidadeHorasSemana);
     const criticasPendentes = tarefas.filter((t) => t.situacao !== 'concluido' && (t.prioridadeCard === 'Crítica' || t.prioridadeCard === 'Alta')).length;
+    const tarefasAntigasOuLongas = tarefas.filter((t) => (t.horasEstimadas && t.horasEstimadas >= 10) || (t.etapas?.some((e) => (e.tempoRodandoHoras ?? 0) >= 12)));
+    const estagioCritico = criticasPendentes >= 2 || atrasado >= 2 || horasRodandoMax >= 14 || horasEstipuladasSemana > capacidadeHorasSemana || (criticasPendentes >= 1 && (horasRodandoMax >= 8 || tarefas.length >= 5));
+    let motivoEstagioCritico: string | undefined;
+    if (estagioCritico)
+    {
+      const motivos: string[] = [];
+      if (criticasPendentes >= 2) motivos.push(`${criticasPendentes} demandas críticas simultâneas`);
+      else if (criticasPendentes === 1) motivos.push('demanda crítica em execução');
+      if (horasRodandoMax >= 14) motivos.push(`etapa rodando há ${horasRodandoMax}h`);
+      if (atrasado >= 2) motivos.push(`${atrasado} demandas em atraso`);
+      if (horasEstipuladasSemana > capacidadeHorasSemana) motivos.push(`${horasEstipuladasSemana}h estipuladas vs ${capacidadeHorasSemana}h capacidade`);
+      if (tarefasAntigasOuLongas.length >= 2) motivos.push(`${tarefasAntigasOuLongas.length} tarefas acumuladas`);
+      motivoEstagioCritico = `Sobrecarga crítica: ${motivos.join(', ')}.`;
+    }
+
     const penalidadeFila = atrasado * 18 + criticasPendentes * 10 + (horasRodandoMax >= 12 ? 8 : 0);
     const bonusResolvidos = concluidos * 8;
     const probabilidadeMaisServicosPct = Math.min(
@@ -502,6 +519,8 @@ export function analisarTimeNoProjeto(opcoes: {
       nivelDemora,
       motivoDemora,
       horasRodandoMax,
+      estagioCritico,
+      motivoEstagioCritico,
       probabilidadeMaisServicosPct,
       servicosExtrasSugeridos,
       acumuladoSemanas: {
@@ -516,6 +535,13 @@ export function analisarTimeNoProjeto(opcoes: {
 
   for (const item of parciais)
   {
+    if (item.estagioCritico)
+    {
+      item.sugestoesAjuda.unshift(
+        `Alerta de sobrecarga crítica: ${item.motivoEstagioCritico || 'demanda crítica/tempo excessivo'}. Recomendado redistribuir ou parear para destravar entregas.`,
+      );
+    }
+
     const colegasComAtraso = parciais.filter((o) => o.pessoa.id !== item.pessoa.id && (o.atrasado > 0 || o.emRisco > 0));
     const colegasSobrecarregados = parciais.filter((o) => o.pessoa.id !== item.pessoa.id && o.total > item.total + 1);
 

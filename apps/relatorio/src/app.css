@@ -5,43 +5,43 @@
 @import 'open-props/shadows';
 @import 'open-props/easings';
 
-/* escuro tecnológico (carbono-esmeralda): sem tom azulado e sem preto chapado cansativo, destacando a grade de quadrados */
+/* escuro tecnológico refinado (carbono-obsidiana com esmeralda neon): sem tom azulado e sem tom de verde musgo velho, destacando a grade geométrica de quadrados */
 :root
 {
   color-scheme: dark;
-  --fundo: #121715;
-  --superficie: #18201d;
-  --superficie-2: #1f2a26;
-  --borda: #2b3a34;
-  --borda-forte: #3c5249;
-  --texto: #ebf2ee;
-  --suave: #9cb0a7;
-  --marca: #3dd68c;
-  --sobre-marca: #052014;
-  --marca-escura: #0c110f;
-  --barra: #0e1311;
-  --marca-clara: rgb(61 214 140 / 14%);
-  --verde: #4ce09a;
-  --verde-fundo: rgb(76 224 154 / 13%);
-  --amarelo: #f2c14e;
-  --amarelo-fundo: rgb(242 193 78 / 13%);
-  --laranja: #f39c4f;
-  --laranja-fundo: rgb(243 156 79 / 14%);
-  --vermelho: #ff6f61;
-  --vermelho-fundo: rgb(255 111 97 / 13%);
-  --azul: #5ec2b7;
-  --azul-fundo: rgb(94 194 183 / 13%);
-  --grade-fundo: rgb(61 214 140 / 8.5%);
-  --sombra: 0 0 0 1px rgb(0 0 0 / 28%), 0 8px 22px rgb(0 0 0 / 32%);
-  --brilho: 0 0 0 1px rgb(61 214 140 / 35%), 0 0 24px rgb(61 214 140 / 12%);
+  --fundo: #0b0e11;
+  --superficie: #12161a;
+  --superficie-2: #181e24;
+  --borda: #252e37;
+  --borda-forte: #364350;
+  --texto: #f0f4f7;
+  --suave: #8b99a6;
+  --marca: #00e599;
+  --sobre-marca: #011910;
+  --marca-escura: #07120e;
+  --barra: #0b0e11;
+  --marca-clara: rgb(0 229 153 / 14%);
+  --verde: #00e599;
+  --verde-fundo: rgb(0 229 153 / 13%);
+  --amarelo: #f59e0b;
+  --amarelo-fundo: rgb(245 158 11 / 14%);
+  --laranja: #f97316;
+  --laranja-fundo: rgb(249 115 22 / 14%);
+  --vermelho: #ef4444;
+  --vermelho-fundo: rgb(239 68 68 / 14%);
+  --azul: #38bdf8;
+  --azul-fundo: rgb(56 189 248 / 13%);
+  --grade-fundo: rgb(0 229 153 / 11%);
+  --sombra: 0 0 0 1px rgb(0 0 0 / 40%), 0 8px 24px rgb(0 0 0 / 45%);
+  --brilho: 0 0 0 1px rgb(0 229 153 / 40%), 0 0 24px rgb(0 229 153 / 15%);
   --raio: var(--radius-3);
   --raio-pequeno: var(--radius-2);
   --espaco: var(--size-5);
   --curva: var(--ease-3);
   --fonte-maquina: "Courier Prime", "Courier New", monospace;
   --fonte-texto: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --cor-barra: #3dd68c;
-  --fundo-barra: #151d1a;
+  --cor-barra: #00e599;
+  --fundo-barra: #151c22;
   --cursor: default;
   --cursor-clique: pointer;
 }
@@ -130,7 +130,7 @@ body
   background-image:
     linear-gradient(var(--grade-fundo) 1px, transparent 1px),
     linear-gradient(90deg, var(--grade-fundo) 1px, transparent 1px),
-    radial-gradient(ellipse at 50% 0%, rgb(61 214 140 / 6%), transparent 70%);
+    radial-gradient(ellipse at 50% 0%, rgb(0 229 153 / 7%), transparent 70%);
   background-size: 28px 28px, 28px 28px, 100% 640px;
   background-position: -1px -1px, -1px -1px, 0 0;
   background-repeat: repeat, repeat, no-repeat;

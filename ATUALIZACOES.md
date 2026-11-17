@@ -133,9 +133,31 @@ Registro de diretrizes visuais, regras de negocio e funcionalidades implementada
    - `InspetorTarefaCard.svelte`: inspetor unificado para painel lateral a direita e modal detalhado da tarefa.
    - `ModalCapturaAmpliada.svelte`: modal ampliado de print e OCR.
    - `ModalGerenciarEquipe.svelte`: modal de gerenciamento de pessoas, batimento de rendimento e alerta de remocao preservando historico.
-3. **Tema Escuro Carbono-Esmeralda com Grade de Quadrados Visivel (`app.css`)**:
-   - Substituido o tom azulado por uma paleta escura carbono-esmeralda (`--fundo: #121715`, `--superficie: #18201d`, `--superficie-2: #1f2a26`, `--borda: #2b3a34`, `--marca: #3dd68c`) alinhada ao verde tecnologico do OrbisOS.
-   - A grade de quadrados de `28px x 28px` no fundo (`--grade-fundo: rgb(61 214 140 / 8.5%)`) foi realcada com linhas esmeralda sutis e brilho radial tecnologico para que os quadrados fiquem nitidos sobre o fundo escuro sem cansar a vista.
+
+---
+
+## 9. Refinamento do Tema Escuro Cibernetico, Leitura Integral da Descricao de Cards e Alerta de Sobrecarga Critica
+
+1. **Ajuste Fino do Modo Escuro Tecnologico (`app.css`)**:
+   - Eliminado o tom de verde musgo/oliva envelhecido e o tom azulado em favor de uma paleta refinada em **carbono-obsidiana neutro com esmeralda neon de alta tecnologia**:
+     - `--fundo: #0b0e11` (grafite-obsidiana limpo e profundo, sem reflexos azulados e sem aparencia de verde militar).
+     - `--superficie: #12161a` e `--superficie-2: #181e24` (superficies contrastadas e sofisticadas).
+     - `--borda: #252e37` e `--borda-forte: #364350`.
+     - `--marca: #00e599` (verde neon tecnologico vibrante e moderno).
+     - `--grade-fundo: rgb(0 229 153 / 11%)` com `radial-gradient(ellipse at 50% 0%, rgb(0 229 153 / 7%), transparent 70%)`: a grade geometrica de quadrados de `28px x 28px` destaca-se com nitidez, estilo telemetria cyber-tech e total conforto visual.
+2. **Correcao e Extracao Integral da Descricao nos Prints (`packages/core/src/leitor/cards.ts`)**:
+   - Corrigido o leitor de demandas (`lerDemanda`): anteriormente o parser olhava apenas para as duas primeiras linhas de cada bloco de card; quando o OCR lia o selo de prioridade (`• Crítico`) ou data sob o ID, o titulo ficava corrompido e a descricao vazia.
+   - Agora, o leitor filtra todas as linhas puras de metadados (datas, selos, tracos, nomes de pessoas, tempos, status e cabecalhos), isola o tipo de sistema (`Suporte Kitu` / `Kitu Sistema`), remove ruidos periféricos e extrai a **coluna de descricao completa da tarefa** (ex.: `Outros — Erro cadastro de candidatos/funcionários • Kitu Sistema > Funcionários Descrição do solicitante: Ao...` ou `Ajuste no BD: Fazer as seguintes validações: se mesmo cpf, então passar para o próximo campo; Se matrícula...`).
+   - Popula simultaneamente `card.descricaoCompleta` e `card.titulo`, alimentando o `<textarea>` do inspetor e permitindo edicao em tempo real.
+   - No leitor de card aberto (`lerCardAberto`), o bloco `O QUE FOI PEDIDO` agora captura o texto integral multiline mesmo com botoes `[Editar]` ou icone na tela.
+3. **Alerta de Sobrecarga Critica (`[Sobrecarga crítica]`)**:
+   - Em `packages/core/src/leitor/equipe-analise.ts`, foi implementada a deteccao automatica de sobrecarga: alerta quando uma pessoa acumula multiplas demandas criticas simultaneas, etapas rodando ha mais de 14h (ou acumuladas ha semanas) ou horas estipuladas acima da capacidade semanal.
+   - O selo pulsante `[Sobrecarga crítica]` e exibido tanto no cabecalho da pessoa na arvore do envio quanto na Visao Executiva da Home, sugerindo no diagnostico a redistribuicao ou pareamento com colegas disponiveis.
+4. **Ergonomia Visual do Passo 2 e Rolagem Independente de Tarefas**:
+   - O container de **Resumo das tarefas identificadas** (`.lista-tarefas-resumo`) e a lista de pessoas (`.lista-pessoas-arvore`) receberam rolagem interna suave com `max-height: 440px` e scrollbar customizada tecnologica.
+   - O painel de indicadores e checklist completa (`.painel-inteligencia-auto`) inicia recolhido por padrao (sem `open`), reduzindo o consumo vertical do Passo 2 e permitindo chegar rapidamente ao Passo 3 (**Motivo e resumo do registro**) e Passo 4 (**Guardar no diario**).
+   - O grafico de linhas de demandas (`GraficoLinhaDemandas`) agora so e renderizado quando existem pontos de dados identificados.
+
 
 
 
