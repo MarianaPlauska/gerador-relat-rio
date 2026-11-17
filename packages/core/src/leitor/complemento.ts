@@ -1,4 +1,5 @@
-import type { CapturaLida, CardSnapshot, Pessoa, PlanoSemana, RegistroPainel, Ritmo, Situacao, Snapshot } from '../tipos';
+import type { CapturaLida, CardSnapshot, EtapaCard, Pessoa, PlanoSemana, RegistroPainel, Ritmo, Situacao, Snapshot } from '../tipos';
+import { estimarHorasCard, extrairAssunto } from './correlacao';
 import { nomesTotais } from './totais';
 import { semAcento } from './normalizar';
 
@@ -198,13 +199,22 @@ export interface TarefaPessoaSemana
 {
   codigo: string;
   titulo: string;
+  assunto: string;
+  descricaoCompleta?: string | undefined;
+  prioridadeCard?: string | undefined;
+  statusCard?: string | undefined;
+  horasEstimadas: number;
   etapa?: string | undefined;
+  etapas?: EtapaCard[] | undefined;
+  etapasConcluidas?: number | undefined;
+  etapasTotal?: number | undefined;
   frente?: string | undefined;
   ritmo?: Ritmo | undefined;
   situacao?: Situacao | undefined;
   previsao?: string | undefined;
   vencimento?: string | undefined;
   comentario?: string | undefined;
+  fontesCorrelacionadas?: string[] | undefined;
 }
 
 export interface ResumoPessoaProjeto
@@ -223,6 +233,15 @@ export interface ResumoPessoaProjeto
   sugestoesAjuda: string[];
   rendimentoSemanaPct: number;
   rendimentoAcumuladoPct: number;
+  horasEstipuladasSemana: number;
+  capacidadeHorasSemana: number;
+  horasLivresEstimadas: number;
+  nivelEntregaPct: number;
+  nivelDemora: 'baixo' | 'moderado' | 'alto';
+  motivoDemora: string;
+  horasRodandoMax: number;
+  probabilidadeMaisServicosPct: number;
+  servicosExtrasSugeridos: number;
   acumuladoSemanas: {
     semanasAtivas: number;
     totalDemandas: number;
@@ -307,7 +326,7 @@ export function analisarTimeNoProjeto(opcoes: {
     const noRitmo = meus.filter((c) => c.ritmoPainel === 'no_ritmo').length;
     const emRisco = meus.filter((c) => c.ritmoPainel === 'em_risco').length;
     const itensPlano = planoSemana?.pessoas.find((pp) => pp.pessoaId === p.id)?.itens ?? [];
-    const feitosPlano = itensPlano.filter((i) => i.feito || (i.cardCodigo && todosMeus.some((c) => c.codigo === i.cardCodigo && (c.situacao === 'concluido' || !!c.concluidoEm)))).length;
+    const feitosPlano = itensPlano.filter((i) => i.status === 'feito' || (i as { feito?: boolean }).feito || (i.cardCodigo && todosMeus.some((c) => c.codigo === i.cardCodigo && (c.situacao === 'concluido' || !!c.concluidoEm)))).length;
 
     const pts = noRitmo * 2 + concluidos * 2.5 + feitosPlano * 2 + emRisco * 1 + (meus.length > 0 ? 0.5 : 0);
     pontosSemanaPorPessoa.set(p.id, pts);
@@ -362,21 +381,32 @@ export function analisarTimeNoProjeto(opcoes: {
   {
     const meus = baseCards.filter((c) => pertenceAPessoa(c, p));
     const todosMeus = cardsAtuais.filter((c) => pertenceAPessoa(c, p));
-    const concluidos = todosMeus.filter((c) => c.situacao === 'concluido' || !!c.concluidoEm).length;
+    const concluidos = todosMeus.filter((c) => c.situacao === 'concluido' || !!c.concluidoEm || semAcento(c.statusCard ?? '').toLowerCase() === 'resolvido').length;
     const noRitmo = meus.filter((c) => c.ritmoPainel === 'no_ritmo').length;
     const emRisco = meus.filter((c) => c.ritmoPainel === 'em_risco').length;
     const atrasado = meus.filter((c) => c.ritmoPainel === 'atrasado' || c.situacao === 'atrasado').length;
 
-    const tarefas: TarefaPessoaSemana[] = meus.map((c) => ({
+    const listaBase = todosMeus.length > meus.length ? todosMeus : meus;
+
+    const tarefas: TarefaPessoaSemana[] = listaBase.map((c) => ({
       codigo: c.codigo,
       titulo: c.titulo ?? 'Demanda em acompanhamento',
+      assunto: c.assunto ?? extrairAssunto(c),
+      descricaoCompleta: c.descricaoCompleta,
+      prioridadeCard: c.prioridadeCard,
+      statusCard: c.statusCard,
+      horasEstimadas: estimarHorasCard(c),
       etapa: c.etapaAtual,
+      etapas: c.etapas,
+      etapasConcluidas: c.etapasConcluidas,
+      etapasTotal: c.etapasTotal,
       frente: c.sistema ?? pastaNorm,
       ritmo: c.ritmoPainel,
       situacao: c.situacao,
       previsao: c.previsao,
       vencimento: c.vencimento,
       comentario: c.comentario,
+      fontesCorrelacionadas: c.fontesCorrelacionadas,
     }));
 
     // também inclui itens do plano da semana se não houver cards lidos para ela
@@ -385,24 +415,85 @@ export function analisarTimeNoProjeto(opcoes: {
       const itensPlano = planoSemana.pessoas.find((pp) => pp.pessoaId === p.id)?.itens ?? [];
       for (const item of itensPlano)
       {
+        const feito = item.status === 'feito';
         tarefas.push({
           codigo: item.cardCodigo ?? 'PLANO',
           titulo: item.descricao,
-          etapa: item.feito ? 'Concluído' : 'Planejado na semana',
+          assunto: item.descricao,
+          horasEstimadas: feito ? 0 : (item.horas ?? 4),
+          etapa: feito ? 'Concluído' : 'Planejado na semana',
           frente: pastaNorm,
-          ritmo: item.feito ? 'no_ritmo' : undefined,
+          ritmo: feito ? 'no_ritmo' : undefined,
+          situacao: feito ? 'concluido' : 'em_execucao',
           previsao: item.ate,
         });
       }
     }
 
     const etapasEmAndamento = [...new Set(
-      tarefas.map((t) => t.etapa).filter((e): e is string => !!e && e.trim().length > 0),
+      tarefas
+        .flatMap((t) => [t.etapa, ...(t.etapas?.filter((e) => e.situacao === 'rodando').map((e) => e.nome) ?? [])])
+        .filter((e): e is string => !!e && e.trim().length > 0),
     )];
 
     const frentes = [...new Set(
       tarefas.map((t) => t.frente).filter((f): f is string => !!f && f.trim().length > 0),
     )];
+
+    // Cálculos de tempo estipulado, demora, nível de entrega e probabilidade de novos serviços
+    const capacidadeHorasSemana = p.capacidadeHorasSemana || 40;
+    const horasEstipuladasSemana = Math.round(tarefas.reduce((acc, t) => acc + t.horasEstimadas, 0) * 10) / 10;
+    const horasLivresEstimadas = Math.max(0, Math.round((capacidadeHorasSemana - horasEstipuladasSemana) * 10) / 10);
+
+    // Verifica horas acumuladas em etapas rodando (Imagem 3: ex. "rodando há 15,8 h")
+    let horasRodandoMax = 0;
+    let cardComDemora = '';
+    for (const t of tarefas)
+    {
+      for (const et of t.etapas ?? [])
+      {
+        if (et.tempoRodandoHoras !== undefined && et.tempoRodandoHoras > horasRodandoMax)
+        {
+          horasRodandoMax = et.tempoRodandoHoras;
+          cardComDemora = `${t.codigo} (${et.nome}: ${et.tempoRodandoHoras}h rodando)`;
+        }
+      }
+    }
+
+    let nivelDemora: 'baixo' | 'moderado' | 'alto' = 'baixo';
+    let motivoDemora = 'Fluxo sem gargalo de tempo registrado nas etapas.';
+    if (atrasado > 0 || horasRodandoMax >= 14)
+    {
+      nivelDemora = 'alto';
+      motivoDemora = cardComDemora
+        ? `Etapa em execução prolongada em ${cardComDemora}.`
+        : `${atrasado} ${atrasado === 1 ? 'demanda com atraso' : 'demandas com atraso'} na semana.`;
+    }
+    else if (emRisco > 0 || horasRodandoMax >= 8 || tarefas.filter((t) => t.situacao !== 'concluido').length >= 6)
+    {
+      nivelDemora = 'moderado';
+      motivoDemora = cardComDemora
+        ? `Atenção ao tempo em aberto em ${cardComDemora}.`
+        : `Fila com ${tarefas.filter((t) => t.situacao !== 'concluido').length} itens pendentes para a semana.`;
+    }
+
+    // Nível de entrega (0 a 100%)
+    const totalTarefas = tarefas.length;
+    const avancandoOuConcluidas = concluidos + noRitmo + tarefas.filter((t) => (t.etapasConcluidas ?? 0) > 0 || t.statusCard === 'Em andamento').length * 0.6;
+    const nivelEntregaPct = totalTarefas === 0
+      ? 100
+      : Math.min(100, Math.max(15, Math.round((avancandoOuConcluidas / totalTarefas) * 100 - atrasado * 12)));
+
+    // Probabilidade de absorver mais serviços na semana (0 a 100%)
+    const folgaRatio = Math.max(0, (capacidadeHorasSemana - horasEstipuladasSemana) / capacidadeHorasSemana);
+    const criticasPendentes = tarefas.filter((t) => t.situacao !== 'concluido' && (t.prioridadeCard === 'Crítica' || t.prioridadeCard === 'Alta')).length;
+    const penalidadeFila = atrasado * 18 + criticasPendentes * 10 + (horasRodandoMax >= 12 ? 8 : 0);
+    const bonusResolvidos = concluidos * 8;
+    const probabilidadeMaisServicosPct = Math.min(
+      98,
+      Math.max(5, Math.round(folgaRatio * 90 + bonusResolvidos - penalidadeFila)),
+    );
+    const servicosExtrasSugeridos = Math.max(0, Math.floor((horasLivresEstimadas * (probabilidadeMaisServicosPct / 100)) / 4));
 
     // Calcula quando ficará livre na semana
     const datasPendentes = tarefas
@@ -414,9 +505,10 @@ export function analisarTimeNoProjeto(opcoes: {
     let quandoLivre = 'Livre agora (sem tarefas ativas na semana)';
     let livreCedo = false;
 
-    if (tarefas.length === 0)
+    const ativasCount = tarefas.filter((t) => t.situacao !== 'concluido').length;
+    if (ativasCount === 0)
     {
-      quandoLivre = 'Livre na semana (disponível para novas frentes)';
+      quandoLivre = 'Livre na semana (disponível para novas demandas)';
       livreCedo = true;
     }
     else if (datasPendentes.length > 0)
@@ -434,18 +526,19 @@ export function analisarTimeNoProjeto(opcoes: {
       }
       else
       {
-        quandoLivre = `Alocado(a) até ${formatarDiaCurto(ultimaData)} (${tarefas.length} ${tarefas.length === 1 ? 'demanda' : 'demandas'})`;
+        quandoLivre = `Alocado(a) até ${formatarDiaCurto(ultimaData)} (${horasEstipuladasSemana}h estipuladas)`;
         livreCedo = false;
       }
     }
-    else if (tarefas.length <= 2 && atrasado === 0)
+    else if (horasEstipuladasSemana <= 20 && atrasado === 0)
     {
-      quandoLivre = `Previsão de agenda livre a partir de quinta (${tarefas.length} ${tarefas.length === 1 ? 'demanda ativa' : 'demandas ativas'})`;
+      const diasUteis = Math.max(1, Math.ceil(horasEstipuladasSemana / 8));
+      quandoLivre = `Estipulado ~${horasEstipuladasSemana}h (${diasUteis}d úteis) · livre em ${horasLivresEstimadas}h na semana`;
       livreCedo = true;
     }
     else
     {
-      quandoLivre = `Alocado(a) durante a semana (${tarefas.length} demandas em andamento)`;
+      quandoLivre = `Carga estipulada de ${horasEstipuladasSemana}h (${ativasCount} demandas ativas)`;
       livreCedo = false;
     }
 
@@ -474,6 +567,15 @@ export function analisarTimeNoProjeto(opcoes: {
       sugestoesAjuda: [] as string[],
       rendimentoSemanaPct,
       rendimentoAcumuladoPct,
+      horasEstipuladasSemana,
+      capacidadeHorasSemana,
+      horasLivresEstimadas,
+      nivelEntregaPct,
+      nivelDemora,
+      motivoDemora,
+      horasRodandoMax,
+      probabilidadeMaisServicosPct,
+      servicosExtrasSugeridos,
       acumuladoSemanas: {
         semanasAtivas: Math.max(hist.semanas.size, tarefas.length > 0 ? 1 : 0),
         totalDemandas: Math.max(hist.totalDemandas, tarefas.length),

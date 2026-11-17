@@ -1,8 +1,9 @@
 <script lang="ts">
   import
   {
-    agruparPorPessoa, agoraLocal, compararComAnteriores, detectarOrigem, ehCsvDeDemandas, fotoVazia, idCurto, lerCards, lerCsvDemandas, lerOndas, lerTotais,
-    linhasNaoReconhecidas, mesclarNaFoto, nomesTotais, pessoasDoProjeto, sugerirDaCaptura, unirCapturas,
+    agruparPorPessoa, agoraLocal, analisarTimeNoProjeto, compararComAnteriores, consolidarArvoreDeCards, correlacionarCapturaComArvore,
+    detectarOrigem, ehCsvDeDemandas, fotoVazia, idCurto, lerCards, lerCsvDemandas, lerOndas, lerTotais,
+    linhasNaoReconhecidas, mesclarNaFoto, nomesTotais, pessoasDoProjeto, segundaDaSemana, somarDias, sugerirDaCaptura, unirCapturas,
     type CapturaLida, type CardSnapshot, type Onda, type OrigemLeitura, type RegistroPainel, type Snapshot, type TotaisPainel,
   } from '@supervisao/core';
   import { goto } from '$app/navigation';
@@ -84,6 +85,7 @@
   let textoFinal = $state('');
   let editouTexto = $state(false);
   let novaPessoaNome = $state('');
+  let pessoaExpandidaEnvio = $state<string | null>(null);
 
   // diário
   let busca = $state('');
@@ -112,6 +114,19 @@
   const porPessoaConsolidado = $derived(agruparPorPessoa(cardsLidos, dados.pessoas));
   const pessoasDaPasta = $derived(pessoasDoProjeto(dados.pessoas, [...cardsLidos, ...(fotoBase?.cards ?? [])], pastaAtual));
 
+  const semanaRegistro = $derived(segundaDaSemana(dataRegistro));
+  const analiseEnvio = $derived(
+    analisarTimeNoProjeto({
+      pessoas: dados.pessoas,
+      fotos: [...fotosDaPasta.filter((f) => f.data < dataRegistro), { data: dataRegistro, pasta: pastaAtual, totais: totaisLidos, cards: cardsLidos }],
+      planos: dados.planos,
+      pasta: pastaAtual,
+      semanaInicio: semanaRegistro,
+      semanaFim: somarDias(semanaRegistro, 6),
+      hoje: dataRegistro,
+    }),
+  );
+
   // o texto final acompanha os comentários até a supervisora mexer nele
   $effect(() =>
   {
@@ -137,34 +152,60 @@
     recalcular();
   }
 
-  function analisar(conteudo: string, origemForcada: OrigemLeitura | undefined, anteriores: CardSnapshot[])
+  function analisar(
+    conteudo: string,
+    origemForcada: OrigemLeitura | undefined,
+    anteriores: CardSnapshot[],
+    capturasPrevias: CapturaLida[] = [],
+    cardPaiForcado?: string,
+  )
   {
     const origem = origemForcada ?? detectarOrigem(conteudo);
     const csv = ehCsvDeDemandas(conteudo) ? lerCsvDemandas(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas }) : undefined;
     const totais = csv ? {} : lerTotais(conteudo);
-    const cards = csv ? csv.cards : lerCards(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas, origem, hoje: dataRegistro });
+    const cardsBrutos = csv ? csv.cards : lerCards(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas, origem, hoje: dataRegistro });
+    const corr = correlacionarCapturaComArvore(cardsBrutos, anteriores, capturasPrevias, dados.pessoas, cardPaiForcado);
+    const cards = corr.cards.filter((c) => c.codigo !== '__ORFAO__');
     const ondas = lerOndas(conteudo);
     const comp = compararComAnteriores(cards, anteriores);
     const { avisos, sugestoes } = sugerirDaCaptura({ origem, totais, cards, ondas });
     const porPessoa = agruparPorPessoa(cards, dados.pessoas).map(({ pessoa, tarefas }) => ({ pessoa, tarefas }));
-    return { origem, totais, cards, ondas, avisos, sugestoes, naoReconhecido: linhasNaoReconhecidas(conteudo, pastaAtual), repetidos: comp.repetidos, novos: comp.novos, porPessoa };
+    return {
+      origem,
+      totais,
+      cards,
+      ondas,
+      avisos,
+      sugestoes,
+      naoReconhecido: linhasNaoReconhecidas(conteudo, pastaAtual),
+      repetidos: comp.repetidos,
+      novos: comp.novos,
+      porPessoa,
+      cardPaiVinculado: corr.cardPaiVinculado,
+      confiancaVinculoPct: corr.confiancaVinculoPct,
+      motivoVinculo: corr.motivoVinculo,
+    };
   }
 
   function juntar(t: TotaisPainel, c: CardSnapshot[], novoT: TotaisPainel, novoC: CardSnapshot[])
   {
     const m = mesclarNaFoto({ data: dataRegistro, totais: t, cards: c }, novoT, novoC);
-    return { totais: m.totais, cards: m.cards };
+    return { totais: m.totais, cards: consolidarArvoreDeCards(m.cards) };
   }
 
   function registrarCaptura(conteudo: string, nome: string, imagemDataUrl?: string)
   {
-    const a = analisar(conteudo, undefined, [...cardsLidos, ...(fotoBase?.cards ?? [])]);
+    const previas = $state.snapshot(capturas) as CapturaLida[];
+    const a = analisar(conteudo, undefined, [...cardsLidos, ...(fotoBase?.cards ?? [])], previas);
     capturas = [
       ...capturas,
       {
         id: idCurto(), nome: `${nome} · ${nomesOrigem[a.origem]}`, origem: a.origem, texto: conteudo, ...(imagemDataUrl ? { imagemDataUrl } : {}),
         totais: Object.keys(a.totais) as ChaveTotal[], cards: a.cards.map((c) => c.codigo), ondas: a.ondas.length, avisos: a.avisos, sugestoes: a.sugestoes,
         comentario: '', naoReconhecido: a.naoReconhecido, repetidos: a.repetidos, novos: a.novos, porPessoa: a.porPessoa,
+        ...(a.cardPaiVinculado ? { cardPaiVinculado: a.cardPaiVinculado } : {}),
+        ...(a.confiancaVinculoPct !== undefined ? { confiancaVinculoPct: a.confiancaVinculoPct } : {}),
+        ...(a.motivoVinculo ? { motivoVinculo: a.motivoVinculo } : {}),
       },
     ];
     const j = juntar($state.snapshot(totaisLidos), $state.snapshot(cardsLidos), a.totais, a.cards);
@@ -173,25 +214,49 @@
     if (a.ondas.length) ondasLidas = a.ondas;
   }
 
-  // refaz tudo a partir do texto de cada print (depois de corrigir um texto ou mudar o tipo)
+  // refaz tudo a partir do texto de cada print (depois de corrigir um texto, mudar o tipo ou ajustar o card pai)
   function recalcular()
   {
     let t: TotaisPainel = {};
     let c: CardSnapshot[] = [];
     let o: Onda[] = [];
     const base = fotoBase?.cards ?? [];
-    capturas = capturas.map((cap) =>
+    const processadas: CapturaLida[] = [];
+    for (const cap of capturas)
     {
-      const a = analisar(cap.texto, cap.origem, [...c, ...base]);
+      const a = analisar(cap.texto, cap.origem, [...c, ...base], processadas, cap.cardPaiVinculado);
       const j = juntar(t, c, a.totais, a.cards);
       t = j.totais;
       c = j.cards;
       if (a.ondas.length) o = a.ondas;
-      return { ...cap, totais: Object.keys(a.totais) as ChaveTotal[], cards: a.cards.map((x) => x.codigo), ondas: a.ondas.length, avisos: a.avisos, sugestoes: a.sugestoes, naoReconhecido: a.naoReconhecido, repetidos: a.repetidos, novos: a.novos, porPessoa: a.porPessoa };
-    });
+      const atualizada: CapturaLida = {
+        ...cap,
+        totais: Object.keys(a.totais) as ChaveTotal[],
+        cards: a.cards.map((x) => x.codigo),
+        ondas: a.ondas.length,
+        avisos: a.avisos,
+        sugestoes: a.sugestoes,
+        naoReconhecido: a.naoReconhecido,
+        repetidos: a.repetidos,
+        novos: a.novos,
+        porPessoa: a.porPessoa,
+        ...(a.cardPaiVinculado ? { cardPaiVinculado: a.cardPaiVinculado } : {}),
+        ...(a.confiancaVinculoPct !== undefined ? { confiancaVinculoPct: a.confiancaVinculoPct } : {}),
+        ...(a.motivoVinculo ? { motivoVinculo: a.motivoVinculo } : {}),
+      };
+      processadas.push(atualizada);
+    }
+    capturas = processadas;
     totaisLidos = t;
     cardsLidos = c;
     ondasLidas = o;
+  }
+
+  function atualizarHorasCard(codigo: string, valor: string)
+  {
+    const num = Number(valor);
+    if (Number.isNaN(num) || num < 0) return;
+    cardsLidos = cardsLidos.map((c) => (c.codigo === codigo ? { ...c, horasEstimadas: num } : c));
   }
 
   function removerCaptura(id: string)
@@ -444,17 +509,116 @@
 
     {#if capturas.length}
       <section class="cartao passo" class:feito={comentados > 0}>
-        <h2><span class="num">{comentados ? '✓' : '2'}</span> Confira e comente cada print <small>({comentados}/{capturas.length} comentados)</small></h2>
-        <p class="dica">À esquerda está o print; à direita, o que foi entendido dele, a divisão por pessoa sem repetir nomes e o seu comentário.</p>
+        <h2><span class="num">{comentados ? '✓' : '2'}</span> Árvore de correlação e conferência dos prints <small>({comentados}/{capturas.length} comentados)</small></h2>
+        <p class="dica">O sistema correlaciona automaticamente a lista geral (Vetor A), os detalhes do pedido (Vetor B1) e as etapas (Vetor B2), sem repetir nomes.</p>
 
-        {#if porPessoaConsolidado.length}
-          <div class="resumo-por-pessoa">
-            <span class="etiqueta">Divisão por pessoa neste envio:</span>
-            <ul class="lista-por-pessoa">
-              {#each porPessoaConsolidado as grupo (grupo.pessoaId)}
-                <li><b>{grupo.pessoa}</b> &rarr; {grupo.tarefas.join(', ')}</li>
-              {/each}
-            </ul>
+        {#if cardsLidos.length}
+          <div class="grade-arvore-envio">
+            <!-- RESUMO DAS TAREFAS (SEM REPETIÇÃO DE NOMES) -->
+            <div class="caixa-arvore">
+              <span class="etiqueta">Resumo das tarefas identificadas ({cardsLidos.length})</span>
+              <div class="lista-tarefas-resumo">
+                {#each cardsLidos as card (card.codigo)}
+                  <div class="item-tarefa-resumo">
+                    <div class="linha-entre">
+                      <span>
+                        <b class="maquina">{card.codigo}</b>
+                        {#if card.prioridadeCard}
+                          <span class="pilula prio-{card.prioridadeCard.toLowerCase()}">{card.prioridadeCard}</span>
+                        {/if}
+                        {#if card.statusCard}
+                          <span class="badge-status-card">{card.statusCard}</span>
+                        {/if}
+                      </span>
+                      <span class="fontes-vetor">
+                        {#if card.fontesCorrelacionadas?.length}
+                          [{card.fontesCorrelacionadas.join(' + ')}]
+                        {/if}
+                        {#if card.etapas?.length}
+                          · {card.etapasConcluidas ?? 0}/{card.etapas.length} etapas
+                        {/if}
+                        · ~{card.horasEstimadas ?? 4}h
+                      </span>
+                    </div>
+                    <div class="assunto-tarefa">{card.assunto || card.titulo || 'Demanda do painel'}</div>
+                  </div>
+                {/each}
+              </div>
+            </div>
+
+            <!-- PESSOAS IDENTIFICADAS (CLIQUE PARA EXPANDIR TAREFAS, PEDIDO, ETAPAS E PROBABILIDADE) -->
+            <div class="caixa-arvore">
+              <span class="etiqueta">Pessoas na semana (clique para ver as tarefas de cada pessoa)</span>
+              <div class="lista-pessoas-arvore">
+                {#each analiseEnvio.filter((p) => p.total > 0) as p (p.pessoa.id)}
+                  {@const aberta = pessoaExpandidaEnvio === p.pessoa.id}
+                  <div class="pessoa-no-arvore" class:aberta>
+                    <button
+                      type="button"
+                      class="cabecalho-pessoa-arvore"
+                      onclick={() => (pessoaExpandidaEnvio = aberta ? null : p.pessoa.id)}
+                    >
+                      <span>
+                        <span class="seta-arvore">{aberta ? '▾' : '▸'}</span>
+                        <b>{p.pessoa.nome}</b>
+                        <small>({p.total} {p.total === 1 ? 'tarefa' : 'tarefas'})</small>
+                      </span>
+                      <span class="metricas-pessoa-arvore">
+                        <span class="pilula">{p.horasEstipuladasSemana}h / {p.capacidadeHorasSemana}h</span>
+                        <span class="pilula" class:no_ritmo={p.probabilidadeMaisServicosPct >= 60} class:em_risco={p.probabilidadeMaisServicosPct >= 35 && p.probabilidadeMaisServicosPct < 60} class:atrasado={p.probabilidadeMaisServicosPct < 35}>
+                          {p.probabilidadeMaisServicosPct}% prob. +serviços
+                        </span>
+                      </span>
+                    </button>
+
+                    {#if aberta}
+                      <div class="corpo-pessoa-arvore">
+                        <div class="resumo-probabilistico">
+                          <span>Entrega: <b>{p.nivelEntregaPct}%</b></span>
+                          <span>Demora: <b>{p.nivelDemora}</b> ({p.motivoDemora})</span>
+                          <span>Capacidade extra: <b>+{p.servicosExtrasSugeridos} {p.servicosExtrasSugeridos === 1 ? 'serviço' : 'serviços'} (~{p.horasLivresEstimadas}h livres)</b></span>
+                        </div>
+
+                        {#each p.tarefas as tar (tar.codigo)}
+                          <div class="card-filho-arvore">
+                            <div class="linha-entre">
+                              <span>
+                                <b class="maquina">{tar.codigo}</b> {tar.assunto}
+                                {#if tar.prioridadeCard}<span class="badge-status-card">{tar.prioridadeCard}</span>{/if}
+                              </span>
+                              <label class="mini">Tempo estipulado (h)
+                                <input
+                                  type="number"
+                                  step="0.5"
+                                  class="input-horas-curto"
+                                  value={tar.horasEstimadas}
+                                  onchange={(e) => atualizarHorasCard(tar.codigo, e.currentTarget.value)}
+                                />
+                              </label>
+                            </div>
+                            {#if tar.descricaoCompleta}
+                              <p class="pedido-completo"><b>O que foi pedido:</b> {tar.descricaoCompleta}</p>
+                            {/if}
+                            {#if tar.etapas?.length}
+                              <ul class="etapas-filhas">
+                                {#each tar.etapas as et (et.ordem)}
+                                  <li>
+                                    <b>{et.ordem}. {et.nome}</b>
+                                    <span class="dica">
+                                      ({et.situacao.replace('_', ' ')}{et.tempoRodandoHoras !== undefined ? ` · rodando há ${et.tempoRodandoHoras}h` : ''}{et.desde ? ` desde ${et.desde.slice(0, 10).split('-').reverse().join('/')}` : ''})
+                                    </span>
+                                  </li>
+                                {/each}
+                              </ul>
+                            {/if}
+                          </div>
+                        {/each}
+                      </div>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            </div>
           </div>
         {/if}
 
@@ -530,6 +694,26 @@
                 {#if cap.novos?.length}<span class="pilula novo">{cap.novos.length} novos</span>{/if}
                 {#if cap.repetidos?.length}<span class="pilula repetido">{cap.repetidos.length} já vistos</span>{/if}
               </div>
+              {#if cap.cardPaiVinculado || cap.origem === 'card'}
+                <div class="vinculo-arvore-barra">
+                  <span class="etiqueta">Vetor Filho &rarr; Pai:</span>
+                  <select
+                    value={cap.cardPaiVinculado ?? cap.cards[0] ?? ''}
+                    onchange={(e) => { cap.cardPaiVinculado = e.currentTarget.value || undefined; recalcular(); }}
+                  >
+                    <option value="">Detectar automaticamente</option>
+                    {#each cardsLidos as c (c.codigo)}
+                      <option value={c.codigo}>{c.codigo} ({c.assunto || c.titulo || 'Demanda'})</option>
+                    {/each}
+                  </select>
+                  {#if cap.confiancaVinculoPct !== undefined}
+                    <span class="pilula novo">{cap.confiancaVinculoPct}% confiança</span>
+                  {/if}
+                  {#if cap.motivoVinculo}
+                    <small class="dica">{cap.motivoVinculo}</small>
+                  {/if}
+                </div>
+              {/if}
               {#if cap.porPessoa?.length}
                 <div class="por-pessoa-print">
                   {#each cap.porPessoa as gp (gp.pessoa)}
@@ -699,14 +883,39 @@
   .input-nova-opcao { font-size: 0.78rem; padding: 3px 6px; border: 1px solid var(--borda); border-radius: 3px; min-width: 150px; background: var(--fundo); color: var(--texto); }
   .btn-salvar-opcao { font-size: 0.74rem; padding: 3px 8px; background: var(--marca); color: var(--sobre-marca); border: none; border-radius: 3px; cursor: pointer; font-weight: 600; }
 
-  /* EQUIPE DO PROJETO E AGRUPAMENTO POR PESSOA */
+  /* EQUIPE DO PROJETO E ÁRVORE DE CORRELAÇÃO */
   .barra-equipe-projeto { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; margin-bottom: 12px; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-pequeno); }
   .barra-equipe-projeto .pilula { background: var(--superficie-2); border: 1px solid var(--borda); color: var(--texto); }
   .add-pessoa-inline { display: flex; align-items: center; gap: 6px; margin-left: auto; }
   .add-pessoa-inline input { font-size: 0.8rem; padding: 3px 8px; width: 190px; }
   .add-pessoa-inline button { font-size: 0.78rem; padding: 3px 8px; }
-  .resumo-por-pessoa { background: var(--superficie-2); border: 1px solid var(--borda); border-left: 3px solid var(--marca); border-radius: var(--raio-pequeno); padding: 10px 14px; margin: 10px 0; }
-  .lista-por-pessoa { margin: 6px 0 0; padding-left: 18px; font-size: 0.85rem; line-height: 1.45; }
+
+  .grade-arvore-envio { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; margin: 12px 0; }
+  .caixa-arvore { background: var(--superficie-2); border: 1px solid var(--borda); border-radius: var(--raio-pequeno); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .lista-tarefas-resumo, .lista-pessoas-arvore { display: flex; flex-direction: column; gap: 6px; max-height: 360px; overflow-y: auto; }
+  .item-tarefa-resumo { background: var(--superficie); border: 1px solid var(--borda); border-left: 3px solid var(--cor-barra); border-radius: 4px; padding: 7px 10px; font-size: 0.82rem; display: flex; flex-direction: column; gap: 3px; }
+  .assunto-tarefa { color: var(--texto); line-height: 1.3; }
+  .fontes-vetor { font-family: var(--fonte-maquina); font-size: 0.72rem; color: var(--suave); }
+  .badge-status-card { font-family: var(--fonte-maquina); font-size: 0.7rem; padding: 1px 6px; border-radius: 4px; background: var(--superficie-2); border: 1px solid var(--borda); color: var(--suave); margin-left: 4px; }
+  .pilula.prio-crítica, .pilula.prio-critica, .pilula.prio-urgente { background: var(--vermelho-fundo); color: var(--vermelho); }
+  .pilula.prio-alta { background: var(--amarelo-fundo); color: var(--amarelo); }
+  .pilula.prio-baixa { background: var(--superficie-2); color: var(--suave); }
+
+  .pessoa-no-arvore { background: var(--superficie); border: 1px solid var(--borda); border-radius: 6px; overflow: hidden; }
+  .pessoa-no-arvore.aberta { border-color: var(--marca); }
+  .cabecalho-pessoa-arvore { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; background: none; border: none; text-align: left; color: var(--texto); font-family: inherit; }
+  .seta-arvore { color: var(--marca); margin-right: 4px; font-family: var(--fonte-maquina); }
+  .metricas-pessoa-arvore { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .corpo-pessoa-arvore { border-top: 1px solid var(--borda); padding: 10px; background: var(--superficie-2); display: flex; flex-direction: column; gap: 8px; font-size: 0.8rem; }
+  .resumo-probabilistico { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 6px 8px; background: var(--superficie); border-radius: 4px; border: 1px solid var(--borda); font-size: 0.76rem; color: var(--suave); }
+  .resumo-probabilistico b { color: var(--texto); }
+  .card-filho-arvore { background: var(--superficie); border: 1px solid var(--borda); border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+  .input-horas-curto { width: 64px; font-size: 0.78rem; padding: 2px 5px; }
+  .pedido-completo { margin: 4px 0 0; font-size: 0.78rem; line-height: 1.35; color: var(--suave); white-space: pre-line; background: var(--superficie-2); padding: 6px 8px; border-radius: 4px; }
+  .etapas-filhas { margin: 4px 0 0; padding-left: 18px; font-size: 0.78rem; display: flex; flex-direction: column; gap: 2px; }
+
+  .vinculo-arvore-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; padding: 6px 10px; background: var(--superficie); border: 1px solid var(--borda); border-left: 3px solid var(--marca); border-radius: 4px; }
+  .vinculo-arvore-barra select { font-size: 0.78rem; padding: 2px 6px; max-width: 280px; }
   .por-pessoa-print { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; padding: 6px 10px; background: var(--superficie); border-radius: 4px; border: 1px solid var(--borda); font-size: 0.82rem; }
   .item-pessoa-print { color: var(--texto); }
 

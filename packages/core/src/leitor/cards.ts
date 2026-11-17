@@ -40,7 +40,7 @@ export interface OpcoesLeitura
 export function detectarOrigem(texto: string): OrigemLeitura
 {
   const t = semAcento(texto);
-  if (/o que foi pedido|\+ o que vai fazer|adicionar etapa/.test(t)) return 'card';
+  if (/o que foi pedido|\+ o que vai fazer|adicionar etapa|concluir card|subtarefa|ocioso entre etapas|\d+\s+de\s+\d+\s+concluidas/.test(t)) return 'card';
   if (/registros filtrados|solicitante\s+tipo/.test(t)) return 'demandas';
   // listas do cronograma têm a coluna de vencimento; os chips de filtro ("A iniciar") não mudam isso
   if (/\bvenc\b/.test(t) && /situacao/.test(t)) return 'cronograma';
@@ -93,21 +93,48 @@ function pessoasNoTexto(normal: string, pessoas: Pessoa[]): Pessoa[]
 // lista de Demandas: ID + abertura, solicitante, tipo, descrição, responsável, tempo, status
 function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[]): CardSnapshot
 {
-  const card: CardSnapshot = { codigo, responsaveis: [], origens: ['demandas'] };
+  const card: CardSnapshot = { codigo, responsaveis: [], origens: ['demandas'], fontesCorrelacionadas: ['lista'] };
   const normal = semAcento(trecho);
   const achadas = pessoasNoTexto(normal, pessoas);
   card.responsaveis = achadas.map((p) => p.id);
+  if (card.responsaveis.length > 0) card.responsavelEtapaAtual = card.responsaveis[0];
 
   const abertura = trecho.match(/(?:^|\n)[\s\t]*(\d{2}\/\d{2}\/\d{2,4})/);
   if (abertura) card.abertura = lerDatas(abertura[1]!).datas[0];
   const comeca = trecho.match(/come[cç]a\s+(\d{2}\/\d{2}\/\d{2,4})/i);
   if (comeca) card.planejadoPara = lerDatas(comeca[1]!).datas[0];
 
+  // captura selo de prioridade (Baixa, Média, Alta, Crítica, Urgente)
+  const prioMatch = trecho.match(/\b(cr[ií]tica|urgente|alta|m[eé]dia|baixa)\b/i);
+  if (prioMatch)
+  {
+    const pTxt = semAcento(prioMatch[1]!).toLowerCase();
+    card.prioridadeCard = pTxt === 'critica' ? 'Crítica' : pTxt === 'media' ? 'Média' : pTxt[0]!.toUpperCase() + pTxt.slice(1);
+    card.criticidade = pTxt === 'critica' || pTxt === 'urgente' ? 3 : pTxt === 'alta' ? 2 : 1;
+  }
+
   // o status vem depois do tempo; antes dele "novo" pode ser parte da descrição
   const tempo = trecho.match(RE_TEMPO);
+  if (tempo)
+  {
+    const mTempo = tempo[0].replace(/^[Oo]/, '0').match(/([\d,]+)\s*(min|h|d)/i);
+    if (mTempo)
+    {
+      const val = numeroBr(mTempo[1]!);
+      const un = mTempo[2]!.toLowerCase();
+      card.tempoTotalMin = Math.round(un === 'h' ? val * 60 : un === 'd' ? val * 480 : val);
+    }
+  }
   const aposTempo = tempo ? trecho.slice(tempo.index! + tempo[0].length) : trecho;
   const status = aposTempo.match(RE_STATUS_CARD)?.[0];
-  if (status) card.statusCard = status[0]!.toUpperCase() + status.slice(1).toLowerCase().replace(/time (\S)/, (_, l: string) => `Time ${l.toUpperCase()}`);
+  if (status)
+  {
+    card.statusCard = status[0]!.toUpperCase() + status.slice(1).toLowerCase().replace(/time (\S)/, (_, l: string) => `Time ${l.toUpperCase()}`);
+    const stNorm = semAcento(card.statusCard).toLowerCase();
+    if (stNorm === 'resolvido') card.situacao = 'concluido';
+    else if (stNorm === 'em andamento') card.situacao = 'em_execucao';
+    else if (stNorm === 'novo' || stNorm === 'planejado') card.situacao = 'a_iniciar';
+  }
   card.sistema = trecho.match(RE_TIPO)?.[0];
 
   if (trecho.includes('\t'))
@@ -125,7 +152,7 @@ function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[]): CardSnap
   let comeco = tipo ? primeira.slice(tipo.index! + tipo[0].length) : primeira;
   const corte = comeco.search(RE_TEMPO);
   if (corte >= 0) comeco = comeco.slice(0, corte);
-  let resto = (linhas[1] ?? '').replace(/^\d{2}\/\d{2}\/\d{2,4}\s*/, '').replace(/^(baixa|m[eé]dia|alta|urgente)\s+/i, '');
+  let resto = (linhas[1] ?? '').replace(/^\d{2}\/\d{2}\/\d{2,4}\s*/, '').replace(/^(baixa|m[eé]dia|alta|cr[ií]tica|urgente)\s+/i, '');
   for (const p of achadas)
   {
     const partes = p.nome.split(' ');
@@ -145,21 +172,143 @@ const situacaoEtapa = (texto: string): EtapaCard['situacao'] | undefined =>
   return undefined;
 };
 
-// card aberto no painel: cabeçalho (código, abertura, tipo, prazo de resposta, ritmo) e a lista de etapas.
-// Imagem: "1 - , não iniciada" numa linha e "Nome da etapa — ninguém — v Start" na seguinte.
+// extrai etapas no formato moderno do painel ("1 Validação dos requisitos Rodrigo Cinelli • rodando há 15,8 h desde 16/11/2026 16:25")
+function lerEtapasModernas(texto: string, pessoas: Pessoa[]): EtapaCard[]
+{
+  const inicioEtapas = texto.search(/\bEtapas\b|\d+\s+de\s+\d+\s+conclu[ií]das|#\s+ETAPA/i);
+  const escopo = inicioEtapas >= 0 ? texto.slice(inicioEtapas) : texto;
+  const linhas = escopo
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !/^(Etapas\b|#\s*ETAPA|\+\s*o que vai fazer|\+\s*pessoa|Concluir card$)/i.test(l));
+
+  // agrupa pelos índices numéricos de etapa (1, 2, 3...)
+  const blocos: { ordem: number; texto: string }[] = [];
+  for (const l of linhas)
+  {
+    const mNum = l.match(/^(\d{1,2})(?:\s+(.+))?$/);
+    if (mNum && Number(mNum[1]) >= 1 && Number(mNum[1]) <= 30 && (!blocos.length || Number(mNum[1]) === blocos.at(-1)!.ordem + 1 || Number(mNum[1]) === 1))
+    {
+      blocos.push({ ordem: Number(mNum[1]), texto: mNum[2] ?? '' });
+    }
+    else if (blocos.length)
+    {
+      blocos.at(-1)!.texto += ` ${l}`;
+    }
+  }
+
+  const resultado: EtapaCard[] = [];
+  for (const b of blocos)
+  {
+    const bruto = b.texto.replace(/\b(?:Concluir\s+Subtarefa|Subtarefa|Concluir\s+card|\+\s*o que vai fazer|\+\s*pessoa)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+    if (!bruto) continue;
+
+    const norm = semAcento(bruto);
+    const pessoaCad = pessoas.find((p) => norm.includes(semAcento(p.nome)));
+    let nomePessoaTexto = pessoaCad?.nome;
+    if (!nomePessoaTexto)
+    {
+      const mNome = bruto.match(/\b([A-ZÀ-Ý][a-zà-ÿ]+\s+[A-ZÀ-Ý][a-zà-ÿ]+)\b(?=[\s\S]*(?:rodando|n[aã]o iniciada|conclu[ií]d|v\b))/);
+      if (mNome) nomePessoaTexto = mNome[1];
+    }
+
+    let nomeEtapa = bruto;
+    if (nomePessoaTexto)
+    {
+      const idx = semAcento(bruto).toLowerCase().indexOf(semAcento(nomePessoaTexto).toLowerCase());
+      if (idx > 0) nomeEtapa = bruto.slice(0, idx).trim();
+    }
+    nomeEtapa = nomeEtapa.replace(/\s+[v•·-]\s*$/i, '').replace(/\s*(?:rodando h[aá].*|n[aã]o iniciada.*)$/i, '').trim();
+    if (!nomeEtapa) continue;
+
+    const sit = situacaoEtapa(bruto) ?? 'outra';
+    const mHoras = bruto.match(/rodando h[aá]\s*([\d,.]+)\s*(h|min|d)/i);
+    let tempoRodandoHoras: number | undefined;
+    if (mHoras)
+    {
+      const v = numeroBr(mHoras[1]!);
+      const u = mHoras[2]!.toLowerCase();
+      tempoRodandoHoras = Math.round((u === 'min' ? v / 60 : u === 'd' ? v * 8 : v) * 10) / 10;
+    }
+
+    const mDesde = bruto.match(/desde\s+(\d{2}\/\d{2}\/\d{2,4})(?:\s+(\d{2}:\d{2}))?/i);
+    const desdeData = mDesde ? lerDatas(mDesde[1]!).datas[0] : undefined;
+    const desde = desdeData ? (mDesde?.[2] ? `${desdeData}T${mDesde[2]}` : desdeData) : undefined;
+
+    resultado.push({
+      ordem: b.ordem,
+      nome: nomeEtapa,
+      pessoa: pessoaCad?.id ?? nomePessoaTexto,
+      situacao: sit,
+      ...(tempoRodandoHoras !== undefined ? { tempoRodandoHoras } : {}),
+      ...(desde ? { desde } : {}),
+    });
+  }
+  return resultado;
+}
+
+// card aberto no painel: cabeçalho (código, abertura, tipo, prazo de resposta, ritmo), "O que foi pedido" e lista de etapas.
 function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
 {
   const lido = texto.match(new RegExp(`\\b${opcoes.prefixo}-[0-9A-Z]{2,4}\\b`))?.[0];
-  if (!lido) return [];
-  const card: CardSnapshot = { codigo: corrigirCodigo(lido, opcoes.prefixo).codigo, responsaveis: [], origens: ['card'] };
-  const abertura = texto.match(/abertura[\s\S]*?(\d{2}\/\d{2}\/\d{4})/i);
-  if (abertura) card.abertura = lerDatas(abertura[1]!).datas[0]!;
+  const temPedidoOuEtapas = /o que foi pedido|\d+\s+de\s+\d+\s+conclu[ií]das|ocioso entre etapas|rodando h[aá]\s*[\d,]+|\+\s*o que vai fazer/i.test(semAcento(texto));
+  if (!lido && !temPedidoOuEtapas) return [];
+
+  const codigo = lido ? corrigirCodigo(lido, opcoes.prefixo).codigo : '__ORFAO__';
+  const card: CardSnapshot = { codigo, responsaveis: [], origens: ['card'], fontesCorrelacionadas: [] };
+
+  const abertura = texto.match(/abertura[\s\S]*?(\d{2}\/\d{2}\/\d{4})(?:\s+(\d{2}:\d{2}))?/i);
+  if (abertura)
+  {
+    card.abertura = lerDatas(abertura[1]!).datas[0]!;
+    if (abertura[2]) card.aberturaHora = abertura[2];
+  }
   const prazo = texto.match(/prazo de resposta[\s\S]*?(\d{2}\/\d{2}\/\d{4})/i);
   if (prazo) card.vencimento = lerDatas(prazo[1]!).datas[0]!;
   const tipo = texto.match(RE_TIPO)?.[0];
   if (tipo) card.sistema = tipo;
-  const ritmo = ritmos.find(([r]) => r.test(texto.slice(texto.search(/prazo consumido/i))))?.[1];
-  if (ritmo && /prazo consumido/i.test(texto)) card.ritmoPainel = ritmo;
+  const posPrazoConsumido = texto.search(/prazo consumido/i);
+  if (posPrazoConsumido >= 0)
+  {
+    const ritmo = ritmos.find(([r]) => r.test(texto.slice(posPrazoConsumido)))?.[1];
+    if (ritmo) card.ritmoPainel = ritmo;
+  }
+
+  // Extrai "O QUE FOI PEDIDO" (Imagem 2)
+  const mPedido = texto.match(/o que foi pedido(?:\s+editar)?\s*\r?\n([\s\S]+?)(?=\r?\n\s*(?:Etapas\b|\d+\s+de\s+\d+\s+conclu[ií]das|#\s+ETAPA)|$)/i);
+  if (mPedido)
+  {
+    const limpo = mPedido[1]!
+      .split(/\r?\n/)
+      .map((l) => l.replace(/^\s*editar\s*$/i, '').trim())
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+    if (limpo.length > 3)
+    {
+      card.descricaoCompleta = limpo;
+      card.fontesCorrelacionadas = [...(card.fontesCorrelacionadas ?? []), 'pedido'];
+      if (!card.titulo)
+      {
+        const primeiraLinha = limpo.split(/\r?\n/)[0]!;
+        card.titulo = limpo.length <= 120 ? limpo.replace(/\r?\n/g, ' ') : primeiraLinha;
+      }
+    }
+  }
+
+  // Cabeçalho de Etapas: "0 de 3 concluídas · ocioso entre etapas: 0 min úteis"
+  const mResumoEtapas = texto.match(/(\d+)\s+de\s+(\d+)\s+conclu[ií]das/i);
+  if (mResumoEtapas)
+  {
+    card.etapasConcluidas = Number(mResumoEtapas[1]);
+    card.etapasTotal = Number(mResumoEtapas[2]);
+  }
+  const mOcioso = texto.match(/ocioso entre etapas:\s*([\d,.]+)\s*(min|h)/i);
+  if (mOcioso)
+  {
+    const v = numeroBr(mOcioso[1]!);
+    card.ociosoEtapasMin = mOcioso[2]!.toLowerCase() === 'h' ? Math.round(v * 60) : Math.round(v);
+  }
 
   const etapas: EtapaCard[] = [];
   let pendente = '';
@@ -182,24 +331,36 @@ function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
     }
     else pendente += ` ${linha}`;
   }
+
+  if (etapas.length === 0)
+  {
+    const modernas = lerEtapasModernas(texto, opcoes.pessoas);
+    etapas.push(...modernas);
+  }
+
   if (etapas.length)
   {
     card.etapas = etapas;
-    card.etapasTotal = etapas.length;
-    card.etapasConcluidas = etapas.filter((e) => e.situacao === 'concluida').length;
+    card.etapasTotal = card.etapasTotal ?? etapas.length;
+    card.etapasConcluidas = card.etapasConcluidas ?? etapas.filter((e) => e.situacao === 'concluida').length;
+    card.fontesCorrelacionadas = [...new Set([...(card.fontesCorrelacionadas ?? []), 'etapas'])];
     const atual = etapas.find((e) => e.situacao === 'rodando') ?? etapas.find((e) => e.situacao !== 'concluida');
     if (atual)
     {
       card.etapaAtual = atual.nome;
       card.etapaAtualStatus = atual.situacao === 'rodando' ? 'rodando' : 'aguardando_start';
+      if (atual.tempoRodandoHoras !== undefined)
+      {
+        card.etapaAtualRodandoHaDias = Math.round((atual.tempoRodandoHoras / 8) * 10) / 10;
+      }
       if (atual.pessoa)
       {
         card.responsavelEtapaAtual = atual.pessoa;
-        card.responsaveis = [atual.pessoa];
+        card.responsaveis = [...new Set(etapas.map((e) => e.pessoa).filter((p): p is string => !!p))];
       }
     }
   }
-  card.avisosLeitura = etapas.length ? [] : ['sem etapas'];
+  card.avisosLeitura = etapas.length || card.descricaoCompleta ? [] : ['sem etapas'];
   return [card];
 }
 
@@ -452,13 +613,20 @@ function lerTrecho(codigo: string, trechoBruto: string, origem: OrigemLeitura, p
   return card;
 }
 
-// une duas leituras do mesmo card; o que veio depois tem prioridade
+// une duas leituras do mesmo card; o que veio depois tem prioridade, preservando descrição completa e fontes
 export function juntarCard(antigo: CardSnapshot, novo: CardSnapshot): CardSnapshot
 {
   const definidos = Object.fromEntries(Object.entries(novo).filter(([, v]) => v !== undefined));
+  const fontes = [...new Set([...(antigo.fontesCorrelacionadas ?? []), ...(novo.fontesCorrelacionadas ?? [])])];
+  const descricaoCompleta = (novo.descricaoCompleta?.length ?? 0) >= (antigo.descricaoCompleta?.length ?? 0)
+    ? (novo.descricaoCompleta ?? antigo.descricaoCompleta)
+    : antigo.descricaoCompleta;
+
   return {
     ...antigo,
     ...definidos,
+    ...(descricaoCompleta ? { descricaoCompleta } : {}),
+    ...(fontes.length ? { fontesCorrelacionadas: fontes } : {}),
     responsaveis: [...new Set([...antigo.responsaveis, ...novo.responsaveis])],
     origens: [...new Set([...antigo.origens, ...novo.origens])],
   };

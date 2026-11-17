@@ -46,7 +46,14 @@ export interface CardSnapshot
   // do CSV exportado da lista de Demandas: prioridade e horas da abertura até a conclusão, como o painel calcula
   prioridadeCard?: string;
   horasAteConcluir?: number;
-  // do card aberto: a lista de etapas
+  // do card aberto: texto integral de "O que foi pedido" e lista de etapas com tempos
+  descricaoCompleta?: string | undefined;
+  assunto?: string | undefined;
+  aberturaHora?: string | undefined;
+  tempoTotalMin?: number | undefined;
+  ociosoEtapasMin?: number | undefined;
+  horasEstimadas?: number | undefined;
+  fontesCorrelacionadas?: string[] | undefined;
   etapas?: EtapaCard[];
   comentario?: string | undefined;
   origens: OrigemLeitura[];
@@ -59,6 +66,8 @@ export interface EtapaCard
   nome: string;
   pessoa?: string | undefined;
   situacao: 'nao_iniciada' | 'rodando' | 'concluida' | 'outra';
+  tempoRodandoHoras?: number | undefined;
+  desde?: string | undefined;
 }
 
 // números exatamente como aparecem no painel do gestor
@@ -150,6 +159,9 @@ export interface CapturaLida
   repetidos?: { codigo: string; mudou: string[] }[] | undefined;
   novos?: string[] | undefined;
   porPessoa?: { pessoa: string; tarefas: string[] }[] | undefined;
+  cardPaiVinculado?: string | undefined;
+  confiancaVinculoPct?: number | undefined;
+  motivoVinculo?: string | undefined;
 }
 
 // uma entrada do diário da pasta: prints + comentários unidos em um texto, guardada com dia e motivo

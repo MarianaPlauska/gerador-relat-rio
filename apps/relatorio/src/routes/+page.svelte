@@ -286,22 +286,31 @@
       {:else}
         <div class="lista-demandas">
           {#each tarefasDaSemana as c (c.codigo)}
-            <div class="item-demanda" class:urgente={c.ritmoPainel === 'atrasado' || c.situacao === 'atrasado'}>
+            <div class="item-demanda" class:urgente={c.ritmoPainel === 'atrasado' || c.situacao === 'atrasado' || c.prioridadeCard === 'Crítica'}>
               <div class="demanda-topo">
                 <span class="demanda-codigo">{c.codigo}</span>
+                {#if c.prioridadeCard}
+                  <span class="pilula" class:atrasado={c.prioridadeCard === 'Crítica'} class:em_risco={c.prioridadeCard === 'Alta'}>{c.prioridadeCard}</span>
+                {/if}
                 {#if c.sistema}
                   <span class="demanda-frente">{c.sistema}</span>
                 {/if}
-                <span class="demanda-etapa">{c.etapaAtual || 'Em andamento'}</span>
+                <span class="demanda-etapa">{c.etapaAtual || c.statusCard || 'Em andamento'}</span>
+                {#if c.etapas?.length}
+                  <span class="demanda-frente">{c.etapasConcluidas ?? 0}/{c.etapas.length} etapas</span>
+                {/if}
+                {#if c.horasEstimadas !== undefined && c.horasEstimadas > 0}
+                  <span class="demanda-frente">~{c.horasEstimadas}h</span>
+                {/if}
                 {#if c.ritmoPainel === 'atrasado' || c.situacao === 'atrasado'}
                   <span class="pilula atrasado">atrasado</span>
                 {:else if c.ritmoPainel === 'em_risco'}
                   <span class="pilula em_risco">em risco</span>
-                {:else if c.ritmoPainel === 'no_ritmo'}
-                  <span class="pilula no_ritmo">no ritmo</span>
+                {:else if c.ritmoPainel === 'no_ritmo' || c.situacao === 'concluido'}
+                  <span class="pilula no_ritmo">{c.situacao === 'concluido' ? 'resolvido' : 'no ritmo'}</span>
                 {/if}
               </div>
-              <strong class="demanda-titulo">{c.titulo || 'Tarefa sem título descrito'}</strong>
+              <strong class="demanda-titulo">{c.assunto || c.titulo || 'Tarefa sem título descrito'}</strong>
               {#if c.previsao || c.vencimento || c.comentario}
                 <div class="demanda-meta">
                   {#if c.previsao}<span>Previsão: {dataMedia(c.previsao)}</span>{/if}
@@ -333,7 +342,7 @@
       <div class="secao-cabecalho">
         <div>
           <span class="etiqueta">Clique na pessoa para expandir</span>
-          <h2>Equipe e rendimento ({projetoAtual})</h2>
+          <h2>Equipe, entrega e probabilidade ({projetoAtual})</h2>
         </div>
         <a href="/semana" class="link-subtil">plano da semana &rarr;</a>
       </div>
@@ -356,11 +365,11 @@
                   <strong>{p.pessoa.nome}</strong>
                 </div>
                 <div class="pessoa-acoes">
-                  <span class="badge-rendimento" title="Percentual de rendimento na semana em relação à equipe">
-                    {p.rendimentoSemanaPct}% sem.
+                  <span class="badge-acumulado" title="Tempo estipulado na semana / Capacidade semanal">
+                    {p.horasEstipuladasSemana}h / {p.capacidadeHorasSemana}h
                   </span>
-                  <span class="badge-acumulado" title="Rendimento acumulado ao longo das semanas">
-                    {p.rendimentoAcumuladoPct}% acum.
+                  <span class="badge-rendimento" title="Probabilidade de conseguir absorver mais serviços na semana">
+                    {p.probabilidadeMaisServicosPct}% prob. +serviços
                   </span>
                   <span class="pessoa-contagem">{p.total} {p.total === 1 ? 'tarefa' : 'tarefas'}</span>
                   <button class="btn-1a1" onclick={(e) => abrirUmAUm(p.pessoa.id, e)} title="Abrir pauta de 1:1">1:1</button>
@@ -368,7 +377,7 @@
               </div>
 
               <div class="barra-ritmo-pilha" title="{p.noRitmo} no ritmo · {p.emRisco} em risco · {p.atrasado} atrasadas">
-                <span class="ritmo-verde" style:flex={p.noRitmo}></span>
+                <span class="ritmo-verde" style:flex={p.noRitmo + p.concluidos}></span>
                 <span class="ritmo-amarelo" style:flex={p.emRisco}></span>
                 <span class="ritmo-vermelho" style:flex={p.atrasado}></span>
                 {#if p.total === 0}
@@ -381,9 +390,8 @@
                   {#if p.total === 0}
                     Sem demandas ativas · {p.quandoLivre}
                   {:else}
-                    <span class="txt-verde">{p.noRitmo} ok</span> ·
-                    <span class="txt-amarelo">{p.emRisco} risco</span> ·
-                    <span class="txt-vermelho">{p.atrasado} atraso</span> ·
+                    <span>Entrega: <b>{p.nivelEntregaPct}%</b></span> ·
+                    <span>Demora: <b>{p.nivelDemora}</b></span> ·
                     <span>{p.quandoLivre}</span>
                   {/if}
                 </small>
@@ -392,22 +400,43 @@
 
             {#if expandida}
               <div class="pessoa-detalhes-expandido">
-                <!-- 1. TAREFAS E ETAPAS EM ANDAMENTO -->
+                <!-- 1. ÁRVORE DE TAREFAS, PEDIDO COMPLETO E ETAPAS DA PESSOA -->
                 <div class="bloco-detalhe-pessoa">
-                  <span class="etiqueta">O que está fazendo ({p.tarefas.length})</span>
+                  <span class="etiqueta">Árvore de tarefas de {p.pessoa.nome} ({p.tarefas.length})</span>
                   {#if p.tarefas.length === 0}
                     <p class="dica-curta">Nenhuma tarefa atribuída nesta semana.</p>
                   {:else}
-                    <ul class="lista-tarefas-pessoa">
+                    <div class="arvore-tarefas-home">
                       {#each p.tarefas as tar (tar.codigo)}
-                        <li>
-                          <b class="maquina">{tar.codigo}</b> {tar.titulo}
-                          {#if tar.etapa}<span class="meta-inline">· Etapa: <b>{tar.etapa}</b></span>{/if}
-                          {#if tar.frente}<span class="meta-inline">· Frente: {tar.frente}</span>{/if}
-                          {#if tar.previsao}<span class="meta-inline">· Prev.: {dataCurta(tar.previsao)}</span>{/if}
-                        </li>
+                        <div class="no-tarefa-home">
+                          <div class="no-tarefa-topo">
+                            <span>
+                              <b class="maquina">{tar.codigo}</b> {tar.assunto}
+                              {#if tar.prioridadeCard}<span class="chip-detalhe">{tar.prioridadeCard}</span>{/if}
+                              {#if tar.statusCard}<span class="chip-detalhe">{tar.statusCard}</span>{/if}
+                            </span>
+                            <span class="meta-inline">~{tar.horasEstimadas}h{tar.previsao ? ` · Prev. ${dataCurta(tar.previsao)}` : ''}</span>
+                          </div>
+                          {#if tar.descricaoCompleta}
+                            <p class="pedido-home"><b>Pedido:</b> {tar.descricaoCompleta}</p>
+                          {/if}
+                          {#if tar.etapas?.length}
+                            <ul class="etapas-home">
+                              {#each tar.etapas as et (et.ordem)}
+                                <li>
+                                  <b>{et.ordem}. {et.nome}</b>
+                                  <span class="meta-inline">
+                                    ({et.situacao.replace('_', ' ')}{et.tempoRodandoHoras !== undefined ? ` · rodando há ${et.tempoRodandoHoras}h` : ''}{et.desde ? ` desde ${et.desde.slice(0, 10).split('-').reverse().join('/')}` : ''})
+                                  </span>
+                                </li>
+                              {/each}
+                            </ul>
+                          {:else if tar.etapa}
+                            <span class="meta-inline">Etapa atual: <b>{tar.etapa}</b></span>
+                          {/if}
+                        </div>
                       {/each}
-                    </ul>
+                    </div>
                   {/if}
                 </div>
 
@@ -419,33 +448,36 @@
                       {#each p.etapasEmAndamento as et (et)}
                         <span class="chip-detalhe">{et}</span>
                       {:else}
-                        <span class="dica-curta">Nenhuma etapa informada</span>
+                        <span class="dica-curta">Nenhuma etapa em execução</span>
                       {/each}
                     </div>
                   </div>
                   <div>
-                    <span class="etiqueta">Frentes de atuação</span>
-                    <div class="chips-detalhe">
-                      {#each p.frentes as fr (fr)}
-                        <span class="chip-detalhe">{fr}</span>
-                      {:else}
-                        <span class="dica-curta">{projetoAtual}</span>
-                      {/each}
-                    </div>
+                    <span class="etiqueta">Diagnóstico de demora e ritmo</span>
+                    <p class="texto-destaque-detalhe">Nível {p.nivelDemora}: {p.motivoDemora}</p>
                   </div>
                 </div>
 
-                <!-- 3. QUANDO FICARÁ LIVRE E RENDIMENTO SEMANAL + ACUMULADO -->
+                <!-- 3. PROBABILIDADE DE MAIS SERVIÇOS E RENDIMENTO SEMANAL + ACUMULADO -->
                 <div class="grade-mini-detalhes">
                   <div>
-                    <span class="etiqueta">Disponibilidade na semana</span>
-                    <p class="texto-destaque-detalhe">{p.quandoLivre}</p>
+                    <span class="etiqueta">Probabilidade de absorver mais serviços</span>
+                    <div class="barras-rendimento">
+                      <div class="linha-rend">
+                        <span>Probabilidade: <b>{p.probabilidadeMaisServicosPct}%</b> (+{p.servicosExtrasSugeridos} {p.servicosExtrasSugeridos === 1 ? 'serviço' : 'serviços'} / ~{p.horasLivresEstimadas}h livres)</span>
+                        <div class="kpi-barra"><div class="kpi-barra-preenchimento" style:width="{p.probabilidadeMaisServicosPct}%"></div></div>
+                      </div>
+                      <div class="linha-rend">
+                        <span>Nível de entrega na semana: <b>{p.nivelEntregaPct}%</b></span>
+                        <div class="kpi-barra"><div class="kpi-barra-preenchimento" style:width="{p.nivelEntregaPct}%"></div></div>
+                      </div>
+                    </div>
                   </div>
                   <div>
                     <span class="etiqueta">Rendimento comparativo e acumulado</span>
                     <div class="barras-rendimento">
                       <div class="linha-rend">
-                        <span>Semana atual: <b>{p.rendimentoSemanaPct}%</b> da equipe</span>
+                        <span>Participação na semana: <b>{p.rendimentoSemanaPct}%</b> da equipe</span>
                         <div class="kpi-barra"><div class="kpi-barra-preenchimento" style:width="{p.rendimentoSemanaPct}%"></div></div>
                       </div>
                       <div class="linha-rend">
@@ -962,9 +994,10 @@
     justify-content: space-between;
     font-size: 0.72rem;
   }
-  .ritmo-texto .txt-verde { color: var(--verde); font-weight: 600; }
-  .ritmo-texto .txt-amarelo { color: var(--amarelo); font-weight: 600; }
-  .ritmo-texto .txt-vermelho { color: var(--vermelho); font-weight: 600; }
+  .ritmo-texto b
+  {
+    color: var(--texto);
+  }
 
   /* PAINEL EXPANDIDO DA PESSOA */
   .pessoa-detalhes-expandido
@@ -983,7 +1016,7 @@
     flex-direction: column;
     gap: 4px;
   }
-  .lista-tarefas-pessoa, .lista-sugestoes-pessoa
+  .lista-sugestoes-pessoa
   {
     margin: 2px 0 0;
     padding-left: 16px;
@@ -991,6 +1024,52 @@
     flex-direction: column;
     gap: 3px;
     line-height: 1.35;
+  }
+  .arvore-tarefas-home
+  {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 2px;
+  }
+  .no-tarefa-home
+  {
+    background: var(--superficie-2);
+    border: 1px solid var(--borda);
+    border-radius: 4px;
+    padding: 7px 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .no-tarefa-topo
+  {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+  }
+  .pedido-home
+  {
+    margin: 2px 0 0;
+    font-size: 0.76rem;
+    color: var(--suave);
+    line-height: 1.35;
+    white-space: pre-line;
+    background: var(--superficie);
+    padding: 5px 8px;
+    border-radius: 3px;
+    border-left: 2px solid var(--cor-barra);
+  }
+  .etapas-home
+  {
+    margin: 2px 0 0;
+    padding-left: 16px;
+    font-size: 0.76rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
   .meta-inline
   {

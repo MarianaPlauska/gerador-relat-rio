@@ -75,7 +75,7 @@ Registro de diretrizes visuais, regras de negocio e funcionalidades implementada
 
 ---
 
-## 5. Editor Visual de Fluxos de Processo (`/fluxos`)
+## 5.Editor Visual de Fluxos de Processo (`/fluxos`)
 
 1. **Criacao a partir de tres origens**:
    - **Texto solto (primeira opcao)**: transforma qualquer texto corrido, lista de passos, orientacoes com `// detalhes`, decisoes (`Pergunta? sim: A / nao: B`) ou codigo Mermaid em fluxograma.
@@ -86,3 +86,20 @@ Registro de diretrizes visuais, regras de negocio e funcionalidades implementada
 3. **Indicador de lacunas e Modo Percorrer**:
    - Alerta no topo caso existam nos sem saida, orfaos ou decisoes incompletas.
    - Botao **Percorrer** abre o guia passo a passo interativo, destacando o no atual no diagrama, exibindo as orientacoes da etapa e permitindo escolher os caminhos de decisao.
+
+---
+
+## 6. Correlacao por Vetores e Arvore entre Imagens + Modelo Probabilistico (`correlacao.ts`)
+
+1. **Hierarquia Vetor Pai (Lista) -> Vetor Filho (Pedido) -> Vetor Filho (Etapas)**:
+   - **Imagem tipo 1 (Lista Geral da Semana)**: extrai cards (`DEV-274`, `DEV-047`, `DEV-284`...), prioridades (`Critica`, `Alta`, `Media`, `Baixa`), status (`Em andamento`, `Resolvido`, `Novo`) e descricoes truncadas.
+   - **Imagem tipo 2 (Detalhe do Card / O que foi pedido)**: correlaciona por ID explicito ou por similaridade vetorial (cosseno de termos + prefixo truncado) e preenche `descricaoCompleta`, regras de validacao e horario exato de abertura (`18/11/2026 11:32`).
+   - **Imagem tipo 3 (Etapas Internas sem ID visivel no recorte)**: mesmo quando o print mostra apenas a tabela `Etapas` sem o codigo do card no topo, o motor vincula automaticamente ao card pai correto cruzando sequencia do envio, vetor de responsavel (`Rodrigo Cinelli`) e consistencia de status (`Em andamento` compativel com `rodando ha 15,8 h`).
+2. **Visualizacao sem repetir nomes e Arvore por Pessoa**:
+   - Na visao geral da semana e do envio, exibe apenas o resumo das tarefas (codigo, assunto, prioridade, etapas e tempo estipulado), sem repetir o nome do responsavel em cada linha.
+   - Ao clicar no nome da pessoa, expande a arvore completa com cada tarefa dela, o texto integral do pedido (`O que foi pedido`) e as etapas internas com tempos (`Etapas`).
+3. **Calculo de Tempo Estipulado, Nivel de Entrega, Demora e Probabilidade de Mais Servicos**:
+   - **Tempo estipulado (`horasEstimadas`)**: calculado automaticamente pela prioridade, quantidade de regras condicionais (`se ... entao`) no pedido e etapas restantes (com edicao manual disponivel).
+   - **Nivel de entrega (`nivelEntregaPct`) e Demora (`nivelDemora`)**: avalia a proporcao de itens concluidos/avancando e alerta gargalos quando ha etapas rodando ha muitas horas (ex.: `15,8 h` desde `16/11`).
+   - **Probabilidade de absorver mais servicos (`probabilidadeMaisServicosPct`)**: calcula de 0% a 100% a chance de alocar novas demandas para a pessoa na semana e sugere quantos servicos/horas extras cabem na agenda dela.
+
