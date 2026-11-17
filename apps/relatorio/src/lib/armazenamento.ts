@@ -58,11 +58,13 @@ export interface Dados
   registros: RegistroPainel[];
   // opções personalizadas de tipo para "Entendi como"
   origensPersonalizadas?: string[];
+  // lista de projetos / pastas criados na organização
+  projetos?: string[];
 }
 
 function padrao(): Dados
 {
-  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [], vivos: [], registros: [], origensPersonalizadas: [] };
+  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [], vivos: [], registros: [], origensPersonalizadas: [], projetos: ['DEV'] };
 }
 
 // campos que faltam ganham o padrão; listas antigas ganham fases e diário

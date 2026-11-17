@@ -49,8 +49,8 @@ async function prepararImagem(imagem: Blob): Promise<HTMLCanvasElement>
   return canvas;
 }
 
-// gera uma cópia leve em JPEG (data URL) para guardar no registro e usar no relatório PDF/link
-export async function miniaturaDataUrl(imagem: Blob, larguraMax = 920): Promise<string>
+// gera uma cópia nítida em JPEG (data URL) para guardar no registro, ampliar no modal e usar no relatório PDF/link
+export async function miniaturaDataUrl(imagem: Blob, larguraMax = 1280): Promise<string>
 {
   const bitmap = await createImageBitmap(imagem);
   const escala = Math.min(1, larguraMax / bitmap.width);
@@ -59,7 +59,7 @@ export async function miniaturaDataUrl(imagem: Blob, larguraMax = 920): Promise<
   canvas.height = Math.max(1, Math.round(bitmap.height * escala));
   const ctx = canvas.getContext('2d')!;
   ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/jpeg', 0.78);
+  return canvas.toDataURL('image/jpeg', 0.84);
 }
 
 // quanto o texto parece do painel: códigos de card, datas e palavras de verdade

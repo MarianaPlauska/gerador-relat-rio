@@ -27,6 +27,8 @@
 
   const projetos = $derived(
     [...new Set([
+      'DEV',
+      ...(dados.projetos ?? []),
       dados.prefixo || 'DEV',
       ...dados.registros.map((r) => r.pasta),
       ...dados.fotos.map((f) => f.pasta).filter((p): p is string => !!p),
@@ -111,8 +113,14 @@
   {
     const p = novoProjeto.trim().toUpperCase();
     if (!p) return;
+    const atuais = dados.projetos ?? ['DEV'];
+    if (!atuais.includes(p))
+    {
+      dados.projetos = [...atuais, p];
+    }
     projetoAtual = p;
     novoProjeto = '';
+    salvar($state.snapshot(dados));
   }
 
   function adicionarPessoaAoProjeto()

@@ -13,6 +13,10 @@ export interface Pessoa
   nome: string;
   capacidadeHorasSemana: number;
   pastas?: string[] | undefined;
+  pastasRemovidas?: string[] | undefined;
+  removidaDaOrganizacao?: boolean | undefined;
+  historicoDe?: string | undefined;
+  historicoAte?: string | undefined;
 }
 
 // tudo opcional porque cada tela do painel mostra só parte do card
@@ -54,6 +58,8 @@ export interface CardSnapshot
   ociosoEtapasMin?: number | undefined;
   horasEstimadas?: number | undefined;
   fontesCorrelacionadas?: string[] | undefined;
+  cardsRelacionados?: string[] | undefined;
+  impactoSemana?: string | undefined;
   etapas?: EtapaCard[];
   comentario?: string | undefined;
   origens: OrigemLeitura[];
@@ -64,10 +70,13 @@ export interface EtapaCard
 {
   ordem: number;
   nome: string;
+  descricao?: string | undefined;
   pessoa?: string | undefined;
   situacao: 'nao_iniciada' | 'rodando' | 'concluida' | 'outra';
   tempoRodandoHoras?: number | undefined;
+  horasEstimadas?: number | undefined;
   desde?: string | undefined;
+  origemEtapa?: 'print' | 'automatica' | 'manual' | undefined;
 }
 
 // números exatamente como aparecem no painel do gestor

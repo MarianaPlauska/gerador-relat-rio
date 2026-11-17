@@ -156,10 +156,13 @@ function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[]): CardSnap
   for (const p of achadas)
   {
     const partes = p.nome.split(' ');
-    comeco = comeco.replace(new RegExp(`\\s*${partes[0]}\\s*$`, 'i'), '');
-    resto = resto.replace(new RegExp(`\\s*${partes.slice(1).join(' ')}\\s*$`, 'i'), '');
+    const reCompleto = new RegExp(`\\s*\\b${p.nome}\\b\\s*$`, 'i');
+    const rePrimeiro = new RegExp(`\\s*\\b${partes[0]}\\b\\s*$`, 'i');
+    const reSobrenome = new RegExp(`\\s*\\b${partes.slice(1).join(' ')}\\b\\s*$`, 'i');
+    comeco = comeco.replace(reCompleto, '').replace(rePrimeiro, '').replace(reSobrenome, '');
+    resto = resto.replace(reCompleto, '').replace(reSobrenome, '').replace(rePrimeiro, '');
   }
-  card.titulo = `${comeco.trim()} ${resto.trim()}`.trim() || undefined;
+  card.titulo = `${comeco.trim()} ${resto.trim()}`.replace(/\s{2,}/g, ' ').trim() || undefined;
   return card;
 }
 
@@ -240,6 +243,7 @@ function lerEtapasModernas(texto: string, pessoas: Pessoa[]): EtapaCard[]
       nome: nomeEtapa,
       pessoa: pessoaCad?.id ?? nomePessoaTexto,
       situacao: sit,
+      origemEtapa: 'print',
       ...(tempoRodandoHoras !== undefined ? { tempoRodandoHoras } : {}),
       ...(desde ? { desde } : {}),
     });
@@ -622,9 +626,22 @@ export function juntarCard(antigo: CardSnapshot, novo: CardSnapshot): CardSnapsh
     ? (novo.descricaoCompleta ?? antigo.descricaoCompleta)
     : antigo.descricaoCompleta;
 
+  // Preserva etapas vindas de print ou editadas manualmente quando o novo card só traz etapas automáticas ou nenhuma
+  let etapasMescladas = novo.etapas ?? antigo.etapas;
+  if (antigo.etapas?.length && novo.etapas?.length)
+  {
+    const antigoEhPrintOuManual = antigo.etapas.some((e) => e.origemEtapa === 'print' || e.origemEtapa === 'manual');
+    const novoEhPrintOuManual = novo.etapas.some((e) => e.origemEtapa === 'print' || e.origemEtapa === 'manual');
+    if (antigoEhPrintOuManual && !novoEhPrintOuManual)
+    {
+      etapasMescladas = antigo.etapas;
+    }
+  }
+
   return {
     ...antigo,
     ...definidos,
+    ...(etapasMescladas ? { etapas: etapasMescladas } : {}),
     ...(descricaoCompleta ? { descricaoCompleta } : {}),
     ...(fontes.length ? { fontesCorrelacionadas: fontes } : {}),
     responsaveis: [...new Set([...antigo.responsaveis, ...novo.responsaveis])],

@@ -103,3 +103,21 @@ Registro de diretrizes visuais, regras de negocio e funcionalidades implementada
    - **Nivel de entrega (`nivelEntregaPct`) e Demora (`nivelDemora`)**: avalia a proporcao de itens concluidos/avancando e alerta gargalos quando ha etapas rodando ha muitas horas (ex.: `15,8 h` desde `16/11`).
    - **Probabilidade de absorver mais servicos (`probabilidadeMaisServicosPct`)**: calcula de 0% a 100% a chance de alocar novas demandas para a pessoa na semana e sugere quantos servicos/horas extras cabem na agenda dela.
 
+## 7. Persistencia de Projetos, Modais Ampliados, Painel Lateral de Etapas, Gestao de Pessoas e Grafico em Linha
+
+1. **Persistencia Automatica de Novos Projetos (`dados.projetos`)**:
+   - Projetos criados pelo botao `+ Projeto` (tanto no Diario do Painel quanto na Visao Executiva) sao gravados imediatamente no armazenamento local e sincronizados, permanecendo salvos mesmo antes do primeiro registro.
+2. **Modal Ampliado da Captura (`<article class="captura">`)**:
+   - Clicar na miniatura do print ou em `Ver em modal` abre uma janela modal ampla com zoom de 100% na imagem, cards identificados clicaveis, divisao por pessoa, comentario e texto OCR editavel.
+3. **Painel Lateral a Direita + Modal da Tarefa + Etapas Automaticas Ticaveis**:
+   - Clicar em qualquer item de `Resumo das tarefas identificadas` ou dentro da arvore da pessoa abre o **Painel de Inspecao a Direita** (com botao `Ampliar em modal`).
+   - Cada card recebe automaticamente etapas estruturadas com a descricao do que a pessoa vai fazer (`gerarEtapasAutomaticasCard`), permitindo ticar (`checkbox`) o que ja foi feito ou sera feito, adicionar novas etapas, anotar observacoes e vincular/correlacionar com outras demandas futuras da semana (`calcularRelacoesEImpactoSemana`).
+4. **Organizador Inteligente de Tarefas (`ordenarCardsResumidos`)**:
+   - Permite ordenar o resumo das tarefas por: Prioridade e tempo (maior para menor), Codigo do card (`DEV-xxx` do maior para o menor ou menor para o maior), Assuntos/nomes parecidos (agrupamento por similaridade de cosseno) e Datas proximas.
+5. **Gerenciamento de Pessoas da Organizacao e Modal de Alerta de Remocao**:
+   - Modal dedicado para bater o rendimento semanal e acumulado da equipe, ajustar capacidade de horas e remover pessoas do projeto ou da organizacao.
+   - Ao remover uma pessoa, exibe um modal de confirmacao informando que a pessoa sera desativada para novos envios mantendo preservado o historico registrado do **dia X ao dia Y** (`calcularPeriodoHistoricoPessoa`).
+6. **Calculo Automatico de Indicadores, Pontos de Atencao, Gargalos e Grafico em Linha**:
+   - Calcula automaticamente os indicadores da pasta (`em risco`, `atrasadas`, `media de horas por demanda`, `tempo mediano por etapa`, `etapas concluidas`), reorganiza por prioridades, aponta onde estao demorando mais e plota um **Grafico em Linha SVG interativo** comparando Tempo Estipulado (h) vs Tempo Rodando/Consumido (h).
+
+

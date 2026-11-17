@@ -1,5 +1,5 @@
 import type { CapturaLida, CardSnapshot, EtapaCard, Pessoa, PlanoSemana, RegistroPainel, Ritmo, Situacao, Snapshot } from '../tipos';
-import { estimarHorasCard, extrairAssunto } from './correlacao';
+import { enriquecerCard, estimarHorasCard, extrairAssunto } from './correlacao';
 import { nomesTotais } from './totais';
 import { semAcento } from './normalizar';
 
@@ -156,12 +156,16 @@ export function agruparPorPessoa(cards: CardSnapshot[], pessoas: Pessoa[]): { pe
   return [...mapa.values()];
 }
 
-// retorna os colaboradores do projeto (pasta): tanto os cadastrados nesse projeto quanto novos nomes descobertos nos cards
+// retorna os colaboradores ativos do projeto (pasta): tanto os cadastrados nesse projeto quanto novos nomes descobertos nos cards (respeitando pessoas removidas)
 export function pessoasDoProjeto(pessoas: Pessoa[], cards: CardSnapshot[], pasta: string): Pessoa[]
 {
   const pastaNorm = (pasta || 'DEV').trim().toUpperCase();
+  const foiRemovida = (p: Pessoa) =>
+    !!p.removidaDaOrganizacao || (p.pastasRemovidas?.map((x) => x.toUpperCase()).includes(pastaNorm) ?? false);
+
   const base = pessoas.filter((p) =>
   {
+    if (foiRemovida(p)) return false;
     if (p.pastas && p.pastas.length > 0) return p.pastas.map((x) => x.toUpperCase()).includes(pastaNorm);
     return pastaNorm === 'DEV';
   });
@@ -180,11 +184,14 @@ export function pessoasDoProjeto(pessoas: Pessoa[], cards: CardSnapshot[], pasta
       const existente = pessoas.find((p) => p.id === bruto || semAcento(p.nome) === semAcento(bruto));
       if (existente)
       {
+        if (foiRemovida(existente)) continue;
         if (!porId.has(existente.id)) porId.set(existente.id, existente);
       }
       else
       {
         const id = slugPessoa(bruto);
+        const jaRemovidaPorSlug = pessoas.find((p) => slugPessoa(p.nome) === id && foiRemovida(p));
+        if (jaRemovidaPorSlug) continue;
         if (!porId.has(id))
         {
           porId.set(id, { id, nome: bruto.trim(), capacidadeHorasSemana: 40, pastas: [pastaNorm] });
@@ -193,6 +200,47 @@ export function pessoasDoProjeto(pessoas: Pessoa[], cards: CardSnapshot[], pasta
     }
   }
   return [...porId.values()];
+}
+
+// Calcula o intervalo de datas (Dia X ao Dia Y) em que a pessoa teve registros ou cards no histórico
+export function calcularPeriodoHistoricoPessoa(
+  pessoa: Pessoa,
+  fotos: Snapshot[],
+  registros: RegistroPainel[],
+  hoje: string,
+): { de: string; ate: string }
+{
+  const datas: string[] = [];
+  const idSub = slugPessoa(pessoa.nome);
+  const nomeNorm = semAcento(pessoa.nome).toLowerCase();
+
+  for (const f of fotos)
+  {
+    const temCard = f.cards.some(
+      (c) =>
+        c.responsavelEtapaAtual === pessoa.id ||
+        (c.responsavelEtapaAtual && slugPessoa(c.responsavelEtapaAtual) === idSub) ||
+        c.responsaveis.some((r) => r === pessoa.id || slugPessoa(r) === idSub),
+    );
+    if (temCard) datas.push(f.data);
+  }
+
+  for (const r of registros)
+  {
+    const temNoRegistro =
+      semAcento(r.texto).toLowerCase().includes(nomeNorm) ||
+      r.capturas.some((cap) => cap.porPessoa?.some((gp) => semAcento(gp.pessoa).toLowerCase() === nomeNorm));
+    if (temNoRegistro) datas.push(r.data);
+  }
+
+  if (pessoa.historicoDe) datas.push(pessoa.historicoDe);
+  if (pessoa.historicoAte) datas.push(pessoa.historicoAte);
+
+  datas.sort();
+  return {
+    de: datas[0] ?? hoje,
+    ate: datas.at(-1) ?? hoje,
+  };
 }
 
 export interface TarefaPessoaSemana
@@ -215,6 +263,8 @@ export interface TarefaPessoaSemana
   vencimento?: string | undefined;
   comentario?: string | undefined;
   fontesCorrelacionadas?: string[] | undefined;
+  cardsRelacionados?: string[] | undefined;
+  impactoSemana?: string | undefined;
 }
 
 export interface ResumoPessoaProjeto
@@ -388,26 +438,32 @@ export function analisarTimeNoProjeto(opcoes: {
 
     const listaBase = todosMeus.length > meus.length ? todosMeus : meus;
 
-    const tarefas: TarefaPessoaSemana[] = listaBase.map((c) => ({
-      codigo: c.codigo,
-      titulo: c.titulo ?? 'Demanda em acompanhamento',
-      assunto: c.assunto ?? extrairAssunto(c),
-      descricaoCompleta: c.descricaoCompleta,
-      prioridadeCard: c.prioridadeCard,
-      statusCard: c.statusCard,
-      horasEstimadas: estimarHorasCard(c),
-      etapa: c.etapaAtual,
-      etapas: c.etapas,
-      etapasConcluidas: c.etapasConcluidas,
-      etapasTotal: c.etapasTotal,
-      frente: c.sistema ?? pastaNorm,
-      ritmo: c.ritmoPainel,
-      situacao: c.situacao,
-      previsao: c.previsao,
-      vencimento: c.vencimento,
-      comentario: c.comentario,
-      fontesCorrelacionadas: c.fontesCorrelacionadas,
-    }));
+    const tarefas: TarefaPessoaSemana[] = listaBase.map((bruto) =>
+    {
+      const c = enriquecerCard(bruto);
+      return {
+        codigo: c.codigo,
+        titulo: c.titulo ?? 'Demanda em acompanhamento',
+        assunto: c.assunto ?? extrairAssunto(c),
+        descricaoCompleta: c.descricaoCompleta,
+        prioridadeCard: c.prioridadeCard,
+        statusCard: c.statusCard,
+        horasEstimadas: estimarHorasCard(c),
+        etapa: c.etapaAtual,
+        etapas: c.etapas,
+        etapasConcluidas: c.etapasConcluidas,
+        etapasTotal: c.etapasTotal,
+        frente: c.sistema ?? pastaNorm,
+        ritmo: c.ritmoPainel,
+        situacao: c.situacao,
+        previsao: c.previsao,
+        vencimento: c.vencimento,
+        comentario: c.comentario,
+        fontesCorrelacionadas: c.fontesCorrelacionadas,
+        cardsRelacionados: c.cardsRelacionados,
+        impactoSemana: c.impactoSemana,
+      };
+    });
 
     // também inclui itens do plano da semana se não houver cards lidos para ela
     if (tarefas.length === 0 && planoSemana)

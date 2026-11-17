@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { pessoasExemplo } from '../exemplo';
 import { lerCards } from './cards';
-import { analisarTimeNoProjeto } from './complemento';
-import { consolidarArvoreDeCards, correlacionarCapturaComArvore } from './correlacao';
+import { analisarTimeNoProjeto, calcularPeriodoHistoricoPessoa, pessoasDoProjeto } from './complemento';
+import { calcularMetricasAutomaticasDosCards, consolidarArvoreDeCards, correlacionarCapturaComArvore, ordenarCardsResumidos } from './correlacao';
 
 describe('Correlação por Vetores e Árvore entre as 3 Imagens (Lista -> Pedido -> Etapas)', () =>
 {
@@ -114,5 +114,43 @@ describe('Correlação por Vetores e Árvore entre as 3 Imagens (Lista -> Pedido
     // Douglas tem 4 demandas novas (incluindo Crítica e Alta), logo tem mais horas estipuladas na fila que Rodrigo
     expect(douglas.horasEstipuladasSemana).toBeGreaterThan(rodrigo.horasEstipuladasSemana);
     expect(rodrigo.probabilidadeMaisServicosPct).toBeGreaterThan(douglas.probabilidadeMaisServicosPct);
+
+    // 5. Verifica geração automática de descrição nas etapas, cálculo automático de métricas e gráfico em linha
+    expect(dev274.etapas![0]!.descricao).toBeTruthy();
+    const dev284 = arvoreFinal.find((c) => c.codigo === 'DEV-284')!;
+    expect(dev284.etapas).toHaveLength(3);
+    expect(dev284.etapas![0]!.descricao).toContain('Colocar histórico');
+    expect(dev284.impactoSemana).toBeTruthy();
+
+    const metricas = calcularMetricasAutomaticasDosCards(arvoreFinal, {}, pessoasExemplo);
+    expect(metricas.totais.itensCronograma).toBe(6);
+    expect(metricas.totais.concluidos).toBe(1);
+    expect((metricas.totais.ritmoEmRisco ?? 0) + (metricas.totais.ritmoAtrasadas ?? 0)).toBeGreaterThan(0);
+    expect(metricas.gargalosDemora.length).toBeGreaterThan(0);
+    expect(metricas.pontosDeAtencao.length).toBeGreaterThan(0);
+    expect(metricas.serieGraficoLinha).toHaveLength(6);
+
+    // 6. Verifica organizador (maior para menor código, prioridade, nomes parecidos)
+    const porCodigoDesc = ordenarCardsResumidos(arvoreFinal, 'card_maior');
+    expect(porCodigoDesc[0]!.codigo).toBe('DEV-284');
+    expect(porCodigoDesc.at(-1)!.codigo).toBe('DEV-047');
+
+    // 7. Verifica remoção de pessoa mantendo período histórico (Dia X ao Dia Y)
+    const periodoRodrigo = calcularPeriodoHistoricoPessoa(
+      pessoasExemplo[0]!,
+      [
+        { data: '2026-11-10', pasta: 'DEV', totais: {}, cards: arvoreFinal },
+        { data: '2026-11-17', pasta: 'DEV', totais: {}, cards: arvoreFinal },
+      ],
+      [],
+      '2026-11-17',
+    );
+    expect(periodoRodrigo).toEqual({ de: '2026-11-10', ate: '2026-11-17' });
+
+    const pessoasComRodrigoRemovido = pessoasExemplo.map((p) =>
+      p.id === 'rodrigo-cinelli' ? { ...p, pastasRemovidas: ['DEV'] } : p,
+    );
+    const ativosDev = pessoasDoProjeto(pessoasComRodrigoRemovido, arvoreFinal, 'DEV');
+    expect(ativosDev.some((p) => p.id === 'rodrigo-cinelli')).toBe(false);
   });
 });
