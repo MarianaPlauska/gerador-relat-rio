@@ -1,7 +1,12 @@
+import { binarizarAdaptativa, binarizarOtsu } from '@supervisao/core';
 import { createWorker, PSM } from 'tesseract.js';
 
-// amplia, passa para cinza, inverte o tema escuro e estica o contraste: o leitor erra menos com texto preto no branco
-async function prepararImagem(imagem: Blob): Promise<HTMLCanvasElement>
+type Preparo = 'contraste' | 'otsu' | 'adaptativa';
+
+// amplia, passa para cinza, inverte o tema escuro e estica o contraste: o leitor erra menos com texto preto no branco.
+// 'otsu' e 'adaptativa' deixam a imagem só em preto e branco (limiar global ou local) para prints com fundo irregular,
+// selos coloridos ou compressão que borra as letras
+async function prepararImagem(imagem: Blob, preparo: Preparo = 'contraste'): Promise<HTMLCanvasElement>
 {
   const bitmap = await createImageBitmap(imagem);
   // prints pequenos ganham mais ampliação; os grandes não passam de ~3200 px de largura
@@ -39,31 +44,42 @@ async function prepararImagem(imagem: Blob): Promise<HTMLCanvasElement>
   };
   const baixo = corte(0.02);
   const alto = Math.max(baixo + 1, corte(0.98));
+  const esticada = new Uint8ClampedArray(total);
   for (let i = 0; i < total; i++)
   {
-    let c = escuro ? 255 - cinzas[i]! : cinzas[i]!;
-    c = Math.max(0, Math.min(255, ((c - baixo) * 255) / (alto - baixo)));
-    px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = c;
+    const c = escuro ? 255 - cinzas[i]! : cinzas[i]!;
+    esticada[i] = Math.max(0, Math.min(255, ((c - baixo) * 255) / (alto - baixo)));
   }
+  const final = preparo === 'otsu' ? binarizarOtsu(esticada) : preparo === 'adaptativa' ? binarizarAdaptativa(esticada, canvas.width, canvas.height, Math.round(escala * 14)) : esticada;
+  for (let i = 0; i < total; i++) px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = final[i]!;
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
 
-// gera uma cópia nítida em JPEG (data URL) para guardar no registro, ampliar no modal e usar no relatório PDF/link
-export async function miniaturaDataUrl(imagem: Blob, larguraMax = 1280): Promise<string>
+// a cópia guardada no registro, no PDF e no link (e na nuvem) precisa caber num documento do Firestore (1 MB):
+// começa nítido e vai baixando largura e qualidade até ficar abaixo do teto de caracteres
+export async function miniaturaDataUrl(imagem: Blob, larguraMax = 1280, tetoCaracteres = 700_000): Promise<string>
 {
   const bitmap = await createImageBitmap(imagem);
-  const escala = Math.min(1, larguraMax / bitmap.width);
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(bitmap.width * escala));
-  canvas.height = Math.max(1, Math.round(bitmap.height * escala));
-  const ctx = canvas.getContext('2d')!;
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/jpeg', 0.84);
+  let ultima = '';
+  for (const largura of [larguraMax, Math.round(larguraMax * 0.8), Math.round(larguraMax * 0.62), Math.round(larguraMax * 0.5)])
+  {
+    const escala = Math.min(1, largura / bitmap.width);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * escala));
+    canvas.height = Math.max(1, Math.round(bitmap.height * escala));
+    canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    for (const qualidade of [0.84, 0.72, 0.6])
+    {
+      ultima = canvas.toDataURL('image/jpeg', qualidade);
+      if (ultima.length <= tetoCaracteres) return ultima;
+    }
+  }
+  return ultima;
 }
 
 // quanto o texto parece do painel: códigos de card, datas e palavras de verdade
-function pontuar(texto: string, prefixo: string): number
+export function pontuar(texto: string, prefixo: string): number
 {
   const codigos = texto.match(new RegExp(`\\b${prefixo} ?- ?[0-9A-Z]{2,4}\\b`, 'g'))?.length ?? 0;
   const datas = texto.match(/\d{2}\/\d{2}\/\d{2,4}/g)?.length ?? 0;
@@ -72,34 +88,59 @@ function pontuar(texto: string, prefixo: string): number
   return codigos * 12 + datas * 4 + palavras - lixo * 2;
 }
 
-// duas leituras com formas diferentes de ver a página (bloco único e colunas); fica a que parece mais com o painel
+// leitura boa o bastante para não gastar mais passadas: muita coisa reconhecida e pouco símbolo solto
+function leituraBoa(texto: string, pontos: number): boolean
+{
+  const lixo = texto.match(/[^\sA-Za-zÀ-ÿ0-9/:.,%()·\-—–★*+_|]/g)?.length ?? 0;
+  return pontos >= 60 && lixo / Math.max(1, texto.length) < 0.04;
+}
+
+// primeiro lê com o contraste esticado, em duas formas de ver a página (bloco único e colunas);
+// só se o resultado ficar fraco tenta o preto e branco (Otsu e adaptativo) e fica com a melhor leitura
 export async function lerImagem(imagem: Blob, progresso: (p: number) => void, prefixo = 'DEV'): Promise<string>
 {
-  const canvas = await prepararImagem(imagem);
+  const variantes: Preparo[] = ['contraste', 'otsu', 'adaptativa'];
   const modos = [PSM.SINGLE_BLOCK, PSM.AUTO];
-  let fase = 0;
+  let passo = 0;
+  let totalPassos = modos.length;
   const worker = await createWorker('por', 1, {
     logger: (m) =>
     {
-      if (m.status === 'recognizing text') progresso((fase + m.progress) / modos.length);
+      if (m.status === 'recognizing text') progresso(Math.min(1, (passo + m.progress) / totalPassos));
     },
   });
   try
   {
     let melhor = '';
     let pontos = -Infinity;
-    for (const modo of modos)
+    let melhorModo: PSM = modos[0]!;
+    const ler = async (canvas: HTMLCanvasElement, modo: PSM) =>
     {
       await worker.setParameters({ tessedit_pageseg_mode: modo, preserve_interword_spaces: '1', user_defined_dpi: '300' });
       const { data } = await worker.recognize(canvas);
-      const p = pontuar(data.text, prefixo);
+      // a confiança do próprio leitor entra no desempate: texto limpo vence texto parecido com lixo
+      const p = pontuar(data.text, prefixo) + data.confidence * 0.4;
       if (p > pontos)
       {
         pontos = p;
         melhor = data.text;
+        melhorModo = modo;
       }
-      fase++;
+      passo++;
+    };
+
+    const base = await prepararImagem(imagem, variantes[0]);
+    for (const modo of modos) await ler(base, modo);
+
+    if (!leituraBoa(melhor, pontuar(melhor, prefixo)))
+    {
+      totalPassos += variantes.length - 1;
+      for (const preparo of variantes.slice(1))
+      {
+        await ler(await prepararImagem(imagem, preparo), melhorModo);
+      }
     }
+    progresso(1);
     return melhor;
   }
   finally

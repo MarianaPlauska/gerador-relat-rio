@@ -40,8 +40,8 @@
 
   const ordenados = $derived([...dados.fluxos].sort((a, b) => b.atualizadoEm.localeCompare(a.atualizadoEm)));
 
-  // cards de hoje do snapshot mais recente ou do painel
-  const ultimoSnapshot = $derived(dados.snapshots && dados.snapshots.length > 0 ? dados.snapshots[dados.snapshots.length - 1] : undefined);
+  // cards da última foto do painel
+  const ultimoSnapshot = $derived([...dados.fotos].sort((a, b) => a.data.localeCompare(b.data)).at(-1));
   const cardsHoje = $derived(ultimoSnapshot?.cards ?? []);
 
   function abrir(f: Fluxograma)

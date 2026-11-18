@@ -156,6 +156,8 @@ export interface CapturaLida
   origem: OrigemLeitura;
   texto: string;
   imagemDataUrl?: string | undefined;
+  // quando a imagem fica na nuvem (Firestore) em vez de dentro do registro
+  imagemId?: string | undefined;
   totais: (keyof TotaisPainel)[];
   cards: string[];
   ondas: number;
@@ -169,6 +171,8 @@ export interface CapturaLida
   novos?: string[] | undefined;
   porPessoa?: { pessoa: string; tarefas: string[] }[] | undefined;
   cardPaiVinculado?: string | undefined;
+  // card pai escolhido à mão na tela; vale sobre o que o sistema descobriu
+  cardPaiManual?: string | undefined;
   confiancaVinculoPct?: number | undefined;
   motivoVinculo?: string | undefined;
 }

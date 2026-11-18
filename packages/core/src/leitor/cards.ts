@@ -302,7 +302,21 @@ function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
 {
   const lido = texto.match(new RegExp(`\\b${opcoes.prefixo}-[0-9A-Z]{2,4}\\b`))?.[0];
   const temPedidoOuEtapas = /o que foi pedido|\d+\s+de\s+\d+\s+conclu[ií]das|ocioso entre etapas|rodando h[aá]\s*[\d,]+|\+\s*o que vai fazer/i.test(semAcento(texto));
-  if (!lido && !temPedidoOuEtapas) return [];
+  if (!lido && !temPedidoOuEtapas)
+  {
+    // print só com o meio ou o fim do texto do pedido (cortado entre duas imagens): só vale se foi marcado como card aberto
+    const continuacao = texto.split(/\r?\n/).map((l) => l.trim()).filter((l) => /[A-Za-zÀ-ÿ]{3}/.test(l)).join('\n');
+    if (opcoes.origem !== 'card' || continuacao.length < 25) return [];
+    return [{
+      codigo: '__ORFAO__',
+      titulo: continuacao.split('\n')[0]!.slice(0, 120),
+      descricaoCompleta: continuacao,
+      responsaveis: [],
+      origens: ['card'],
+      fontesCorrelacionadas: ['pedido'],
+      avisosLeitura: ['continuação do texto, sem código'],
+    }];
+  }
 
   const codigo = lido ? corrigirCodigo(lido, opcoes.prefixo).codigo : '__ORFAO__';
   const card: CardSnapshot = { codigo, responsaveis: [], origens: ['card'], fontesCorrelacionadas: [] };

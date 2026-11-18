@@ -2,15 +2,16 @@
   import
   {
     agruparPorPessoa, agoraLocal, analisarTimeNoProjeto, calcularMetricasAutomaticasDosCards, calcularPeriodoHistoricoPessoa,
-    calcularRelacoesEImpactoSemana, compararComAnteriores, consolidarArvoreDeCards, correlacionarCapturaComArvore,
+    calcularRelacoesEImpactoSemana, compararComAnteriores, consolidarArvoreDeCards, correlacionarLote,
     detectarOrigem, ehCsvDeDemandas, enriquecerCard, fotoVazia, idCurto, lerCards, lerCsvDemandas, lerOndas, lerTotais,
-    linhasNaoReconhecidas, mesclarNaFoto, nomesTotais, ordenarCardsResumidos, pessoasDoProjeto, segundaDaSemana, somarDias, sugerirDaCaptura, unirCapturas,
-    type CapturaLida, type CardSnapshot, type CriterioOrdenacaoCards, type EtapaCard, type Onda, type OrigemLeitura, type Pessoa, type RegistroPainel, type Snapshot, type TotaisPainel,
+    linhasNaoReconhecidas, mesclarNaFoto, montarGanttSemana, nomesTotais, ordenarCardsResumidos, pessoasDoProjeto, segundaDaSemana, somarDias, sugerirDaCaptura, unirCapturas,
+    type CapturaLida, type CardSnapshot, type CriterioOrdenacaoCards, type EtapaCard, type Onda, type OrigemLeitura, type Pessoa, type RegistroPainel, type SaidaCapturaLote, type Snapshot, type TotaisPainel,
   } from '@supervisao/core';
   import { goto } from '$app/navigation';
-  import { carregar, exportarJson, importarJson, salvar, type Dados } from '#lib/armazenamento.ts';
+  import { carregar, exportarJson, hidratarImagens, importarJson, salvar, type Dados } from '#lib/armazenamento.ts';
   import { lerColagem } from '#lib/colagem.ts';
   import { lerImagem, miniaturaDataUrl } from '#lib/ocr.ts';
+  import GanttSemana from '#lib/painel/GanttSemana.svelte';
   import InspetorTarefaCard from '#lib/painel/InspetorTarefaCard.svelte';
   import ModalCapturaAmpliada from '#lib/painel/ModalCapturaAmpliada.svelte';
   import ModalGerenciarEquipe from '#lib/painel/ModalGerenciarEquipe.svelte';
@@ -117,6 +118,11 @@
   let dataNumeros = $state(agoraLocal().slice(0, 10));
 
   $effect(() => salvar($state.snapshot(dados)));
+  // imagens dos registros guardados ficam na nuvem: aqui elas voltam para a tela
+  $effect(() =>
+  {
+    hidratarImagens(dados);
+  });
 
   const pastas = $derived([...new Set(['DEV', ...(dados.projetos ?? []), dados.prefixo || 'DEV', ...dados.registros.map((r) => r.pasta), ...dados.fotos.map((f) => f.pasta).filter((p): p is string => !!p), ...(dados.pessoas.flatMap((p) => p.pastas ?? [])), pastaAtual])].filter(Boolean));
   const registrosDaPasta = $derived([...dados.registros].filter((r) => r.pasta === pastaAtual).sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm)));
@@ -153,6 +159,7 @@
       hoje: dataRegistro,
     }),
   );
+  const ganttEnvio = $derived(montarGanttSemana(analiseEnvio.filter((p) => p.total > 0), { semanaInicio: semanaRegistro, hoje: dataRegistro }));
 
   $effect(() =>
   {
@@ -233,23 +240,32 @@
     salvar($state.snapshot(dados));
   }
 
+  // lê o texto de um print (CSV de demandas ou texto de imagem) sem correlacionar: a ligação entre prints é feita no lote todo
+  function lerConteudo(conteudo: string, origem: OrigemLeitura)
+  {
+    const csv = ehCsvDeDemandas(conteudo) ? lerCsvDemandas(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas }) : undefined;
+    return {
+      totais: csv ? {} : lerTotais(conteudo),
+      cards: csv ? csv.cards : lerCards(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas, origem, hoje: dataRegistro }),
+    };
+  }
+
   function analisar(
     conteudo: string,
-    origemForcada: OrigemLeitura | undefined,
+    origem: OrigemLeitura,
+    totais: TotaisPainel,
     anteriores: CardSnapshot[],
-    capturasPrevias: CapturaLida[] = [],
-    cardPaiForcado?: string,
+    correlacionado: SaidaCapturaLote,
   )
   {
-    const origem = origemForcada ?? detectarOrigem(conteudo);
-    const csv = ehCsvDeDemandas(conteudo) ? lerCsvDemandas(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas }) : undefined;
-    const totais = csv ? {} : lerTotais(conteudo);
-    const cardsBrutos = csv ? csv.cards : lerCards(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas, origem, hoje: dataRegistro });
-    const corr = correlacionarCapturaComArvore(cardsBrutos, anteriores, capturasPrevias, dados.pessoas, cardPaiForcado);
-    const cards = corr.cards.filter((c) => c.codigo !== '__ORFAO__');
+    const cards = correlacionado.cards.filter((c) => c.codigo !== '__ORFAO__');
     const ondas = lerOndas(conteudo);
     const comp = compararComAnteriores(cards, anteriores);
     const { avisos, sugestoes } = sugerirDaCaptura({ origem, totais, cards, ondas });
+    if (correlacionado.pendentes > 0)
+    {
+      avisos.push('Este print não mostra o código do card e ainda não achei o card dele. A ordem de envio não importa: envie o print que mostra o código ou escolha o card ao lado.');
+    }
     const porPessoa = agruparPorPessoa(cards, dados.pessoas).map(({ pessoa, tarefas }) => ({ pessoa, tarefas }));
     return {
       origem,
@@ -262,9 +278,9 @@
       repetidos: comp.repetidos,
       novos: comp.novos,
       porPessoa,
-      cardPaiVinculado: corr.cardPaiVinculado,
-      confiancaVinculoPct: corr.confiancaVinculoPct,
-      motivoVinculo: corr.motivoVinculo,
+      cardPaiVinculado: correlacionado.cardPaiVinculado,
+      confiancaVinculoPct: correlacionado.confiancaVinculoPct,
+      motivoVinculo: correlacionado.motivoVinculo,
     };
   }
 
@@ -282,28 +298,21 @@
     totaisLidos = calcularMetricasAutomaticasDosCards(cardsLidos, totaisLidos, dados.pessoas).totais;
   }
 
+  // o print entra na lista e tudo é refeito: assim a ordem de envio não muda o resultado
   function registrarCaptura(conteudo: string, nome: string, imagemDataUrl?: string)
   {
-    const previas = $state.snapshot(capturas) as CapturaLida[];
-    const a = analisar(conteudo, undefined, [...cardsLidos, ...(fotoBase?.cards ?? [])], previas);
-    const j = juntar($state.snapshot(totaisLidos), $state.snapshot(cardsLidos), a.totais, a.cards);
-    totaisLidos = j.totais;
-    cardsLidos = j.cards;
-    if (a.ondas.length) ondasLidas = a.ondas;
+    const origem = detectarOrigem(conteudo);
     capturas = [
       ...capturas,
       {
-        id: idCurto(), nome: `${nome} · ${nomesOrigem[a.origem]}`, origem: a.origem, texto: conteudo, ...(imagemDataUrl ? { imagemDataUrl } : {}),
-        totais: Object.keys(j.totais) as ChaveTotal[], cards: a.cards.map((c) => c.codigo), ondas: a.ondas.length, avisos: a.avisos, sugestoes: a.sugestoes,
-        comentario: '', naoReconhecido: a.naoReconhecido, repetidos: a.repetidos, novos: a.novos, porPessoa: a.porPessoa,
-        ...(a.cardPaiVinculado ? { cardPaiVinculado: a.cardPaiVinculado } : {}),
-        ...(a.confiancaVinculoPct !== undefined ? { confiancaVinculoPct: a.confiancaVinculoPct } : {}),
-        ...(a.motivoVinculo ? { motivoVinculo: a.motivoVinculo } : {}),
+        id: idCurto(), nome: `${nome} · ${nomesOrigem[origem]}`, origem, texto: conteudo, ...(imagemDataUrl ? { imagemDataUrl } : {}),
+        totais: [], cards: [], ondas: 0, avisos: [], sugestoes: [], comentario: '',
       },
     ];
-    if (!cardSelecionadoCodigo && j.cards.length > 0)
+    recalcular();
+    if (!cardSelecionadoCodigo && cardsLidos.length > 0)
     {
-      cardSelecionadoCodigo = j.cards[0]!.codigo;
+      cardSelecionadoCodigo = cardsLidos[0]!.codigo;
     }
   }
 
@@ -313,16 +322,24 @@
     let c: CardSnapshot[] = [];
     let o: Onda[] = [];
     const base = fotoBase?.cards ?? [];
-    const processadas: CapturaLida[] = [];
-    for (const cap of capturas)
+    const leituras = new Map(capturas.map((cap) => [cap.id, lerConteudo(cap.texto, cap.origem)]));
+    const lote = correlacionarLote(
+      capturas.map((cap) => ({ id: cap.id, origem: cap.origem, cards: leituras.get(cap.id)!.cards, cardPaiForcado: cap.cardPaiManual })),
+      base,
+      dados.pessoas,
+    );
+    const atualizadas = new Map<string, CapturaLida>();
+    for (const id of lote.ordemProcessamento)
     {
-      const a = analisar(cap.texto, cap.origem, [...c, ...base], processadas, cap.cardPaiVinculado);
+      const cap = capturas.find((x) => x.id === id)!;
+      const a = analisar(cap.texto, cap.origem, leituras.get(id)!.totais, [...c, ...base], lote.porCaptura.get(id)!);
       const j = juntar(t, c, a.totais, a.cards);
       t = j.totais;
       c = j.cards;
       if (a.ondas.length) o = a.ondas;
-      const atualizada: CapturaLida = {
-        ...cap,
+      const { cardPaiVinculado: _antigo, confiancaVinculoPct: _conf, motivoVinculo: _motivo, ...semVinculo } = cap;
+      atualizadas.set(id, {
+        ...semVinculo,
         totais: Object.keys(j.totais) as ChaveTotal[],
         cards: a.cards.map((x) => x.codigo),
         ondas: a.ondas.length,
@@ -335,10 +352,9 @@
         ...(a.cardPaiVinculado ? { cardPaiVinculado: a.cardPaiVinculado } : {}),
         ...(a.confiancaVinculoPct !== undefined ? { confiancaVinculoPct: a.confiancaVinculoPct } : {}),
         ...(a.motivoVinculo ? { motivoVinculo: a.motivoVinculo } : {}),
-      };
-      processadas.push(atualizada);
+      });
     }
-    capturas = processadas;
+    capturas = capturas.map((cap) => atualizadas.get(cap.id) ?? cap);
     totaisLidos = t;
     cardsLidos = c;
     ondasLidas = o;
@@ -425,7 +441,7 @@
 
   function atualizarDescricaoEtapa(codigo: string, ordemEtapa: number, descricao: string, naFotoDia = false)
   {
-    const atualizarLista = (lista: CardSnapshot[]) =>
+    const atualizarLista = (lista: CardSnapshot[]): CardSnapshot[] =>
       lista.map((c) =>
       {
         if (c.codigo !== codigo) return c;
@@ -887,7 +903,14 @@
                         <div class="resumo-probabilistico">
                           <span>Entrega: <b>{p.nivelEntregaPct}%</b></span>
                           <span>Demora: <b>{p.nivelDemora}</b> ({p.motivoDemora})</span>
-                          <span>Capacidade extra: <b>+{p.servicosExtrasSugeridos} {p.servicosExtrasSugeridos === 1 ? 'serviço' : 'serviços'} (~{p.horasLivresEstimadas}h livres)</b></span>
+                          <span>Capacidade extra: <b>+{p.servicosExtrasSugeridos} {p.servicosExtrasSugeridos === 1 ? 'serviço' : 'serviços'} (~{p.horasLivresCalibradas}h livres)</b></span>
+                          <span>
+                            {#if p.calibracao.usouHistorico}
+                              Histórico: <b>{p.calibracao.velocidadeMediaHorasSemana}h/semana</b> em {p.calibracao.semanasAmostra} {p.calibracao.semanasAmostra === 1 ? 'semana' : 'semanas'} (confiança {p.calibracao.confiancaPct}%)
+                            {:else}
+                              Sem histórico ainda: vale a folga da jornada
+                            {/if}
+                          </span>
                         </div>
 
                         {#each p.tarefas as tar (tar.codigo)}
@@ -988,6 +1011,11 @@
               </aside>
             {/if}
           </div>
+
+          <details class="conferir cronograma-envio">
+            <summary>Cronograma da semana: quem faz o quê em cada dia e quando fica livre</summary>
+            <GanttSemana gantt={ganttEnvio} selecionado={cardSelecionadoCodigo} aoSelecionarCard={(cod) => (cardSelecionadoCodigo = cod)} />
+          </details>
         {/if}
 
         {#each capturas as cap, idx (cap.id)}
@@ -1081,12 +1109,12 @@
               </div>
               {#if cap.cardPaiVinculado || cap.origem === 'card'}
                 <div class="vinculo-arvore-barra">
-                  <span class="etiqueta">Vetor Filho &rarr; Pai:</span>
+                  <span class="etiqueta">Pertence ao card:</span>
                   <select
-                    value={cap.cardPaiVinculado ?? cap.cards[0] ?? ''}
-                    onchange={(e) => { cap.cardPaiVinculado = e.currentTarget.value || undefined; recalcular(); }}
+                    value={cap.cardPaiManual ?? ''}
+                    onchange={(e) => { cap.cardPaiManual = e.currentTarget.value || undefined; recalcular(); }}
                   >
-                    <option value="">Detectar automaticamente</option>
+                    <option value="">Descobrir sozinho{cap.cardPaiVinculado ? ` (${cap.cardPaiVinculado})` : ''}</option>
                     {#each cardsLidos as c (c.codigo)}
                       <option value={c.codigo}>{c.codigo} ({c.assunto || c.titulo || 'Demanda'})</option>
                     {/each}

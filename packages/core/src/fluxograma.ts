@@ -1,6 +1,6 @@
 import { agoraLocal, idCurto, type Lista } from './checklist';
 import { interpretarAnotacao } from './leitor/anotacao';
-import type { CardSnapshot, PlanoSemana, RegistroPainel } from './tipos';
+import type { CapturaLida, CardSnapshot, PlanoSemana, RegistroPainel } from './tipos';
 
 export type TipoNo = 'inicio' | 'passo' | 'decisao' | 'fim' | 'nota';
 
@@ -594,8 +594,11 @@ export function fluxoDoRegistroPainel(
     for (let i = 0; i < registro.capturas.length; i++)
     {
       const cap = registro.capturas[i]!;
-      const titulo = cap.etapa || cap.titulo || `Etapa ${i + 1}`;
-      const detalhes = cap.comentario || (cap.textoLido ? cap.textoLido.slice(0, 200) : `Conferência do print ${i + 1}`);
+      // registros antigos podem trazer `etapa`, `titulo` e `textoLido` em vez de `nome` e `texto`
+      const antigo = cap as Partial<CapturaLida> & { etapa?: string; titulo?: string; textoLido?: string };
+      const titulo = antigo.etapa || antigo.titulo || antigo.nome?.split(' · ')[0] || `Etapa ${i + 1}`;
+      const textoDoPrint = antigo.texto ?? antigo.textoLido;
+      const detalhes = cap.comentario || (textoDoPrint ? textoDoPrint.slice(0, 200) : `Conferência do print ${i + 1}`);
       const id = m.no('passo', titulo, detalhes);
       m.ligar(anterior, id);
       anterior = id;

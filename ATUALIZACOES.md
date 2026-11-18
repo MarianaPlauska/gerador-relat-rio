@@ -161,3 +161,21 @@ Registro de diretrizes visuais, regras de negocio e funcionalidades implementada
 
 
 
+
+---
+
+## 10. Prints fora de ordem, Cronograma (Gantt), Calibração pelo histórico, Imagens na nuvem e Leitura mais robusta
+
+1. **Correlação de prints fora de ordem (`packages/core/src/leitor/lote.ts`)**:
+   - Antes, cada print era ligado só aos anteriores; um print sem código (etapas ou continuação do pedido) enviado antes do card com código era descartado.
+   - Agora todos os prints são analisados juntos (`correlacionarLote`) e a ordem de envio não muda o resultado (teste com as 120 ordens possíveis de 5 prints). Cada print vira *âncoras* (cards com código) e *fragmentos* (etapas ou texto do pedido sem código).
+   - Os fragmentos procuram o card pelo conjunto de sinais: texto parecido (cosseno e prefixo), texto que continua de um print no outro (sobreposição no fim e no começo), etapas que seguem a numeração (1 e 2 num print, 3 e 4 no outro), mesmo responsável, status compatível e proximidade de envio. O par mais forte liga primeiro e o card ganha o texto e as etapas do fragmento, então o fragmento seguinte consegue se ligar *por intermédio* dele (encadeamento).
+   - O texto cortado entre dois prints é costurado sem repetir a linha em comum (`costurarTextos`); as etapas de prints diferentes são unidas pela numeração (`unirEtapas`).
+   - Fragmento sem card ainda fica pendente, com aviso na tela, e se liga sozinho quando o print com o código chegar. Há seletor "Pertence ao card" para decidir à mão (`cardPaiManual`), que vale sobre o cálculo.
+   - Listas e cards com código são mesclados antes dos prints de detalhe, para o detalhe sempre vencer.
+   - Print só com texto do pedido (cortado entre imagens) é aceito quando marcado como "Card aberto".
+2. **Cronograma semanal (Gantt)** (`gantt.ts` e `GanttSemana.svelte`): fila de cada pessoa por prioridade e prazo, em jornadas de 8 h (capacidade/5), com quando termina cada tarefa, quando a pessoa fica livre, o que passa do prazo, o que não cabe na semana e conflitos entre tarefas relacionadas de pessoas diferentes. Aparece na Home e no Passo 2 do Diário.
+3. **Probabilidade calibrada pelo histórico** (`calibracao.ts`): horas realmente fechadas por semana (tempo real do painel, ou estimativa), média e desvio das últimas semanas. A probabilidade mistura a folga da jornada com a chance estatística (normal) de caber mais um serviço, e o peso do histórico cresce até 4 semanas (confiança 100%). A tela mostra a base de cálculo e a confiança.
+4. **Imagens e registros na nuvem**: `usuarios/{uid}/registros/{id}` e `usuarios/{uid}/imagens/{id}` (JPEG sempre abaixo de 1 MB). O documento geral deixa de carregar registros e imagens. O localStorage guarda só o `imagemId` quando a imagem já está confirmada na nuvem. Cache local do Firestore (IndexedDB) para uso offline. Fotos de projetos diferentes no mesmo dia não se sobrescrevem mais. O link publicado limita as imagens a um orçamento total.
+5. **Leitura de imagem (OCR)**: se a primeira leitura sair fraca, tenta também a imagem em preto e branco (limiar de Otsu e limiar adaptativo local) e fica com a melhor, usando a confiança do próprio leitor. Só gasta passadas extras quando precisa.
+6. **Interface**: rodapé em todas as páginas (nas telas abertas, sem os atalhos do app); botão de IA sem textos repetidos, com um único botão para os três campos da supervisão.

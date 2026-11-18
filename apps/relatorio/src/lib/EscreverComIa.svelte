@@ -2,42 +2,61 @@
   import { numerosForaDoPacote } from '@supervisao/core';
   import { escreverComIa, iaDisponivel, modeloIa } from '#lib/ia.ts';
 
-  let { instrucao, fatos, aceitar }: { instrucao: string; fatos: () => string; aceitar: (texto: string) => void } = $props();
+  interface Item
+  {
+    rotulo?: string;
+    instrucao: string;
+    aceitar: (texto: string) => void;
+  }
+
+  // um campo (instrucao + aceitar) ou vários de uma vez (lote): o botão aparece uma vez só
+  let { instrucao, aceitar, lote, fatos, rotuloBotao }: {
+    instrucao?: string;
+    aceitar?: (texto: string) => void;
+    lote?: Item[];
+    fatos: () => string;
+    rotuloBotao?: string;
+  } = $props();
+
+  const itens = $derived<Item[]>(lote ?? (instrucao && aceitar ? [{ instrucao, aceitar }] : []));
 
   let etapa = $state<'parado' | 'carregando' | 'escrevendo' | 'pronto'>('parado');
   let pct = $state(0);
   let status = $state('');
-  let texto = $state('');
   let erro = $state('');
-  let fora = $state<string[]>([]);
+  let atual = $state(0);
+  let resultados = $state<{ texto: string; fora: string[] }[]>([]);
 
   const disponivel = iaDisponivel();
 
   async function escrever()
   {
     erro = '';
-    fora = [];
-    texto = '';
+    resultados = [];
     etapa = 'carregando';
     const material = fatos();
     try
     {
-      const final = await escreverComIa(
-        instrucao,
-        material,
-        (parcial) =>
-        {
-          etapa = 'escrevendo';
-          texto = parcial;
-        },
-        (p, t) =>
-        {
-          pct = p;
-          status = t;
-        },
-      );
-      texto = final;
-      fora = numerosForaDoPacote(final, material);
+      for (const [i, item] of itens.entries())
+      {
+        atual = i;
+        resultados[i] = { texto: '', fora: [] };
+        const final = await escreverComIa(
+          item.instrucao,
+          material,
+          (parcial) =>
+          {
+            etapa = 'escrevendo';
+            resultados[i] = { texto: parcial, fora: [] };
+          },
+          (p, t) =>
+          {
+            pct = p;
+            status = t;
+          },
+        );
+        resultados[i] = { texto: final, fora: numerosForaDoPacote(final, material) };
+      }
       etapa = 'pronto';
     }
     catch (e)
@@ -47,23 +66,30 @@
     }
   }
 
-  function usar()
+  function usar(i: number)
   {
-    aceitar(texto);
-    etapa = 'parado';
-    texto = '';
+    itens[i]?.aceitar(resultados[i]?.texto ?? '');
+    resultados[i] = { texto: '', fora: [] };
+    if (resultados.every((r) => !r.texto)) etapa = 'parado';
   }
+
+  function usarTodos()
+  {
+    itens.forEach((_, i) => usar(i));
+    etapa = 'parado';
+  }
+
+  const foraDoPacote = $derived(resultados.flatMap((r) => r.fora));
 </script>
 
 <div class="ia">
   {#if etapa === 'parado'}
     <div class="chamada">
-      <button class="botao-ia" disabled={!disponivel} onclick={escrever} title={disponivel ? `Modelo ${modeloIa}, roda neste navegador` : 'Precisa de Chrome ou Edge com WebGPU'}>
+      <button class="botao-ia" disabled={!disponivel || itens.length === 0} onclick={escrever} title={disponivel ? `Modelo ${modeloIa}, roda neste navegador` : 'Precisa de Chrome ou Edge com WebGPU'}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3l1.9 5.1L17 10l-5.1 1.9L10 17l-1.9-5.1L3 10l5.1-1.9z" /><path d="M18.5 14l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z" /></svg>
-        Escrever com IA
+        {rotuloBotao ?? (itens.length > 1 ? `Escrever os ${itens.length} campos com IA` : 'Escrever com IA')}
       </button>
-      <span class="selo">IA local</span>
-      <span class="dica">{disponivel ? 'Roda no seu navegador, de graça. Escreve só com os números conferidos do painel e avisa se aparecer número que não está lá. Você revisa antes de usar.' : 'Indisponível: precisa de Chrome ou Edge com WebGPU.'}</span>
+      {#if !disponivel}<span class="dica">Precisa de Chrome ou Edge com WebGPU.</span>{/if}
     </div>
   {:else if etapa === 'carregando'}
     <div class="carregando">
@@ -72,15 +98,26 @@
     </div>
   {:else}
     <div class="previa">
-      <p class="rotulo">{etapa === 'escrevendo' ? 'escrevendo...' : 'rascunho da IA local, revise antes de usar'}</p>
-      <pre>{texto}</pre>
+      <p class="rotulo">{etapa === 'escrevendo' ? `escrevendo${itens.length > 1 ? ` ${atual + 1} de ${itens.length}` : ''}...` : 'rascunho, revise antes de usar'}</p>
+      {#each resultados as r, i (i)}
+        {#if r.texto}
+          <div class="item-previa">
+            {#if itens[i]?.rotulo}<b class="titulo-item">{itens[i]!.rotulo}</b>{/if}
+            <pre>{r.texto}</pre>
+            {#if etapa === 'pronto'}
+              {#if r.fora.length}<p class="alerta">Números que não estão no pacote conferido: {r.fora.join(', ')}. Confira ou apague essas linhas.</p>{/if}
+              {#if itens.length > 1}<button class="link" onclick={() => usar(i)}>usar só este</button>{/if}
+            {/if}
+          </div>
+        {/if}
+      {/each}
       {#if etapa === 'pronto'}
-        {#if fora.length}<p class="alerta">Números que não estão no pacote conferido: {fora.join(', ')}. Confira ou apague essas linhas.</p>{/if}
         <div class="acoes">
-          <button class="principal" onclick={usar}>Usar este texto</button>
+          <button class="principal" onclick={usarTodos}>{itens.length > 1 ? 'Usar todos' : 'Usar este texto'}</button>
           <button onclick={escrever}>Escrever de novo</button>
           <button onclick={() => (etapa = 'parado')}>Descartar</button>
         </div>
+        {#if itens.length > 1 && foraDoPacote.length}<span class="dica">{foraDoPacote.length} número(s) fora do pacote nos rascunhos acima.</span>{/if}
       {/if}
     </div>
   {/if}
@@ -122,20 +159,9 @@
     color: var(--suave);
     background: transparent;
   }
-  .selo
-  {
-    font-family: var(--fonte-maquina);
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 1px 8px;
-    border-radius: 999px;
-    border: 1px solid var(--marca);
-    color: var(--marca);
-  }
   .chamada .dica
   {
-    flex: 1 1 260px;
+    flex: 1 1 200px;
     margin: 0;
     font-size: 0.8rem;
   }
@@ -160,13 +186,26 @@
     border-radius: var(--raio-pequeno);
     padding: var(--size-3);
     background: var(--marca-clara);
+    display: grid;
+    gap: var(--size-2);
   }
   .rotulo
   {
-    margin: 0 0 var(--size-2);
+    margin: 0;
     font-family: var(--fonte-maquina);
     font-size: 0.75rem;
     color: var(--marca);
+  }
+  .item-previa
+  {
+    display: grid;
+    gap: var(--size-1);
+  }
+  .titulo-item
+  {
+    font-family: var(--fonte-maquina);
+    font-size: 0.78rem;
+    color: var(--texto);
   }
   pre
   {
@@ -178,7 +217,7 @@
   }
   .alerta
   {
-    margin: var(--size-2) 0 0;
+    margin: var(--size-1) 0 0;
     padding: var(--size-2);
     border-radius: var(--raio-pequeno);
     background: var(--amarelo-fundo);
@@ -190,6 +229,6 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--size-2);
-    margin-top: var(--size-3);
+    margin-top: var(--size-1);
   }
 </style>

@@ -2,7 +2,8 @@ import
 {
   agoraLocal, dicionarioPadrao, migrarFluxograma, migrarLista, migrarVivo, type Fluxograma, type RelatorioVivo, pessoasExemplo, type Bloco, type ControleCard, type Lista, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type RegistroPainel, type Risco, type Snapshot,
 } from '@supervisao/core';
-import { agendarEnvio, iniciarNuvem, marcarLocal } from './nuvem.svelte.ts';
+import { agendarEnvio, baixarImagem, imagemConfirmada, iniciarNuvem, marcarLocal, nuvemPronta } from './nuvem.svelte.ts';
+import { capturasSemImagem, separarImagens } from './imagens.ts';
 
 // o que eu escrevo no relatório de cada foto
 export interface NotasRelatorio
@@ -108,11 +109,43 @@ export function carregar(): Dados
 
 export function salvar(dados: Dados): void
 {
-  const json = JSON.stringify(dados);
-  if (json === localStorage.getItem(CHAVE)) return;
+  // com a nuvem conectada, as imagens saem do navegador e ficam só nos documentos de imagem (o localStorage tem ~5 MB)
+  const { leve, imagens } = nuvemPronta() ? separarImagens(dados, imagemConfirmada) : { leve: dados, imagens: new Map<string, string>() };
+  const json = JSON.stringify(leve);
+  if (json === localStorage.getItem(CHAVE))
+  {
+    // dados iguais, mas pode haver imagem nova esperando para subir
+    if (imagens.size) agendarEnvio(leve, imagens);
+    return;
+  }
   localStorage.setItem(CHAVE, json);
   marcarLocal();
-  agendarEnvio(dados);
+  agendarEnvio(leve, imagens);
+}
+
+// as telas que mostram ou emitem prints (diário, relatório) chamam isto: baixa da nuvem as imagens que os dados
+// apontam por imagemId e as coloca nos objetos da tela, que seguem reativos
+const cacheImagens = new Map<string, string>();
+
+export async function hidratarImagens(dados: Dados): Promise<void>
+{
+  const faltando = capturasSemImagem(dados);
+  if (!faltando.length) return;
+  const fila = [...faltando];
+  const trabalhar = async () =>
+  {
+    for (let c = fila.shift(); c; c = fila.shift())
+    {
+      const id = c.imagemId!;
+      const url = cacheImagens.get(id) ?? (await baixarImagem(id).catch(() => undefined));
+      if (url)
+      {
+        cacheImagens.set(id, url);
+        c.imagemDataUrl = url;
+      }
+    }
+  };
+  await Promise.all([trabalhar(), trabalhar(), trabalhar()]);
 }
 
 export function exportarJson(dados: Dados): void

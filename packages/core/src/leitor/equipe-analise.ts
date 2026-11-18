@@ -1,4 +1,5 @@
 import type { CardSnapshot, EtapaCard, Pessoa, PlanoSemana, RegistroPainel, Ritmo, Situacao, Snapshot } from '../tipos';
+import { calcularCalibracaoPessoa, calibrarProbabilidade, type CalibracaoPessoa } from './calibracao';
 import { enriquecerCard, estimarHorasCard, extrairAssunto } from './correlacao';
 import { semAcento } from './normalizar';
 
@@ -174,7 +175,11 @@ export interface ResumoPessoaProjeto
   horasRodandoMax: number;
   estagioCritico?: boolean;
   motivoEstagioCritico?: string;
+  // probabilidade final (calibrada pelo histórico) e a base só pela folga da semana
   probabilidadeMaisServicosPct: number;
+  probabilidadeBasePct: number;
+  horasLivresCalibradas: number;
+  calibracao: CalibracaoPessoa;
   servicosExtrasSugeridos: number;
   acumuladoSemanas: {
     semanasAtivas: number;
@@ -435,11 +440,16 @@ export function analisarTimeNoProjeto(opcoes: {
 
     const penalidadeFila = atrasado * 18 + criticasPendentes * 10 + (horasRodandoMax >= 12 ? 8 : 0);
     const bonusResolvidos = concluidos * 8;
-    const probabilidadeMaisServicosPct = Math.min(
+    const probabilidadeBasePct = Math.min(
       98,
       Math.max(5, Math.round(folgaRatio * 90 + bonusResolvidos - penalidadeFila)),
     );
-    const servicosExtrasSugeridos = Math.max(0, Math.floor((horasLivresEstimadas * (probabilidadeMaisServicosPct / 100)) / 4));
+    // o histórico de entregas reais (horas fechadas por semana) corrige a folga teórica da jornada
+    const calibracao = calcularCalibracaoPessoa(fotosProjeto, (c) => pertenceAPessoa(c, p));
+    const calibrada = calibrarProbabilidade({ probabilidadeBasePct, cargaHoras: horasEstipuladasSemana, capacidadeHoras: capacidadeHorasSemana, calibracao });
+    const probabilidadeMaisServicosPct = calibrada.probabilidadePct;
+    const horasLivresCalibradas = calibrada.horasLivresCalibradas;
+    const servicosExtrasSugeridos = Math.max(0, Math.floor((horasLivresCalibradas * (probabilidadeMaisServicosPct / 100)) / 4));
 
     const datasPendentes = tarefas
       .filter((t) => t.situacao !== 'concluido')
@@ -522,6 +532,9 @@ export function analisarTimeNoProjeto(opcoes: {
       estagioCritico,
       motivoEstagioCritico,
       probabilidadeMaisServicosPct,
+      probabilidadeBasePct,
+      horasLivresCalibradas,
+      calibracao,
       servicosExtrasSugeridos,
       acumuladoSemanas: {
         semanasAtivas: Math.max(hist.semanas.size, tarefas.length > 0 ? 1 : 0),

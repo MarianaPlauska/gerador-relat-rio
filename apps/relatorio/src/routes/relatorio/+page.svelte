@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { agoraLocal, alternarItem, dicionarioPadrao, filtrarRegistros, idCurto, itemFeito, novoVivo, progressoVivo, resumoSugerido, segundaDaSemana, somarDias, type Bloco, type CorSemaforo } from '@supervisao/core';
-  import { carregar, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
+  import { carregar, hidratarImagens, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
   import { montarInterativo } from '#lib/interativo.ts';
   import EscreverComIa from '#lib/EscreverComIa.svelte';
   import ListaDeBlocos from '#lib/ListaDeBlocos.svelte';
@@ -38,6 +38,11 @@
   }
 
   $effect(() => salvar($state.snapshot(dados)));
+  // as imagens dos prints ficam na nuvem: voltam para a tela antes de entrarem no PDF ou no link
+  $effect(() =>
+  {
+    hidratarImagens(dados);
+  });
 
   const semanas = $derived(semanasDisponiveis(dados));
   const opcoesAnteriores = $derived([...new Set([somarDias(semana, -7), ...semanas.filter((s) => s < semana)])].sort().reverse());
@@ -292,18 +297,24 @@
     <div class="bloco">
       <h2>Texto da supervisão</h2>
       <p class="dica">Uma linha por item: cada linha vira um tópico no PDF.</p>
+      <EscreverComIa
+        rotuloBotao="Escrever os 3 campos com IA"
+        fatos={() => textoPacote(dados, ctx, notas, true)}
+        lote={[
+          { rotulo: 'Destaques da semana', instrucao: 'Liste de 3 a 5 destaques do período, uma linha cada, começando com \'- \'. Só o que o material sustenta: entregas concluídas, metas atingidas e melhoras.', aceitar: (t) => anotar('destaques', t) },
+          { rotulo: 'Decisões e apoio necessários', instrucao: 'Liste o que a gestão precisa decidir ou destravar, uma linha cada, começando com \'- \'. Só o que o material sustenta (riscos abertos, decisões vencidas, alertas). Se não houver nada, escreva \'- Nenhuma decisão pendente.\'', aceitar: (t) => anotar('decisoes', t) },
+          { rotulo: 'Próximos passos', instrucao: 'Liste os próximos passos, uma linha cada, começando com \'- \': o que será feito, por quem e até quando, usando só o plano e os alertas do material.', aceitar: (t) => anotar('proximosPassos', t) },
+        ]}
+      />
       <label>Destaques da semana
         <textarea rows="3" value={notas.destaques ?? ''} oninput={(e) => anotar('destaques', e.currentTarget.value || undefined)} placeholder="Entregas, avanços e o que deu certo."></textarea>
       </label>
-      <EscreverComIa instrucao="Liste de 3 a 5 destaques do período, uma linha cada, começando com '- '. Só o que o material sustenta: entregas concluídas, metas atingidas e melhoras." fatos={() => textoPacote(dados, ctx, notas, true)} aceitar={(t) => anotar('destaques', t)} />
       <label>Decisões e apoio necessários
         <textarea rows="3" value={notas.decisoes ?? ''} oninput={(e) => anotar('decisoes', e.currentTarget.value || undefined)} placeholder="O que a gestão precisa decidir ou destravar, com prazo."></textarea>
       </label>
-      <EscreverComIa instrucao="Liste o que a gestão precisa decidir ou destravar, uma linha cada, começando com '- '. Só o que o material sustenta (riscos abertos, decisões vencidas, alertas). Se não houver nada, escreva '- Nenhuma decisão pendente.'" fatos={() => textoPacote(dados, ctx, notas, true)} aceitar={(t) => anotar('decisoes', t)} />
       <label>Próximos passos
         <textarea rows="3" value={notas.proximosPassos ?? ''} oninput={(e) => anotar('proximosPassos', e.currentTarget.value || undefined)} placeholder="O que será feito, por quem, até quando e para quê."></textarea>
       </label>
-      <EscreverComIa instrucao="Liste os próximos passos, uma linha cada, começando com '- ': o que será feito, por quem e até quando, usando só o plano e os alertas do material." fatos={() => textoPacote(dados, ctx, notas, true)} aceitar={(t) => anotar('proximosPassos', t)} />
     </div>
 
     <div class="bloco">

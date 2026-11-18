@@ -4,6 +4,7 @@ import
   type Bloco, type CorSemaforo, type ItemInterativo, type Modelo, type RelatorioInterativo, type SecaoInterativa, type TotaisPainel,
 } from '@supervisao/core';
 import type { Dados, NotasRelatorio } from './armazenamento.ts';
+import { imagensQueCabem } from './imagens.ts';
 import { dataCurta, dataMedia, semaforoDoRelatorio, type Contexto } from './semana.ts';
 
 const nomesSemaforo: Record<CorSemaforo, string> = { verde: 'No caminho', amarelo: 'Atenção', vermelho: 'Fora da meta' };
@@ -49,6 +50,7 @@ export function montarInterativo({ dados, ctx, notas, resumo, modelo, blocos }: 
   const secoes: SecaoInterativa[] = [];
   const ignoradas: string[] = [];
   const periodo = `${dataMedia(atual.inicio)} a ${dataMedia(ctx.fim)}`;
+  let orcamentoImagens = 600_000;
 
   function tabelaDe(id: string, titulo: string, chaves: (keyof TotaisPainel)[])
   {
@@ -171,7 +173,10 @@ export function montarInterativo({ dados, ctx, notas, resumo, modelo, blocos }: 
     {
       for (const r of filtrarRegistros(dados.registros, { pasta: b.pasta, ids: b.registroIds, data: b.data, de: atual.inicio, ate: ctx.fim }))
       {
-        const imagens = b.comImagens !== false ? r.capturas.filter((c) => c.imagemDataUrl).slice(0, 4).map((c) => ({ nome: c.nome.split(' · ')[0] ?? c.nome, dataUrl: c.imagemDataUrl! })) : [];
+        const candidatas = b.comImagens !== false ? r.capturas.filter((c) => c.imagemDataUrl).slice(0, 4).map((c) => ({ nome: c.nome.split(' · ')[0] ?? c.nome, dataUrl: c.imagemDataUrl! })) : [];
+        // o link publicado é um documento só (limite de 1 MB): as imagens dividem um orçamento para o relatório todo
+        const imagens = imagensQueCabem(candidatas, orcamentoImagens);
+        orcamentoImagens -= imagens.reduce((acc, i) => acc + i.dataUrl.length, 0);
         secoes.push({
           id: `registro-${r.id}`,
           tipo: 'texto',

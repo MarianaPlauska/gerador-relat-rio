@@ -128,108 +128,114 @@
   }
 </script>
 
-{#if !aberta}
-  <nav>
-    <canvas class="chuva-nav" use:chuva={{ fundo: 'rgba(15, 19, 24, 0.2)', cor: '#4cc38a', tamanho: 12 }}></canvas>
-    <a href="/" class="marca">OrbisOS<span>_</span></a>
-    <div class="links" role="menubar">
-      <a href="/" class="item-topo" class:ativo={page.url.pathname === '/'}>Início</a>
-      {#each gruposMenu as g (g.id)}
-        <div
-          class="grupo-nav"
-          role="none"
-          onmouseenter={() => (menuAberto = g.id)}
-          onmouseleave={() => { if (menuAberto === g.id) menuAberto = null; }}
-        >
-          <button
-            type="button"
-            class="gatilho-nav"
-            class:ativo={grupoAtivo(g)}
-            aria-expanded={menuAberto === g.id}
-            onclick={() => (menuAberto = menuAberto === g.id ? null : g.id)}
+<div class="pagina">
+  {#if !aberta}
+    <nav>
+      <canvas class="chuva-nav" use:chuva={{ fundo: 'rgba(15, 19, 24, 0.2)', cor: '#4cc38a', tamanho: 12 }}></canvas>
+      <a href="/" class="marca">OrbisOS<span>_</span></a>
+      <div class="links" role="menubar">
+        <a href="/" class="item-topo" class:ativo={page.url.pathname === '/'}>Início</a>
+        {#each gruposMenu as g (g.id)}
+          <div
+            class="grupo-nav"
+            role="none"
+            onmouseenter={() => (menuAberto = g.id)}
+            onmouseleave={() => { if (menuAberto === g.id) menuAberto = null; }}
           >
-            <span>{g.nome}</span>
-            <span class="seta" class:aberta={menuAberto === g.id}>▾</span>
-          </button>
-          {#if menuAberto === g.id}
-            <div class="painel-nav" role="menu">
-              {#each g.itens as item (item.href)}
-                <a
-                  href={item.href}
-                  role="menuitem"
-                  class="subitem-nav"
-                  class:ativo={page.url.pathname === item.href}
-                  onclick={() => (menuAberto = null)}
-                >
-                  <b>{item.nome}</b>
-                  <small>{item.dica}</small>
-                </a>
-              {/each}
-            </div>
+            <button
+              type="button"
+              class="gatilho-nav"
+              class:ativo={grupoAtivo(g)}
+              aria-expanded={menuAberto === g.id}
+              onclick={() => (menuAberto = menuAberto === g.id ? null : g.id)}
+            >
+              <span>{g.nome}</span>
+              <span class="seta" class:aberta={menuAberto === g.id}>▾</span>
+            </button>
+            {#if menuAberto === g.id}
+              <div class="painel-nav" role="menu">
+                {#each g.itens as item (item.href)}
+                  <a
+                    href={item.href}
+                    role="menuitem"
+                    class="subitem-nav"
+                    class:ativo={page.url.pathname === item.href}
+                    onclick={() => (menuAberto = null)}
+                  >
+                    <b>{item.nome}</b>
+                    <small>{item.dica}</small>
+                  </a>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+      <div class="direita">
+        <button class="tema" onclick={trocarTema} title="Trocar tema" aria-label="Trocar para o tema {escuro ? 'claro' : 'escuro'}">
+          {#if escuro}
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" /><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" /></svg>
+          {:else}
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" /></svg>
           {/if}
-        </div>
-      {/each}
-    </div>
-    <div class="direita">
-      <button class="tema" onclick={trocarTema} title="Trocar tema" aria-label="Trocar para o tema {escuro ? 'claro' : 'escuro'}">
-        {#if escuro}
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" /><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" /></svg>
-        {:else}
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" /></svg>
-        {/if}
-      </button>
-      <DropdownMenu.Root>
-        <DropdownMenu.Trigger class="usuario" aria-label="Menu da conta">
-          <span class="inicial">{(nome || '?').charAt(0).toUpperCase()}</span>
-          <span class="nome-usuario">{nome.split(' ')[0]}</span>
-        </DropdownMenu.Trigger>
-        <DropdownMenu.Portal>
-          <DropdownMenu.Content class="menu-conta" sideOffset={8} align="end">
-            <div class="menu-titulo">{nome || 'sem nome'}</div>
-            <DropdownMenu.Item class="menu-item" onSelect={() => goto('/perfil')}>Meu perfil</DropdownMenu.Item>
-            <DropdownMenu.Item class="menu-item" onSelect={() => exportarJson(carregar())}>Baixar backup</DropdownMenu.Item>
-            <DropdownMenu.Item class="menu-item" onSelect={trocarTema}>Tema {escuro ? 'claro' : 'escuro'}</DropdownMenu.Item>
-            <DropdownMenu.Separator class="menu-separador" />
-            <DropdownMenu.Item class="menu-item perigo" onSelect={sair}>Sair</DropdownMenu.Item>
-          </DropdownMenu.Content>
-        </DropdownMenu.Portal>
-      </DropdownMenu.Root>
-    </div>
-  </nav>
-{/if}
+        </button>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger class="usuario" aria-label="Menu da conta">
+            <span class="inicial">{(nome || '?').charAt(0).toUpperCase()}</span>
+            <span class="nome-usuario">{nome.split(' ')[0]}</span>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content class="menu-conta" sideOffset={8} align="end">
+              <div class="menu-titulo">{nome || 'sem nome'}</div>
+              <DropdownMenu.Item class="menu-item" onSelect={() => goto('/perfil')}>Meu perfil</DropdownMenu.Item>
+              <DropdownMenu.Item class="menu-item" onSelect={() => exportarJson(carregar())}>Baixar backup</DropdownMenu.Item>
+              <DropdownMenu.Item class="menu-item" onSelect={trocarTema}>Tema {escuro ? 'claro' : 'escuro'}</DropdownMenu.Item>
+              <DropdownMenu.Separator class="menu-separador" />
+              <DropdownMenu.Item class="menu-item perigo" onSelect={sair}>Sair</DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+      </div>
+    </nav>
+  {/if}
 
-<div class="conteudo">
-  {@render children()}
-</div>
+  <div class="conteudo">
+    {@render children()}
+  </div>
 
-{#if abertura && !aberta}
-  <Abertura terminar={terminarAbertura} />
-{/if}
+  {#if abertura && !aberta}
+    <Abertura terminar={terminarAbertura} />
+  {/if}
 
-{#if !aberta}
-  <Paleta bind:aberta={paletaAberta} {trocarTema} baixarBackup={() => exportarJson(carregar())} {sair} />
+  {#if !aberta}
+    <Paleta bind:aberta={paletaAberta} {trocarTema} baixarBackup={() => exportarJson(carregar())} {sair} />
+  {/if}
+
+  <!-- o rodapé aparece em todas as páginas; nas telas abertas (entrada e relatório por link) fica sem os atalhos do app -->
   <footer>
     <div class="rodape">
       <div class="rodape-sobre">
         <div class="rodape-marca">
-          <a href="/" class="nome-rodape">OrbisOS<span>_</span></a>
+          <a href={aberta ? undefined : '/'} class="nome-rodape">OrbisOS<span>_</span></a>
           <span class="badge-autor">Mariana Coutinho (Plauska)</span>
         </div>
         <p class="sobre-resumo">
-          Ferramenta de supervisão de desenvolvimento. Transforma o painel do gestor (prints, texto ou CSV) em acompanhamento e relatório: lê cards, prazos, ritmo e totais; compara semana com semana; gera semáforo e constatações; guarda plano, riscos e compromissos; emite PDF ou link interativo para a gestão responder (Ciente, Concordo, Dúvida). A IA é opcional: tudo roda no navegador.
+          Ferramenta de supervisão de desenvolvimento. Transforma o painel do gestor (prints, texto ou CSV) em acompanhamento e relatório: lê cards, prazos, ritmo e totais; compara semana com semana; gera semáforo e constatações; guarda plano, riscos e compromissos; emite PDF ou link interativo para a gestão responder (Ciente, Concordo, Dúvida).
         </p>
       </div>
 
       <div class="rodape-direita">
-        <div class="rodape-links">
-          <a href="/painel">Diário</a>
-          <a href="/cards">Cards</a>
-          <a href="/semana">Semana</a>
-          <a href="/fluxos">Fluxos</a>
-          <a href="/relatorio">Relatório</a>
-          <a href="/modelos">Modelos</a>
-          <a href="/roadmap">Roadmap</a>
-        </div>
+        {#if !aberta}
+          <div class="rodape-links">
+            <a href="/painel">Diário</a>
+            <a href="/cards">Cards</a>
+            <a href="/semana">Semana</a>
+            <a href="/fluxos">Fluxos</a>
+            <a href="/relatorio">Relatório</a>
+            <a href="/modelos">Modelos</a>
+            <a href="/roadmap">Roadmap</a>
+          </div>
+        {/if}
         <a href="https://github.com/MarianaPlauska/gerador-relat-rio" target="_blank" rel="noopener noreferrer" class="card-github">
           <svg class="git-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
           <span class="git-repo">GitHub: MarianaPlauska/gerador-relat-rio</span>
@@ -237,16 +243,23 @@
       </div>
     </div>
   </footer>
-{/if}
+</div>
 
 <style>
+  .pagina
+  {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
   .conteudo
   {
-    min-height: calc(100vh - 58px - var(--altura-rodape, 110px));
+    flex: 1 0 auto;
   }
   footer
   {
     margin-top: var(--size-6);
+    flex-shrink: 0;
     background: var(--barra);
     border-top: 1px solid var(--borda-forte);
     color: #9aa5b4;

@@ -4,6 +4,7 @@
     definicoesPadrao,
     diasUteisEntre,
     idCurto,
+    montarGanttSemana,
     segundaDaSemana,
     somarDias,
     type TotaisPainel,
@@ -11,6 +12,7 @@
   import { goto } from '$app/navigation';
   import { carregar, salvar, type Dados } from '#lib/armazenamento.ts';
   import CobrinhaMascote from '#lib/CobrinhaMascote.svelte';
+  import GanttSemana from '#lib/painel/GanttSemana.svelte';
   import { chaveDoRelatorio } from '#lib/modelos.ts';
   import { contextoDaSemana, dataCurta, dataMedia, hoje, periodoDaSemana, semaforoDoRelatorio, semanasDisponiveis } from '#lib/semana.ts';
   import { lerSessao } from '#lib/sessao.ts';
@@ -52,7 +54,7 @@
 
   const hora = new Date().getHours();
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
-  const primeiroNome = $derived((dados.identificacao.elaboradoPor || lerSessao()?.nome || 'Mariana').split(' ')[0]);
+  const primeiroNome = $derived((dados.identificacao.elaboradoPor || lerSessao()?.nome || 'Mariana').split(' ')[0] ?? 'Mariana');
 
   const ultimaFoto = $derived([...fotosDoProjeto].filter((f) => f.data <= dia).sort((a, b) => a.data.localeCompare(b.data)).at(-1));
   const diasDesdeFoto = $derived(ultimaFoto ? diasUteisEntre(ultimaFoto.data, dia, definicoesPadrao.feriados) : 0);
@@ -101,6 +103,8 @@
       hoje: dia,
     }),
   );
+
+  const gantt = $derived(montarGanttSemana(pessoasProjeto, { semanaInicio: semana, hoje: dia }));
 
   const registrosProjeto = $derived(
     [...dados.registros]
@@ -475,8 +479,15 @@
                     <span class="etiqueta">Probabilidade de absorver mais serviços</span>
                     <div class="barras-rendimento">
                       <div class="linha-rend">
-                        <span>Probabilidade: <b>{p.probabilidadeMaisServicosPct}%</b> (+{p.servicosExtrasSugeridos} {p.servicosExtrasSugeridos === 1 ? 'serviço' : 'serviços'} / ~{p.horasLivresEstimadas}h livres)</span>
+                        <span>Probabilidade: <b>{p.probabilidadeMaisServicosPct}%</b> (+{p.servicosExtrasSugeridos} {p.servicosExtrasSugeridos === 1 ? 'serviço' : 'serviços'} / ~{p.horasLivresCalibradas}h livres)</span>
                         <div class="kpi-barra"><div class="kpi-barra-preenchimento" style:width="{p.probabilidadeMaisServicosPct}%"></div></div>
+                        <small class="dica-curta">
+                          {#if p.calibracao.usouHistorico}
+                            Calibrada pelo histórico: entrega média de {p.calibracao.velocidadeMediaHorasSemana}h por semana (±{p.calibracao.desvioHorasSemana}h) em {p.calibracao.semanasAmostra} {p.calibracao.semanasAmostra === 1 ? 'semana' : 'semanas'}, confiança {p.calibracao.confiancaPct}%. Pela folga da jornada seria {p.probabilidadeBasePct}%.
+                          {:else}
+                            Ainda sem histórico de entregas: vale a folga da jornada. Melhora a cada semana guardada.
+                          {/if}
+                        </small>
                       </div>
                       <div class="linha-rend">
                         <span>Nível de entrega na semana: <b>{p.nivelEntregaPct}%</b></span>
@@ -525,6 +536,20 @@
       </div>
     </section>
   </div>
+
+  <!-- CRONOGRAMA DA SEMANA: QUEM FAZ O QUÊ EM QUE DIA, QUANDO CADA UM FICA LIVRE -->
+  {#if pessoasProjeto.some((p) => p.total > 0)}
+    <section class="cartao painel-secao">
+      <div class="secao-cabecalho">
+        <div>
+          <span class="etiqueta">Projeto {projetoAtual}</span>
+          <h2>Cronograma da semana</h2>
+        </div>
+        <span class="dica">Fila de cada pessoa por prioridade, em jornadas de 8 h. Clique numa barra para abrir a tarefa.</span>
+      </div>
+      <GanttSemana gantt={gantt} aoSelecionarCard={(codigo) => goto(`/cards?q=${encodeURIComponent(codigo)}`)} />
+    </section>
+  {/if}
 
   <!-- ÚLTIMO REGISTRO DO DIÁRIO (CARD COMPACTO) -->
   {#if ultimoRegistro}

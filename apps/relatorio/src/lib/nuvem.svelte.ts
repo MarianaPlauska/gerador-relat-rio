@@ -1,10 +1,16 @@
-import type { Snapshot } from '@supervisao/core';
+import type { RegistroPainel, Snapshot } from '@supervisao/core';
 import type { Dados } from './armazenamento.ts';
 import { firebaseConfig } from './firebaseConfig.ts';
+import { idsDeImagemUsados, separarImagens } from './imagens.ts';
 
-// no Firestore: usuarios/{uid}/geral/dados (tudo menos as fotos) e usuarios/{uid}/fotos/{data}, uma foto por documento
-// para não bater no limite de 1 MB por documento. O navegador continua sendo a cópia de trabalho;
+// no Firestore:
+//   usuarios/{uid}/geral/dados      tudo menos fotos e registros (configurações, pessoas, planos, listas...)
+//   usuarios/{uid}/fotos/{id}       uma foto do painel por documento (id = data, ou PASTA__data fora do DEV)
+//   usuarios/{uid}/registros/{id}   um registro do diário por documento
+//   usuarios/{uid}/imagens/{id}     uma imagem de print por documento (JPEG em data URL, abaixo de 1 MB)
+// Cada documento fica longe do limite de 1 MB. O navegador continua sendo a cópia de trabalho;
 // a nuvem recebe cada mudança 2 s depois e, ao abrir, a versão mais nova vence.
+// O cache local do próprio Firestore (IndexedDB) guarda o que já foi baixado, inclusive as imagens, e envia o que ficou pendente offline.
 
 export const nuvem = $state<{ estado: 'desligada' | 'sem_login' | 'sincronizando' | 'ok' | 'erro'; email?: string | undefined; nome?: string | undefined; ultimoEnvio?: string | undefined; erro?: string | undefined }>({
   estado: firebaseConfig.apiKey ? 'sem_login' : 'desligada',
@@ -13,14 +19,19 @@ export const nuvem = $state<{ estado: 'desligada' | 'sem_login' | 'sincronizando
 const CHAVE_QUANDO = 'orbisos-atualizado-em';
 // conta que já sincronizou neste navegador; sem isso a nuvem vence, para um navegador novo não apagar os dados de lá
 const CHAVE_CONTA = 'orbisos-nuvem-conta';
+const CHAVE_IMAGENS = 'orbisos-imagens-nuvem';
 export const quandoLocal = () => localStorage.getItem(CHAVE_QUANDO) ?? '';
 export const marcarLocal = (quando = new Date().toISOString()) => localStorage.setItem(CHAVE_QUANDO, quando);
 
 type Servicos = Awaited<ReturnType<typeof abrir>>;
 let servicos: Promise<Servicos> | undefined;
 let uid: string | undefined;
-// o que já está na nuvem, por data da foto, para mandar só as fotos que mudaram
+// o que já está na nuvem, por id do documento, para mandar só o que mudou
 let fotosNaNuvem = new Map<string, string>();
+let registrosNaNuvem = new Map<string, string>();
+// imagens que já subiram para esta conta (guardado no navegador) e as que ainda esperam para subir
+let imagensNaNuvem = new Set<string>();
+const imagensPendentes = new Map<string, string>();
 let espera: ReturnType<typeof setTimeout> | undefined;
 // só envia depois da primeira sincronização desta sessão
 let pronto = false;
@@ -29,10 +40,40 @@ async function abrir()
 {
   const [{ initializeApp }, auth, fs] = await Promise.all([import('firebase/app'), import('firebase/auth'), import('firebase/firestore')]);
   const app = initializeApp(firebaseConfig);
-  return { auth, fs, autenticacao: auth.getAuth(app), banco: fs.initializeFirestore(app, { ignoreUndefinedProperties: true }) };
+  const comCache = typeof indexedDB !== 'undefined';
+  const banco = fs.initializeFirestore(app, {
+    ignoreUndefinedProperties: true,
+    ...(comCache ? { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) } : {}),
+  });
+  return { auth, fs, autenticacao: auth.getAuth(app), banco };
 }
 
 const servico = () => (servicos ??= abrir());
+
+// a nuvem já está conectada e sincronizada nesta sessão: só então as imagens saem de dentro dos dados locais
+export const nuvemPronta = (): boolean => !!uid && pronto;
+// a imagem já foi gravada na nuvem desta conta
+export const imagemConfirmada = (id: string): boolean => imagensNaNuvem.has(id);
+
+function lerImagensEnviadas(conta: string): Set<string>
+{
+  try
+  {
+    return new Set(JSON.parse(localStorage.getItem(`${CHAVE_IMAGENS}-${conta}`) ?? '[]') as string[]);
+  }
+  catch
+  {
+    return new Set();
+  }
+}
+
+function guardarImagensEnviadas(): void
+{
+  if (uid) localStorage.setItem(`${CHAVE_IMAGENS}-${uid}`, JSON.stringify([...imagensNaNuvem]));
+}
+
+// foto de outro projeto no mesmo dia não pode sobrescrever a do DEV: o DEV mantém o id antigo (a data)
+const idDaFoto = (f: Snapshot): string => (f.pasta && f.pasta.toUpperCase() !== 'DEV' ? `${f.pasta.replace(/[/\\]/g, '_')}__${f.data}` : f.data);
 
 export function iniciarNuvem(aoReceber: (dados: Dados, quando: string, primeiraVez: boolean) => void, local: () => Dados): void
 {
@@ -50,6 +91,7 @@ export function iniciarNuvem(aoReceber: (dados: Dados, quando: string, primeiraV
         nuvem.estado = 'sem_login';
         return;
       }
+      imagensNaNuvem = lerImagensEnviadas(uid);
       await executar(async () =>
       {
         const remoto = await baixar();
@@ -82,41 +124,110 @@ async function executar(tarefa: () => Promise<void>)
 async function baixar(): Promise<{ dados: Dados; quando: string } | undefined>
 {
   const { fs, banco } = await servico();
-  const geral = await fs.getDoc(fs.doc(banco, 'usuarios', uid!, 'geral', 'dados'));
-  const fotos = await fs.getDocs(fs.collection(banco, 'usuarios', uid!, 'fotos'));
+  const [geral, fotos, registros] = await Promise.all([
+    fs.getDoc(fs.doc(banco, 'usuarios', uid!, 'geral', 'dados')),
+    fs.getDocs(fs.collection(banco, 'usuarios', uid!, 'fotos')),
+    fs.getDocs(fs.collection(banco, 'usuarios', uid!, 'registros')),
+  ]);
   fotosNaNuvem = new Map(fotos.docs.map((d) => [d.id, JSON.stringify(d.data())]));
+  registrosNaNuvem = new Map(registros.docs.map((d) => [d.id, JSON.stringify(d.data())]));
   if (!geral.exists()) return undefined;
   const { atualizadoEm, ...resto } = geral.data() as Omit<Dados, 'fotos'> & { atualizadoEm: string };
-  const lista = fotos.docs.map((d) => d.data() as Snapshot).sort((a, b) => a.data.localeCompare(b.data));
-  return { dados: { ...resto, fotos: lista }, quando: atualizadoEm };
+  const listaFotos = fotos.docs.map((d) => d.data() as Snapshot).sort((a, b) => a.data.localeCompare(b.data));
+  // contas antigas ainda têm os registros dentro do documento geral; a coleção nova vale quando existe
+  const listaRegistros = registros.size
+    ? registros.docs.map((d) => d.data() as RegistroPainel).sort((a, b) => a.data.localeCompare(b.data) || a.criadoEm.localeCompare(b.criadoEm))
+    : (resto.registros ?? []);
+  const dados: Dados = { ...resto, fotos: listaFotos, registros: listaRegistros };
+  // tudo que veio com imagemId já está na nuvem
+  for (const id of idsDeImagemUsados(dados)) imagensNaNuvem.add(id);
+  guardarImagensEnviadas();
+  return { dados, quando: atualizadoEm };
 }
 
-async function enviar(dados: Dados)
+async function enviarImagens(imagens: Map<string, string>, usadas: Set<string>)
 {
   const { fs, banco } = await servico();
-  const lote = fs.writeBatch(banco);
-  const { fotos, ...resto } = dados;
+  for (const [id, dataUrl] of imagens)
+  {
+    if (imagensNaNuvem.has(id)) continue;
+    await fs.setDoc(fs.doc(banco, 'usuarios', uid!, 'imagens', id), { dataUrl, em: new Date().toISOString() });
+    imagensNaNuvem.add(id);
+    imagensPendentes.delete(id);
+  }
+  // imagem que nenhum registro usa mais sai da nuvem
+  for (const id of [...imagensNaNuvem])
+  {
+    if (usadas.has(id)) continue;
+    await fs.deleteDoc(fs.doc(banco, 'usuarios', uid!, 'imagens', id));
+    imagensNaNuvem.delete(id);
+  }
+  guardarImagensEnviadas();
+}
+
+async function enviar(dadosCompletos: Dados)
+{
+  const { fs, banco } = await servico();
+  // as imagens embutidas saem dos dados e vão para documentos próprios
+  const { leve, imagens } = separarImagens(dadosCompletos);
+  for (const [id, url] of imagensPendentes) if (!imagens.has(id)) imagens.set(id, url);
+  await enviarImagens(imagens, idsDeImagemUsados(leve));
+
+  const { fotos, registros, ...resto } = leve;
   const quando = quandoLocal() || new Date().toISOString();
-  lote.set(fs.doc(banco, 'usuarios', uid!, 'geral', 'dados'), { ...resto, atualizadoEm: quando });
-  const agora = new Map(fotos.map((f) => [f.data, JSON.stringify(f)]));
-  for (const [data, json] of agora)
+  const operacoes: ((lote: ReturnType<typeof fs.writeBatch>) => void)[] = [
+    (lote) => lote.set(fs.doc(banco, 'usuarios', uid!, 'geral', 'dados'), { ...resto, atualizadoEm: quando }),
+  ];
+
+  const fotosAgora = new Map(fotos.map((f) => [idDaFoto(f), JSON.stringify(f)]));
+  for (const [id, json] of fotosAgora)
   {
-    if (fotosNaNuvem.get(data) !== json) lote.set(fs.doc(banco, 'usuarios', uid!, 'fotos', data), JSON.parse(json));
+    if (fotosNaNuvem.get(id) !== json) operacoes.push((lote) => lote.set(fs.doc(banco, 'usuarios', uid!, 'fotos', id), JSON.parse(json)));
   }
-  for (const data of fotosNaNuvem.keys())
+  for (const id of fotosNaNuvem.keys())
   {
-    if (!agora.has(data)) lote.delete(fs.doc(banco, 'usuarios', uid!, 'fotos', data));
+    if (!fotosAgora.has(id)) operacoes.push((lote) => lote.delete(fs.doc(banco, 'usuarios', uid!, 'fotos', id)));
   }
-  await lote.commit();
-  fotosNaNuvem = agora;
+
+  const registrosAgora = new Map(registros.map((r) => [r.id, JSON.stringify(r)]));
+  for (const [id, json] of registrosAgora)
+  {
+    if (registrosNaNuvem.get(id) !== json) operacoes.push((lote) => lote.set(fs.doc(banco, 'usuarios', uid!, 'registros', id), JSON.parse(json)));
+  }
+  for (const id of registrosNaNuvem.keys())
+  {
+    if (!registrosAgora.has(id)) operacoes.push((lote) => lote.delete(fs.doc(banco, 'usuarios', uid!, 'registros', id)));
+  }
+
+  // o Firestore aceita até 500 operações por lote
+  for (let i = 0; i < operacoes.length; i += 400)
+  {
+    const lote = fs.writeBatch(banco);
+    for (const operacao of operacoes.slice(i, i + 400)) operacao(lote);
+    await lote.commit();
+  }
+  fotosNaNuvem = fotosAgora;
+  registrosNaNuvem = registrosAgora;
   nuvem.ultimoEnvio = new Date().toISOString();
 }
 
-export function agendarEnvio(dados: Dados): void
+export function agendarEnvio(dados: Dados, imagens: Map<string, string> = new Map()): void
 {
   if (!uid || !pronto) return;
+  for (const [id, url] of imagens) imagensPendentes.set(id, url);
   clearTimeout(espera);
   espera = setTimeout(() => executar(() => enviar(dados)), 2000);
+}
+
+// uma imagem de print guardada na nuvem; o cache do Firestore evita baixar de novo
+export async function baixarImagem(id: string): Promise<string | undefined>
+{
+  if (nuvem.estado === 'desligada') return undefined;
+  const conta = await esperarUsuario();
+  if (!conta) return undefined;
+  const { fs, banco } = await servico();
+  const doc = await fs.getDoc(fs.doc(banco, 'usuarios', conta, 'imagens', id));
+  return doc.exists() ? (doc.data() as { dataUrl?: string }).dataUrl : undefined;
 }
 
 // o Firebase Auth traz o código do erro; aqui vira uma frase para a tela

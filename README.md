@@ -87,7 +87,9 @@ O navegador é a cópia de trabalho (localStorage). Com o Firebase ligado, cada 
 
 Links interativos: `publicados/{codigo}` guarda o relatório publicado e `publicados/{codigo}/respostas/{id}` as marcas e comentários. O código do link tem 24 letras e números e é o segredo; desativar o link na tela Retornos tira o acesso na hora. As regras deixam qualquer pessoa com o link criar respostas (sem editar nem apagar) e só a dona ler tudo.
 
-Estrutura: `usuarios/{uid}/geral/dados` guarda tudo menos as fotos, e `usuarios/{uid}/fotos/{data}` guarda uma foto do painel por documento. A configuração do app web não é segredo; quem protege os dados são as regras.
+Estrutura: `usuarios/{uid}/geral/dados` guarda tudo menos fotos e registros; `usuarios/{uid}/fotos/{id}` guarda uma foto do painel por documento (o id é a data; fora do DEV vira `PASTA__data`); `usuarios/{uid}/registros/{id}` guarda um registro do diário por documento; `usuarios/{uid}/imagens/{id}` guarda uma imagem de print por documento (JPEG em data URL, sempre abaixo de 1 MB). Assim nenhum documento chega perto do limite de 1 MB do Firestore, e os registros guardam só o `imagemId`. O cache local do Firestore (IndexedDB) mantém o que já foi baixado, inclusive as imagens, e reenvia o que ficou pendente offline. A configuração do app web não é segredo; quem protege os dados são as regras.
+
+Não há servidor próprio: o app é TypeScript de ponta a ponta (SvelteKit estático na Vercel) e o backend é o Firebase (Authentication e Firestore), protegido pelas regras de [firestore.rules](firestore.rules).
 
 ## Convenções
 
