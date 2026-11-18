@@ -1,14 +1,23 @@
 import type { CardSnapshot, EtapaCard, Ritmo } from '../tipos';
+import { amostraParaCard, AMOSTRAS_CONFIANCA_TOTAL, descreverChave, type ModeloEstimativa } from './estimativa';
 import { semAcento } from './normalizar';
 import { extrairAssunto, similaridadeCosseno } from './vetor';
 
-// Estima o tempo em horas de uma demanda com base em prioridade, regras do pedido e etapas (quando não definido manualmente)
-export function estimarHorasCard(card: CardSnapshot): number
+export interface DetalheEstimativa
 {
-  if (card.horasEstimadas !== undefined && card.horasEstimadas > 0) return card.horasEstimadas;
+  horas: number;
+  origem: 'manual' | 'regra' | 'historico';
+  nota?: string | undefined;
+}
+
+// Estima o tempo em horas de uma demanda: o que foi digitado vale; senão, regra por prioridade e condições do pedido,
+// misturada com a mediana das demandas parecidas já concluídas quando o histórico tem amostras suficientes
+export function detalharEstimativa(card: CardSnapshot, modelo?: ModeloEstimativa): DetalheEstimativa
+{
+  if (card.horasEstimadas !== undefined && card.horasEstimadas > 0) return { horas: card.horasEstimadas, origem: card.origemHoras ?? 'manual', nota: card.notaHoras };
   if (card.situacao === 'concluido' || semAcento(card.statusCard ?? '').toLowerCase() === 'resolvido')
   {
-    return 0;
+    return { horas: 0, origem: 'regra' };
   }
 
   let base = 4;
@@ -21,6 +30,17 @@ export function estimarHorasCard(card: CardSnapshot): number
   const condicoes = textoRegras.match(/\bse\s+[a-zà-ÿ0-9\s/]+,\s*ent[aã]o\b/gi)?.length ?? 0;
   base += Math.min(3.5, condicoes * 0.8);
 
+  let origem: DetalheEstimativa['origem'] = 'regra';
+  let nota: string | undefined;
+  const aprendida = amostraParaCard(modelo, card);
+  if (aprendida)
+  {
+    const peso = Math.min(1, aprendida.amostras / AMOSTRAS_CONFIANCA_TOTAL);
+    base = peso * aprendida.mediana + (1 - peso) * base;
+    origem = 'historico';
+    nota = `Mediana de ${aprendida.mediana.toString().replace('.', ',')} h em ${aprendida.amostras} ${descreverChave(aprendida.chave)} (peso ${Math.round(peso * 100)}%).`;
+  }
+
   if (card.etapas && card.etapas.length > 0)
   {
     const temAlgumaConcluida = card.etapas.some((e) => e.situacao === 'concluida');
@@ -31,7 +51,7 @@ export function estimarHorasCard(card: CardSnapshot): number
       const total = card.etapas.length;
       if (total > 0)
       {
-        if (restantes === 0) return 0;
+        if (restantes === 0) return { horas: 0, origem };
         const proporcaoRestante = restantes / total;
         base = Math.max(1.5, base * proporcaoRestante);
       }
@@ -43,7 +63,12 @@ export function estimarHorasCard(card: CardSnapshot): number
     base = Math.max(1.5, base * (restantes / card.etapasTotal));
   }
 
-  return Math.round(base * 2) / 2;
+  return { horas: Math.round(base * 2) / 2, origem, nota };
+}
+
+export function estimarHorasCard(card: CardSnapshot, modelo?: ModeloEstimativa): number
+{
+  return detalharEstimativa(card, modelo).horas;
 }
 
 // Gera ou enriquece as etapas do card descrevendo automaticamente o que a pessoa vai fazer em cada etapa
@@ -161,14 +186,19 @@ export function derivarRitmoCard(card: CardSnapshot): Ritmo
   return 'no_ritmo';
 }
 
-export function enriquecerCard(card: CardSnapshot): CardSnapshot
+export function enriquecerCard(card: CardSnapshot, modelo?: ModeloEstimativa): CardSnapshot
 {
   const assunto = card.assunto ?? extrairAssunto(card);
-  const horasEstimadas = card.horasEstimadas ?? estimarHorasCard(card);
+  // o tempo digitado (ou de origem desconhecida, como nos dados antigos) fica; o calculado acompanha o histórico mais novo
+  const fixo = card.horasEstimadas !== undefined && card.horasEstimadas > 0 && (card.origemHoras === undefined || card.origemHoras === 'manual');
+  const detalhe = fixo ? undefined : detalharEstimativa({ ...card, horasEstimadas: undefined }, modelo);
+  const horasEstimadas = fixo ? card.horasEstimadas! : (detalhe?.horas ?? 0);
   const comHoras: CardSnapshot = {
     ...card,
     assunto,
     horasEstimadas,
+    origemHoras: fixo ? (card.origemHoras ?? 'manual') : detalhe!.origem,
+    notaHoras: fixo ? card.notaHoras : detalhe?.nota,
   };
   const etapas = gerarEtapasAutomaticasCard(comHoras);
   const etapasConcluidas = etapas.filter((e) => e.situacao === 'concluida').length;

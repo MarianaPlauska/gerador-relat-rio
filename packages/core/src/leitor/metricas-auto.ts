@@ -1,5 +1,6 @@
 import type { CardSnapshot, Pessoa, Ritmo, TotaisPainel } from '../tipos';
 import { derivarRitmoCard, enriquecerCard, estimarHorasCard, ordenarCardsResumidos } from './etapas-auto';
+import type { ModeloEstimativa } from './estimativa';
 import { semAcento } from './normalizar';
 
 export interface PontoGraficoLinhaCard
@@ -44,9 +45,10 @@ export function calcularMetricasAutomaticasDosCards(
   cardsBrutos: CardSnapshot[],
   totaisManuais: TotaisPainel = {},
   pessoas: Pessoa[] = [],
+  modelo?: ModeloEstimativa,
 ): MetricasAutomaticasPasta
 {
-  const cards = cardsBrutos.map(enriquecerCard);
+  const cards = cardsBrutos.map((c) => enriquecerCard(c, modelo));
   const total = cards.length;
 
   const concluidos = cards.filter(

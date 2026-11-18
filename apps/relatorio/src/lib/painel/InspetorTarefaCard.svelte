@@ -143,6 +143,14 @@
     </label>
   </div>
 
+  {#if card.origemHoras === 'manual'}
+    <small class="dica">Tempo definido por você: o histórico não altera.</small>
+  {:else if card.origemHoras === 'historico' && card.notaHoras}
+    <small class="dica">Tempo estimado pelo histórico. {card.notaHoras} Digite outro valor para fixar.</small>
+  {:else if card.origemHoras === 'regra'}
+    <small class="dica">Tempo estimado pela regra de prioridade (ainda sem histórico suficiente deste tipo). Digite outro valor para fixar.</small>
+  {/if}
+
   <label class="bloco-campo-direita">
     <span class="etiqueta">O que foi pedido / Descrição da tarefa</span>
     <textarea

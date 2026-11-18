@@ -1,15 +1,17 @@
 <script lang="ts">
   import
   {
-    agruparPorPessoa, agoraLocal, analisarTimeNoProjeto, calcularMetricasAutomaticasDosCards, calcularPeriodoHistoricoPessoa,
-    calcularRelacoesEImpactoSemana, compararComAnteriores, consolidarArvoreDeCards, correlacionarLote,
+    adicionarEtapaAjustada, agruparPorPessoa, agoraLocal, ajustarCampos, ajustarEtapa, ajustarHoras, analisarTimeNoProjeto, aplicarAjustes, aplicarRelacionados,
+    aprenderEstimativas, calcularMetricasAutomaticasDosCards, calcularPeriodoHistoricoPessoa, calcularRelacoesEImpactoSemana, chaveDaEtapa,
+    compararComAnteriores, consolidarArvoreDeCards, correlacionarLote, definicoesPadrao, desvincularAjustado,
     detectarOrigem, ehCsvDeDemandas, enriquecerCard, fotoVazia, idCurto, lerCards, lerCsvDemandas, lerOndas, lerTotais,
-    linhasNaoReconhecidas, mesclarNaFoto, montarGanttSemana, nomesTotais, ordenarCardsResumidos, pessoasDoProjeto, segundaDaSemana, somarDias, sugerirDaCaptura, unirCapturas,
-    type CapturaLida, type CardSnapshot, type CriterioOrdenacaoCards, type EtapaCard, type Onda, type OrigemLeitura, type Pessoa, type RegistroPainel, type SaidaCapturaLote, type Snapshot, type TotaisPainel,
+    linhasNaoReconhecidas, mesclarNaFoto, montarGanttSemana, nomesTotais, ordenarCardsResumidos, pessoasDoProjeto, removerEtapaAjustada, segundaDaSemana, somarDias, sugerirDaCaptura, unirCapturas, vincularAjustado,
+    type Ajustes, type AjusteEtapa, type Ausencia, type CapturaLida, type CardSnapshot, type CriterioOrdenacaoCards, type EtapaCard, type Onda, type OrigemLeitura, type Pessoa, type RegistroPainel, type SaidaCapturaLote, type Snapshot, type TotaisPainel,
   } from '@supervisao/core';
   import { goto } from '$app/navigation';
   import { carregar, exportarJson, hidratarImagens, importarJson, salvar, type Dados } from '#lib/armazenamento.ts';
   import { lerColagem } from '#lib/colagem.ts';
+  import { guardarOrdem, ordemManualDoProjeto } from '#lib/fila.ts';
   import { lerImagem, miniaturaDataUrl } from '#lib/ocr.ts';
   import GanttSemana from '#lib/painel/GanttSemana.svelte';
   import InspetorTarefaCard from '#lib/painel/InspetorTarefaCard.svelte';
@@ -95,6 +97,9 @@
   let capturas = $state<CapturaLida[]>([]);
   let totaisLidos = $state<TotaisPainel>({});
   let cardsLidos = $state<CardSnapshot[]>([]);
+  // cards como saíram dos prints (sem ajustes) e o que foi corrigido à mão por cima deles
+  let cardsBase = $state<CardSnapshot[]>([]);
+  let ajustes = $state<Ajustes>({});
   let ondasLidas = $state<Onda[]>([]);
   let motivo = $state('');
   let textoFinal = $state('');
@@ -134,6 +139,8 @@
   });
   const fotosDaPasta = $derived(dados.fotos.filter((f) => (f.pasta ?? dados.prefixo) === pastaAtual).sort((a, b) => b.data.localeCompare(a.data)));
   const fotoBase = $derived(fotosDaPasta.find((f) => f.data <= dataRegistro));
+  // quanto tempo cada tipo de demanda realmente levou nas demandas já concluídas deste projeto
+  const modeloEstimativa = $derived(aprenderEstimativas(fotosDaPasta));
   const indiceFotoNumeros = $derived(dados.fotos.findIndex((f) => f.data === dataNumeros && (f.pasta ?? dados.prefixo) === pastaAtual));
   const fotoNumeros = $derived<Snapshot>(dados.fotos[indiceFotoNumeros] ?? { ...fotoVazia(dataNumeros), pasta: pastaAtual });
   const chavesLidas = $derived(Object.keys(totaisLidos) as ChaveTotal[]);
@@ -144,8 +151,8 @@
   const cardsOrdenadosResumo = $derived(ordenarCardsResumidos(cardsLidos, ordenacaoTarefas));
   const cardSelecionado = $derived(cardsLidos.find((c) => c.codigo === cardSelecionadoCodigo) ?? null);
   const indiceCapturaModal = $derived(capturas.findIndex((c) => c.id === capturaModalId));
-  const metricasEnvio = $derived(calcularMetricasAutomaticasDosCards(cardsLidos, totaisLidos, dados.pessoas));
-  const metricasPastaDia = $derived(calcularMetricasAutomaticasDosCards(fotoNumeros.cards, fotoNumeros.totais, dados.pessoas));
+  const metricasEnvio = $derived(calcularMetricasAutomaticasDosCards(cardsLidos, totaisLidos, dados.pessoas, modeloEstimativa));
+  const metricasPastaDia = $derived(calcularMetricasAutomaticasDosCards(fotoNumeros.cards, fotoNumeros.totais, dados.pessoas, modeloEstimativa));
 
   const semanaRegistro = $derived(segundaDaSemana(dataRegistro));
   const analiseEnvio = $derived(
@@ -157,9 +164,13 @@
       semanaInicio: semanaRegistro,
       semanaFim: somarDias(semanaRegistro, 6),
       hoje: dataRegistro,
+      modelo: modeloEstimativa,
     }),
   );
-  const ganttEnvio = $derived(montarGanttSemana(analiseEnvio.filter((p) => p.total > 0), { semanaInicio: semanaRegistro, hoje: dataRegistro }));
+  const ganttEnvio = $derived(montarGanttSemana(
+    analiseEnvio.filter((p) => p.total > 0),
+    { semanaInicio: semanaRegistro, hoje: dataRegistro, feriados: definicoesPadrao.feriados, ordemManual: ordemManualDoProjeto(dados.filaManual, pastaAtual) },
+  ));
 
   $effect(() =>
   {
@@ -232,6 +243,14 @@
     confirmacaoRemoverPessoa = null;
   }
 
+  // férias, atestado e folga: a pessoa descoberta nos prints entra no cadastro junto com a ausência
+  function atualizarAusencias(pessoa: Pessoa, ausencias: Ausencia[])
+  {
+    const lista = dados.pessoas.some((p) => p.id === pessoa.id) ? dados.pessoas : [...dados.pessoas, pessoa];
+    dados.pessoas = lista.map((p) => (p.id === pessoa.id ? { ...p, ausencias } : p));
+    salvar($state.snapshot(dados));
+  }
+
   function atualizarCapacidadePessoa(pessoaId: string, valor: string)
   {
     const num = Number(valor);
@@ -287,15 +306,17 @@
   function juntar(t: TotaisPainel, c: CardSnapshot[], novoT: TotaisPainel, novoC: CardSnapshot[])
   {
     const m = mesclarNaFoto({ data: dataRegistro, totais: t, cards: c }, novoT, novoC);
-    const cardsConsolidados = consolidarArvoreDeCards(m.cards);
-    const auto = calcularMetricasAutomaticasDosCards(cardsConsolidados, m.totais, dados.pessoas);
+    const cardsConsolidados = consolidarArvoreDeCards(m.cards, modeloEstimativa);
+    const auto = calcularMetricasAutomaticasDosCards(cardsConsolidados, m.totais, dados.pessoas, modeloEstimativa);
     return { totais: auto.totais, cards: cardsConsolidados };
   }
 
+  // refaz os cards a partir do que foi lido (cardsBase), põe os ajustes manuais por cima e recalcula tempos, relações e totais
   function sincronizarTotaisAutomaticos()
   {
-    cardsLidos = calcularRelacoesEImpactoSemana(cardsLidos.map(enriquecerCard));
-    totaisLidos = calcularMetricasAutomaticasDosCards(cardsLidos, totaisLidos, dados.pessoas).totais;
+    const aplicados = aplicarAjustes(cardsBase, ajustes).map((c) => enriquecerCard(c, modeloEstimativa));
+    cardsLidos = aplicarRelacionados(calcularRelacoesEImpactoSemana(aplicados), ajustes);
+    totaisLidos = calcularMetricasAutomaticasDosCards(cardsLidos, totaisLidos, dados.pessoas, modeloEstimativa).totais;
   }
 
   // o print entra na lista e tudo é refeito: assim a ordem de envio não muda o resultado
@@ -327,6 +348,7 @@
       capturas.map((cap) => ({ id: cap.id, origem: cap.origem, cards: leituras.get(cap.id)!.cards, cardPaiForcado: cap.cardPaiManual })),
       base,
       dados.pessoas,
+      modeloEstimativa,
     );
     const atualizadas = new Map<string, CapturaLida>();
     for (const id of lote.ordemProcessamento)
@@ -356,181 +378,114 @@
     }
     capturas = capturas.map((cap) => atualizadas.get(cap.id) ?? cap);
     totaisLidos = t;
-    cardsLidos = c;
+    cardsBase = c;
     ondasLidas = o;
+    sincronizarTotaisAutomaticos();
+  }
+
+  // tudo que a pessoa corrige à mão vai para a camada de ajustes, que sobrevive quando os prints são lidos de novo
+  function aplicarAjuste(novos: Ajustes)
+  {
+    ajustes = novos;
+    sincronizarTotaisAutomaticos();
   }
 
   function atualizarHorasCard(codigo: string, valor: string)
   {
     const num = Number(valor);
     if (Number.isNaN(num) || num < 0) return;
-    cardsLidos = cardsLidos.map((c) => (c.codigo === codigo ? { ...c, horasEstimadas: num } : c));
-    sincronizarTotaisAutomaticos();
+    aplicarAjuste(ajustarHoras(ajustes, codigo, num));
   }
 
   function atualizarCampoCard(codigo: string, parcial: Partial<CardSnapshot>)
   {
-    cardsLidos = cardsLidos.map((c) => (c.codigo === codigo ? { ...c, ...parcial } : c));
-    sincronizarTotaisAutomaticos();
+    aplicarAjuste(ajustarCampos(ajustes, codigo, parcial));
+  }
+
+  // edição direta nos cards já guardados na foto do dia (não passam pela leitura dos prints)
+  function editarCardDaFoto(codigo: string, mudar: (c: CardSnapshot) => CardSnapshot)
+  {
+    if (indiceFotoNumeros < 0) return;
+    const foto = dados.fotos[indiceFotoNumeros]!;
+    const cards = foto.cards.map((c) => (c.codigo === codigo ? mudar(c) : c));
+    dados.fotos[indiceFotoNumeros] = { ...foto, cards, totais: calcularMetricasAutomaticasDosCards(cards, foto.totais, dados.pessoas, modeloEstimativa).totais };
+    dados.fotos = [...dados.fotos];
+    salvar($state.snapshot(dados));
+  }
+
+  function mudarEtapa(codigo: string, ordemEtapa: number, patchDe: (et: EtapaCard) => AjusteEtapa, naFotoDia = false)
+  {
+    if (naFotoDia && indiceFotoNumeros >= 0)
+    {
+      editarCardDaFoto(codigo, (c) =>
+      {
+        const comEtapas = c.etapas ? c : enriquecerCard(c, modeloEstimativa);
+        const et = comEtapas.etapas?.find((e) => e.ordem === ordemEtapa);
+        return et ? aplicarAjustes([comEtapas], ajustarEtapa({}, codigo, chaveDaEtapa(et, comEtapas.etapas!), patchDe(et)))[0]! : c;
+      });
+      return;
+    }
+    const card = cardsLidos.find((c) => c.codigo === codigo);
+    const et = card?.etapas?.find((e) => e.ordem === ordemEtapa);
+    if (!card || !et) return;
+    aplicarAjuste(ajustarEtapa(ajustes, codigo, chaveDaEtapa(et, card.etapas!), patchDe(et)));
   }
 
   function alternarEtapaCard(codigo: string, ordemEtapa: number, naFotoDia = false)
   {
-    const atualizarLista = (lista: CardSnapshot[]) =>
-      lista.map((c) =>
-      {
-        if (c.codigo !== codigo) return c;
-        const etapasAtuais = c.etapas ?? enriquecerCard(c).etapas ?? [];
-        const novasEtapas: EtapaCard[] = etapasAtuais.map((et) =>
-          et.ordem === ordemEtapa
-            ? { ...et, situacao: et.situacao === 'concluida' ? 'nao_iniciada' : 'concluida', origemEtapa: 'manual' }
-            : et,
-        );
-        const concluidas = novasEtapas.filter((e) => e.situacao === 'concluida').length;
-        const todasFeitas = novasEtapas.length > 0 && concluidas === novasEtapas.length;
-        return {
-          ...c,
-          etapas: novasEtapas,
-          etapasConcluidas: concluidas,
-          etapasTotal: novasEtapas.length,
-          situacao: todasFeitas ? 'concluido' : concluidas > 0 ? 'em_execucao' : c.situacao,
-          statusCard: todasFeitas ? 'Resolvido' : concluidas > 0 ? 'Em andamento' : c.statusCard,
-        };
-      });
-
-    if (naFotoDia && indiceFotoNumeros >= 0)
-    {
-      const cardsAtualizados = atualizarLista(dados.fotos[indiceFotoNumeros]!.cards);
-      const auto = calcularMetricasAutomaticasDosCards(cardsAtualizados, dados.fotos[indiceFotoNumeros]!.totais, dados.pessoas);
-      dados.fotos[indiceFotoNumeros] = {
-        ...dados.fotos[indiceFotoNumeros]!,
-        cards: cardsAtualizados,
-        totais: auto.totais,
-      };
-      dados.fotos = [...dados.fotos];
-      salvar($state.snapshot(dados));
-    }
-    else
-    {
-      cardsLidos = atualizarLista(cardsLidos);
-      sincronizarTotaisAutomaticos();
-    }
+    mudarEtapa(codigo, ordemEtapa, (et) => ({ situacao: et.situacao === 'concluida' ? 'nao_iniciada' : 'concluida' }), naFotoDia);
   }
 
   function atualizarSituacaoEtapa(codigo: string, ordemEtapa: number, situacao: EtapaCard['situacao'])
   {
-    cardsLidos = cardsLidos.map((c) =>
-    {
-      if (c.codigo !== codigo) return c;
-      const etapasAtuais = c.etapas ?? enriquecerCard(c).etapas ?? [];
-      const novasEtapas: EtapaCard[] = etapasAtuais.map((et) =>
-        et.ordem === ordemEtapa ? { ...et, situacao, origemEtapa: 'manual' } : et,
-      );
-      const concluidas = novasEtapas.filter((e) => e.situacao === 'concluida').length;
-      const todasFeitas = novasEtapas.length > 0 && concluidas === novasEtapas.length;
-      return {
-        ...c,
-        etapas: novasEtapas,
-        etapasConcluidas: concluidas,
-        etapasTotal: novasEtapas.length,
-        situacao: todasFeitas ? 'concluido' : novasEtapas.some((e) => e.situacao === 'rodando') ? 'em_execucao' : c.situacao,
-      };
-    });
-    sincronizarTotaisAutomaticos();
+    mudarEtapa(codigo, ordemEtapa, () => ({ situacao }));
   }
 
   function atualizarDescricaoEtapa(codigo: string, ordemEtapa: number, descricao: string, naFotoDia = false)
   {
-    const atualizarLista = (lista: CardSnapshot[]): CardSnapshot[] =>
-      lista.map((c) =>
-      {
-        if (c.codigo !== codigo) return c;
-        const etapasAtuais = c.etapas ?? enriquecerCard(c).etapas ?? [];
-        return {
-          ...c,
-          etapas: etapasAtuais.map((et) => (et.ordem === ordemEtapa ? { ...et, descricao, origemEtapa: 'manual' } : et)),
-        };
-      });
-
-    if (naFotoDia && indiceFotoNumeros >= 0)
-    {
-      dados.fotos[indiceFotoNumeros]!.cards = atualizarLista(dados.fotos[indiceFotoNumeros]!.cards);
-      dados.fotos = [...dados.fotos];
-      salvar($state.snapshot(dados));
-    }
-    else
-    {
-      cardsLidos = atualizarLista(cardsLidos);
-    }
+    mudarEtapa(codigo, ordemEtapa, () => ({ descricao }), naFotoDia);
   }
 
   function adicionarEtapaManual(codigo: string, nome: string, desc: string)
   {
-    cardsLidos = cardsLidos.map((c) =>
-    {
-      if (c.codigo !== codigo) return c;
-      const atuais = c.etapas ?? [];
-      const novaOrdem = atuais.length + 1;
-      const novas: EtapaCard[] = [
-        ...atuais,
-        {
-          ordem: novaOrdem,
-          nome,
-          descricao: desc || `Executar etapa: ${nome}`,
-          pessoa: c.responsavelEtapaAtual ?? c.responsaveis[0],
-          situacao: 'nao_iniciada',
-          horasEstimadas: 1.5,
-          origemEtapa: 'manual',
-        },
-      ];
-      return { ...c, etapas: novas, etapasTotal: novas.length };
-    });
-    sincronizarTotaisAutomaticos();
+    const card = cardsLidos.find((c) => c.codigo === codigo);
+    if (!card) return;
+    const nova: EtapaCard = {
+      ordem: (card.etapas?.length ?? 0) + 1,
+      nome,
+      descricao: desc || `Executar etapa: ${nome}`,
+      pessoa: card.responsavelEtapaAtual ?? card.responsaveis[0],
+      situacao: 'nao_iniciada',
+      horasEstimadas: 1.5,
+      origemEtapa: 'manual',
+    };
+    aplicarAjuste(adicionarEtapaAjustada(ajustes, codigo, nova));
   }
 
   function removerEtapaCard(codigo: string, ordemEtapa: number)
   {
-    cardsLidos = cardsLidos.map((c) =>
-    {
-      if (c.codigo !== codigo) return c;
-      const filtradas = (c.etapas ?? []).filter((e) => e.ordem !== ordemEtapa).map((e, i) => ({ ...e, ordem: i + 1 }));
-      return {
-        ...c,
-        etapas: filtradas,
-        etapasTotal: filtradas.length,
-        etapasConcluidas: filtradas.filter((e) => e.situacao === 'concluida').length,
-      };
-    });
-    sincronizarTotaisAutomaticos();
+    const card = cardsLidos.find((c) => c.codigo === codigo);
+    const et = card?.etapas?.find((e) => e.ordem === ordemEtapa);
+    if (!card || !et) return;
+    aplicarAjuste(removerEtapaAjustada(ajustes, codigo, et, card.etapas!));
   }
 
   function vincularCardRelacionado(codigo: string, outroCodigo: string)
   {
     if (!outroCodigo || codigo === outroCodigo) return;
-    cardsLidos = cardsLidos.map((c) =>
-    {
-      if (c.codigo === codigo)
-      {
-        const rel = [...new Set([...(c.cardsRelacionados ?? []), outroCodigo])];
-        return { ...c, cardsRelacionados: rel };
-      }
-      if (c.codigo === outroCodigo)
-      {
-        const rel = [...new Set([...(c.cardsRelacionados ?? []), codigo])];
-        return { ...c, cardsRelacionados: rel };
-      }
-      return c;
-    });
-    sincronizarTotaisAutomaticos();
+    aplicarAjuste(vincularAjustado(vincularAjustado(ajustes, codigo, outroCodigo), outroCodigo, codigo));
   }
 
   function desvincularCardRelacionado(codigo: string, outroCodigo: string)
   {
-    cardsLidos = cardsLidos.map((c) =>
-    {
-      if (c.codigo !== codigo) return c;
-      return { ...c, cardsRelacionados: (c.cardsRelacionados ?? []).filter((x) => x !== outroCodigo) };
-    });
+    aplicarAjuste(desvincularAjustado(desvincularAjustado(ajustes, codigo, outroCodigo), outroCodigo, codigo));
+  }
+
+  // a ordem da fila de uma pessoa no cronograma, escolhida arrastando as barras
+  function reordenarFila(pessoaId: string, codigos: string[])
+  {
+    dados.filaManual = guardarOrdem(dados.filaManual, pastaAtual, pessoaId, codigos);
+    salvar($state.snapshot(dados));
   }
 
   function removerCaptura(id: string)
@@ -591,7 +546,9 @@
     caixa = '';
     capturas = [];
     totaisLidos = {};
+    cardsBase = [];
     cardsLidos = [];
+    ajustes = {};
     ondasLidas = [];
     motivo = '';
     textoFinal = '';
@@ -1014,7 +971,7 @@
 
           <details class="conferir cronograma-envio">
             <summary>Cronograma da semana: quem faz o quê em cada dia e quando fica livre</summary>
-            <GanttSemana gantt={ganttEnvio} selecionado={cardSelecionadoCodigo} aoSelecionarCard={(cod) => (cardSelecionadoCodigo = cod)} />
+            <GanttSemana gantt={ganttEnvio} selecionado={cardSelecionadoCodigo} aoSelecionarCard={(cod) => (cardSelecionadoCodigo = cod)} aoReordenar={reordenarFila} />
           </details>
         {/if}
 
@@ -1366,6 +1323,7 @@
     aoConfirmarRemocao={confirmarRemocaoPessoa}
     aoCancelarRemocao={() => (confirmacaoRemoverPessoa = null)}
     aoReativarPessoa={(nome) => adicionarPessoaNaPasta(nome)}
+    aoAtualizarAusencias={atualizarAusencias}
   />
 </main>
 

@@ -91,6 +91,22 @@ Estrutura: `usuarios/{uid}/geral/dados` guarda tudo menos fotos e registros; `us
 
 Não há servidor próprio: o app é TypeScript de ponta a ponta (SvelteKit estático na Vercel) e o backend é o Firebase (Authentication e Firestore), protegido pelas regras de [firestore.rules](firestore.rules).
 
+### Espaços compartilhados, convites e papéis (fase 1)
+
+Os dados continuam em `usuarios/{donoUid}`; quem foi convidado abre o espaço do dono em vez do próprio. A lógica pura (e-mail, papéis, convite, aceite, revogação) está em [packages/core/src/acesso.ts](packages/core/src/acesso.ts), com testes; o acesso ao Firestore está em [apps/relatorio/src/lib/acesso.ts](apps/relatorio/src/lib/acesso.ts) e a tela em Gerenciamento de pessoas, seção Acesso e convites.
+
+- `convites/{email__donoUid}`: convite feito pelo dono (e-mail em minúsculo, papel, projetos, status pendente, aceito ou revogado). O convidado lê os convites do próprio e-mail.
+- `usuarios/{donoUid}/membros/{membroUid}`: quem já entrou. O convidado cria o próprio documento só se houver convite pendente com o mesmo papel e projetos; só o dono altera ou remove. Cada membro lê apenas o próprio documento.
+- Papéis: **dono** faz tudo; **supervisor** lê e grava os dados do dono, mas não gerencia a equipe; **leitor** só lê (a tela mostra a faixa Somente leitura e nada é salvo, nem no navegador).
+- Fluxo: o dono convida pelo e-mail; a pessoa entra no OrbisOS com esse e-mail, aceita o convite e escolhe o espaço no seletor. O espaço escolhido fica em `localStorage` (`orbisos-espaco`) e a página recarrega; cada espaço tem cópia local própria. Revogar apaga o documento de membro e marca o convite como revogado; o membro também pode sair sozinho.
+
+O que **não** foi testado: nada disso rodou contra o Firebase real nem contra o emulador. Foram testados só a lógica pura (vitest) e os tipos (`npm run check`); as regras novas foram escritas e relidas, mas nunca executadas. Limites conhecidos:
+
+- Os projetos liberados no convite só filtram o que a tela mostra; as regras não separam por projeto, então um membro com acesso ao espaço consegue ler tudo do dono pelo Firestore.
+- O e-mail do convite é conferido pelo e-mail da conta, mas o app não exige e-mail verificado; quem criar conta com o e-mail convidado antes da pessoa certa receberia o convite. Verificar o e-mail antes de aceitar fica para a próxima fase.
+- Vale a última gravação: se o dono e um supervisor editarem ao mesmo tempo, a mais recente vence (como já era entre dois navegadores).
+- Links publicados (`publicados/{codigo}`) continuam pertencendo a quem os publica; o leitor não publica.
+
 ## Convenções
 
 - Nomes em português, chaves de bloco na linha de baixo, TypeScript estrito sem `any`.

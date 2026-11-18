@@ -1,6 +1,7 @@
 import type { CardSnapshot, EtapaCard, OrigemLeitura, Pessoa } from '../tipos';
-import { juntarCard } from './cards';
+import { AVISO_CONTINUACAO, juntarCard } from './cards';
 import { enriquecerCard } from './etapas-auto';
+import type { ModeloEstimativa } from './estimativa';
 import { semAcento } from './normalizar';
 import { similaridadeCosseno, similaridadeTextos } from './vetor';
 
@@ -324,7 +325,7 @@ function pontuarFragmento(frag: Fragmento, perfil: Perfil, pessoas: Pessoa[]): V
 
 const prioridadeOrigem = (origem: OrigemLeitura): number => (origem === 'card' ? 2 : origem === 'demandas' || origem === 'cronograma' ? 0 : 1);
 
-export function correlacionarLote(entradas: EntradaLote[], existentes: CardSnapshot[], pessoas: Pessoa[]): ResultadoLote
+export function correlacionarLote(entradas: EntradaLote[], existentes: CardSnapshot[], pessoas: Pessoa[], modelo?: ModeloEstimativa): ResultadoLote
 {
   // 1) âncoras: tudo que já traz código, do que já existia e do lote inteiro
   const perfis = new Map<string, Perfil>();
@@ -405,7 +406,7 @@ export function correlacionarLote(entradas: EntradaLote[], existentes: CardSnaps
             ...(perfil.etapas.length ? { etapas: perfil.etapas } : {}),
           }
           : {};
-        cards.push(enriquecerCard({ ...card, ...completo }));
+        cards.push(enriquecerCard({ ...card, ...completo }, modelo));
         continue;
       }
       const frag = fragmentos.find((f) => f.capturaId === entrada.id && f.indice === indice)!;
@@ -418,7 +419,11 @@ export function correlacionarLote(entradas: EntradaLote[], existentes: CardSnaps
       const perfil = perfis.get(v.codigo)!;
       const comTexto = perfil.texto.length > textoDe(card).length ? { descricaoCompleta: perfil.texto } : {};
       const comEtapas = perfil.fragmentos.some((f) => f.card.etapas?.length) ? { etapas: perfil.etapas } : {};
-      cards.push(enriquecerCard({ ...card, ...comTexto, ...comEtapas, codigo: v.codigo }));
+      // o aviso de "continuação sem código" deixa de valer depois do vínculo; se ficasse, o resultado dependeria de qual print é mesclado por último.
+      // O mesmo vale para o título: o do fragmento é só a primeira linha do pedaço de texto e não pode trocar o título do card
+      const { titulo: _tituloDoFragmento, ...semTitulo } = card;
+      const avisos = (card.avisosLeitura ?? []).filter((a) => a !== AVISO_CONTINUACAO);
+      cards.push(enriquecerCard({ ...semTitulo, ...comTexto, ...comEtapas, avisosLeitura: avisos, codigo: v.codigo }, modelo));
       if (!melhorVinculo || v.confianca > melhorVinculo.confianca) melhorVinculo = v;
     }
     porCaptura.set(entrada.id, {

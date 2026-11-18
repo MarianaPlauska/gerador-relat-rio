@@ -127,4 +127,45 @@ describe('cronograma semanal (Gantt)', () =>
     expect(rel).toHaveLength(1);
     expect(rel[0]!.conflito).toBe(true);
   });
+
+  it('feriado e ausência da pessoa são dias sem expediente: a fila pula esses dias', () =>
+  {
+    const emFerias: Pessoa = { ...mari, ausencias: [{ de: '2026-11-17', ate: '2026-11-18', motivo: 'férias' }] };
+    const g = montarGanttSemana([resumo(emFerias, [tarefa('DEV-1', 12)]), resumo(rod, [tarefa('DEV-2', 12)])], { ...opc, feriados: ['2026-11-20'] });
+    expect(g.dias.map((d) => d.feriado)).toEqual([false, false, false, false, true]);
+    const [lm, lr] = g.linhas;
+    expect(lm!.semExpediente).toEqual([null, 'ausencia', 'ausencia', null, 'feriado']);
+    // segunda tem 8 h; terça e quarta ausentes; as 4 h restantes caem na quinta
+    expect(lm!.barras[0]!.segmentos).toEqual([{ dia: 0, de: 0, ate: 8 }, { dia: 3, de: 0, ate: 4 }]);
+    expect(lm!.livreAPartirDe).toEqual({ dia: 3, hora: 4 });
+    // 3 dias de expediente (seg, qui + sem sexta): 16 h menos 12 h
+    expect(lm!.horasLivresSemana).toBe(4);
+    // quem não está ausente só perde o feriado
+    expect(lr!.semExpediente).toEqual([null, null, null, null, 'feriado']);
+    expect(lr!.barras[0]!.segmentos).toEqual([{ dia: 0, de: 0, ate: 8 }, { dia: 1, de: 0, ate: 4 }]);
+    // segunda a quinta são 32 h de expediente, menos as 12 h da tarefa
+    expect(lr!.horasLivresSemana).toBe(20);
+  });
+
+  it('semana inteira de ausência manda tudo para depois da semana', () =>
+  {
+    const g = montarGanttSemana([resumo({ ...mari, ausencias: [{ de: '2026-11-16', ate: '2026-11-20' }] }, [tarefa('DEV-1', 6)])], opc);
+    expect(g.linhas[0]!.barras[0]).toMatchObject({ segmentos: [], horasAlemDaSemana: 6 });
+    expect(g.linhas[0]!.horasLivresSemana).toBe(0);
+    expect(g.linhas[0]!.livreAPartirDe).toBeUndefined();
+  });
+
+  it('a ordem escolhida à mão vem antes da automática e o resto segue a regra', () =>
+  {
+    const tarefas = [
+      tarefa('DEV-1', 4, { prioridadeCard: 'Crítica' }),
+      tarefa('DEV-2', 4, { prioridadeCard: 'Baixa' }),
+      tarefa('DEV-3', 4, { prioridadeCard: 'Média' }),
+    ];
+    const automatica = montarGanttSemana([resumo(mari, tarefas)], opc).linhas[0]!.barras.map((b) => b.codigo);
+    expect(automatica).toEqual(['DEV-1', 'DEV-3', 'DEV-2']);
+    const manual = montarGanttSemana([resumo(mari, tarefas)], { ...opc, ordemManual: { [mari.id]: ['DEV-2', 'DEV-3'] } }).linhas[0]!;
+    expect(manual.barras.map((b) => b.codigo)).toEqual(['DEV-2', 'DEV-3', 'DEV-1']);
+    expect(manual.barras[1]!.iniciaApos).toBe('DEV-2');
+  });
 });

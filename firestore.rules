@@ -2,9 +2,120 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // cada pessoa só lê e grava os próprios dados
+    // e-mail de quem está logado, em minúsculo (os convites guardam o e-mail em minúsculo)
+    function emailAtual() {
+      return request.auth.token.email.lower();
+    }
+
+    // o dono do espaço: a pessoa logada é o uid do caminho
+    function ehDono(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // documento de membro de quem está logado no espaço do dono (só existe depois de um convite aceito)
+    function membroDe(dono) {
+      return get(/databases/$(database)/documents/usuarios/$(dono)/membros/$(request.auth.uid)).data;
+    }
+
+    function ehMembro(dono) {
+      return request.auth != null && exists(/databases/$(database)/documents/usuarios/$(dono)/membros/$(request.auth.uid));
+    }
+
+    // leitor e supervisor leem os dados do dono; um papel desconhecido não lê
+    function membroLe(dono) {
+      return ehMembro(dono) && membroDe(dono).papel in ['leitor', 'supervisor'];
+    }
+
+    // só o supervisor escreve nos dados do dono
+    function membroEscreve(dono) {
+      return ehMembro(dono) && membroDe(dono).papel == 'supervisor';
+    }
+
+    // o dono lê e grava tudo o que está no próprio espaço, inclusive membros
     match /usuarios/{uid}/{documento=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read, write: if ehDono(uid);
+    }
+
+    // dados do dono (as quatro coleções do app): membros leem; só o supervisor escreve.
+    // De propósito não existe regra para membros aqui: a coleção membros só o dono altera, então ninguém se promove.
+    // Atenção: as pastas liberadas no convite não são verificadas aqui, só pela tela (ver README).
+    match /usuarios/{uid}/geral/{id} {
+      allow read: if membroLe(uid);
+      allow write: if membroEscreve(uid);
+    }
+    match /usuarios/{uid}/fotos/{id} {
+      allow read: if membroLe(uid);
+      allow write: if membroEscreve(uid);
+    }
+    match /usuarios/{uid}/registros/{id} {
+      allow read: if membroLe(uid);
+      allow write: if membroEscreve(uid);
+    }
+    match /usuarios/{uid}/imagens/{id} {
+      allow read: if membroLe(uid);
+      allow write: if membroEscreve(uid);
+    }
+
+    // membros do espaço do dono. A lista (list) é só do dono (regra geral acima).
+    match /usuarios/{dono}/membros/{membroUid} {
+      // cada membro lê só o próprio documento, nunca o de outro membro nem o de outro dono
+      allow get: if request.auth != null && request.auth.uid == membroUid;
+
+      // o convidado cria o próprio documento só se houver convite pendente para o e-mail dele, deste dono e com o mesmo papel e pastas.
+      // Papel e pastas vêm do convite, então não dá para entrar como supervisor com convite de leitor
+      allow create: if request.auth != null
+        && request.auth.uid == membroUid
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'nome', 'papel', 'pastas'])
+        && request.resource.data.keys().hasAll(['uid', 'email', 'papel', 'pastas'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == emailAtual()
+        && request.resource.data.papel in ['leitor', 'supervisor']
+        && exists(/databases/$(database)/documents/convites/$(emailAtual() + '__' + dono))
+        && get(/databases/$(database)/documents/convites/$(emailAtual() + '__' + dono)).data.status == 'pendente'
+        && get(/databases/$(database)/documents/convites/$(emailAtual() + '__' + dono)).data.donoUid == dono
+        && get(/databases/$(database)/documents/convites/$(emailAtual() + '__' + dono)).data.email == emailAtual()
+        && get(/databases/$(database)/documents/convites/$(emailAtual() + '__' + dono)).data.papel == request.resource.data.papel
+        && get(/databases/$(database)/documents/convites/$(emailAtual() + '__' + dono)).data.pastas == request.resource.data.pastas;
+
+      // o membro pode sair do espaço apagando o próprio documento; não existe update, então ninguém muda o próprio papel
+      allow delete: if request.auth != null && request.auth.uid == membroUid;
+    }
+
+    // convites: o id é e-mail__donoUid (e-mail em minúsculo)
+    match /convites/{id} {
+      // o dono lê os convites que fez; o convidado lê os endereçados ao e-mail dele
+      allow get, list: if request.auth != null
+        && (resource.data.donoUid == request.auth.uid || resource.data.email == emailAtual());
+
+      // só o dono cria convite, com id coerente, e-mail em minúsculo, papel válido e status pendente
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['email', 'donoUid', 'papel', 'pastas', 'criadoEm', 'status', 'donoEmail', 'donoNome'])
+        && request.resource.data.keys().hasAll(['email', 'donoUid', 'papel', 'pastas', 'criadoEm', 'status'])
+        && request.resource.data.donoUid == request.auth.uid
+        && request.resource.data.email == request.resource.data.email.lower()
+        && id == request.resource.data.email + '__' + request.auth.uid
+        && request.resource.data.papel in ['leitor', 'supervisor']
+        && request.resource.data.pastas is list
+        && request.resource.data.status == 'pendente';
+
+      // o dono reenvia ou revoga o próprio convite, sem trocar de dono nem de e-mail
+      allow update: if request.auth != null
+        && resource.data.donoUid == request.auth.uid
+        && request.resource.data.donoUid == resource.data.donoUid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.papel in ['leitor', 'supervisor']
+        && request.resource.data.pastas is list
+        && request.resource.data.status in ['pendente', 'revogado'];
+
+      // o convidado só marca o convite como aceito (pendente para aceito), sem mudar mais nada
+      allow update: if request.auth != null
+        && resource.data.email == emailAtual()
+        && resource.data.status == 'pendente'
+        && request.resource.data.status == 'aceito'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+
+      // só o dono apaga
+      allow delete: if request.auth != null && resource.data.donoUid == request.auth.uid;
     }
 
     // relatórios publicados por link: quem tem o código (24 letras, impossível de adivinhar) lê enquanto estiver ativo

@@ -1,5 +1,5 @@
-import { agoraLocal, novoCodigo, type Publicacao, type RelatorioInterativo, type RespostaInterativa } from '@supervisao/core';
-import { esperarUsuario, firebaseServicos, nuvem } from './nuvem.svelte.ts';
+import { agoraLocal, novoCodigo, permissoes, type Publicacao, type RelatorioInterativo, type RespostaInterativa } from '@supervisao/core';
+import { esperarUsuario, firebaseServicos, nuvem, papelNoEspaco } from './nuvem.svelte.ts';
 
 // documentos no Firestore:
 //   publicados/{codigo}                    o relatório publicado (dono, ativo, conteudo)
@@ -18,6 +18,7 @@ async function donoAtual(): Promise<string>
 
 export async function publicar(conteudo: RelatorioInterativo): Promise<string>
 {
+  if (!permissoes(papelNoEspaco()).publicarLink) throw new Error('Seu acesso neste espaço é somente leitura: não dá para publicar links.');
   const dono = await donoAtual();
   const { fs, banco } = await firebaseServicos();
   const codigo = novoCodigo();

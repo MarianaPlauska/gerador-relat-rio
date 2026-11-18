@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     analisarTimeNoProjeto,
+    aprenderEstimativas,
     definicoesPadrao,
     diasUteisEntre,
     idCurto,
@@ -12,6 +13,7 @@
   import { goto } from '$app/navigation';
   import { carregar, salvar, type Dados } from '#lib/armazenamento.ts';
   import CobrinhaMascote from '#lib/CobrinhaMascote.svelte';
+  import { guardarOrdem, ordemManualDoProjeto } from '#lib/fila.ts';
   import GanttSemana from '#lib/painel/GanttSemana.svelte';
   import { chaveDoRelatorio } from '#lib/modelos.ts';
   import { contextoDaSemana, dataCurta, dataMedia, hoje, periodoDaSemana, semaforoDoRelatorio, semanasDisponiveis } from '#lib/semana.ts';
@@ -92,6 +94,7 @@
   );
 
   // Análise completa por pessoa no projeto selecionado (com expansão, disponibilidade, sugestões e rendimento semanal + acumulado)
+  const modeloEstimativa = $derived(aprenderEstimativas(fotosDoProjeto));
   const pessoasProjeto = $derived(
     analisarTimeNoProjeto({
       pessoas: dados.pessoas,
@@ -101,10 +104,22 @@
       semanaInicio: semana,
       semanaFim: somarDias(semana, 6),
       hoje: dia,
+      modelo: modeloEstimativa,
     }),
   );
 
-  const gantt = $derived(montarGanttSemana(pessoasProjeto, { semanaInicio: semana, hoje: dia }));
+  const gantt = $derived(montarGanttSemana(pessoasProjeto, {
+    semanaInicio: semana,
+    hoje: dia,
+    feriados: definicoesPadrao.feriados,
+    ordemManual: ordemManualDoProjeto(dados.filaManual, projetoAtual),
+  }));
+
+  function reordenarFila(pessoaId: string, codigos: string[])
+  {
+    dados.filaManual = guardarOrdem(dados.filaManual, projetoAtual, pessoaId, codigos);
+    salvar($state.snapshot(dados));
+  }
 
   const registrosProjeto = $derived(
     [...dados.registros]
@@ -547,7 +562,7 @@
         </div>
         <span class="dica">Fila de cada pessoa por prioridade, em jornadas de 8 h. Clique numa barra para abrir a tarefa.</span>
       </div>
-      <GanttSemana gantt={gantt} aoSelecionarCard={(codigo) => goto(`/cards?q=${encodeURIComponent(codigo)}`)} />
+      <GanttSemana gantt={gantt} aoSelecionarCard={(codigo) => goto(`/cards?q=${encodeURIComponent(codigo)}`)} aoReordenar={reordenarFila} />
     </section>
   {/if}
 

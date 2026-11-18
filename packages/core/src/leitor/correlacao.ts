@@ -1,12 +1,14 @@
 import type { CapturaLida, CardSnapshot, Pessoa } from '../tipos';
 import { juntarCard } from './cards';
 import { calcularRelacoesEImpactoSemana, enriquecerCard } from './etapas-auto';
+import type { ModeloEstimativa } from './estimativa';
 import { semAcento } from './normalizar';
 import { similaridadeTextos } from './vetor';
 
 export * from './vetor';
 export * from './etapas-auto';
 export * from './metricas-auto';
+export * from './estimativa';
 
 export interface ResultadoCorrelacao
 {
@@ -34,7 +36,7 @@ export function correlacionarCapturaComArvore(
 {
   if (!cardsDaCaptura.length || !cardsExistentes.length)
   {
-    return { cards: cardsDaCaptura.map(enriquecerCard) };
+    return { cards: cardsDaCaptura.map((c) => enriquecerCard(c)) };
   }
 
   let cardPaiVinculado: string | undefined;
@@ -172,7 +174,7 @@ function capturasAnterioresComCard(capturas: CapturaLida[]): CapturaLida[]
 }
 
 // Consolida uma lista de cards mesclando pais e filhos pelo código e enriquecendo assunto, etapas, relações e horas estimadas
-export function consolidarArvoreDeCards(cards: CardSnapshot[]): CardSnapshot[]
+export function consolidarArvoreDeCards(cards: CardSnapshot[], modelo?: ModeloEstimativa): CardSnapshot[]
 {
   const mapa = new Map<string, CardSnapshot>();
   for (const c of cards)
@@ -180,7 +182,11 @@ export function consolidarArvoreDeCards(cards: CardSnapshot[]): CardSnapshot[]
     if (c.codigo === '__ORFAO__') continue;
     const existente = mapa.get(c.codigo);
     const unido = existente ? juntarCard(existente, c) : c;
-    mapa.set(c.codigo, enriquecerCard(unido));
+    mapa.set(c.codigo, enriquecerCard(unido, modelo));
   }
-  return calcularRelacoesEImpactoSemana([...mapa.values()]);
+  // as relações (ordem dos relacionados, texto do impacto, fila da pessoa) são calculadas com os cards em ordem de código,
+  // senão o resultado mudaria conforme a ordem dos prints; a lista devolvida segue a ordem em que os cards apareceram
+  const emOrdemDeCodigo = [...mapa.values()].sort((a, b) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }));
+  const calculados = new Map(calcularRelacoesEImpactoSemana(emOrdemDeCodigo).map((c) => [c.codigo, c]));
+  return [...mapa.keys()].map((codigo) => calculados.get(codigo)!);
 }

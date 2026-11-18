@@ -1,6 +1,6 @@
 import type { CardSnapshot, EtapaCard, Pessoa, PlanoSemana, RegistroPainel, Ritmo, Situacao, Snapshot } from '../tipos';
 import { calcularCalibracaoPessoa, calibrarProbabilidade, type CalibracaoPessoa } from './calibracao';
-import { enriquecerCard, estimarHorasCard, extrairAssunto } from './correlacao';
+import { enriquecerCard, estimarHorasCard, extrairAssunto, type ModeloEstimativa } from './correlacao';
 import { semAcento } from './normalizar';
 
 function slugPessoa(nome: string): string
@@ -218,6 +218,8 @@ export function analisarTimeNoProjeto(opcoes: {
   semanaInicio: string;
   semanaFim: string;
   hoje: string;
+  // tempos aprendidos com o histórico do projeto; sem isso vale só a regra fixa
+  modelo?: ModeloEstimativa;
 }): ResumoPessoaProjeto[]
 {
   const pastaNorm = (opcoes.pasta || 'DEV').trim().toUpperCase();
@@ -325,7 +327,7 @@ export function analisarTimeNoProjeto(opcoes: {
 
     const tarefas: TarefaPessoaSemana[] = listaBase.map((bruto) =>
     {
-      const c = enriquecerCard(bruto);
+      const c = enriquecerCard(bruto, opcoes.modelo);
       return {
         codigo: c.codigo,
         titulo: c.titulo ?? 'Demanda em acompanhamento',

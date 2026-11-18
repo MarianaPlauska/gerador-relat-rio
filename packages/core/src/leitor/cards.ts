@@ -29,6 +29,9 @@ const ritmos: [RegExp, Ritmo][] = [
 
 const RE_FIM_DA_SECAO = /\n[^\n]*(fila\s*[—–-]|quem est[aá] cuidando|ocioso entre etapas|pr[oó]ximos 10 vencimentos)/i;
 
+// aviso do fragmento sem código; some quando a correlação em lote liga o fragmento a um card
+export const AVISO_CONTINUACAO = 'continuação do texto, sem código';
+
 export interface OpcoesLeitura
 {
   prefixo: string;
@@ -75,10 +78,21 @@ export function lerCards(textoLido: string, opcoes: OpcoesLeitura): CardSnapshot
   return marcarCodigosEstranhos([...porCodigo.values()]);
 }
 
-const RE_TIPO = /Kitu Sistema|Suporte Kitu|Outras Aplica[cç][oõ]es ou de Terceiros|Direcionamento/i;
-const RE_STATUS_CARD = /em andamento|planejado|novo|resolvido|cancelado|aguardando (?:cliente|time \S+)/i;
+// a imagem às vezes cola as palavras ("KituSistema", "SuporteKitu", "Emandamento")
+const RE_TIPO = /Kitu\s*Sistema|Suporte\s*Kitu|Outras Aplica[cç][oõ]es ou de Terceiros|Direcionamento/i;
+const RE_STATUS_CARD = /em\s*andamento|planejado|novo|resolvido|cancelado|aguardando (?:cliente|time \S+)/i;
+// o que vem depois do nome do responsável quando o tempo não foi lido ("Bmin e Emandamento", "158in (e Emandamento")
+const RE_COLUNAS_FINAIS = /min\b|andamento|resolvido|planejado|cancelado|\(\s*e\s*\w+/i;
 // coluna Tempo da lista ("0 min", "3 h"); a imagem lê 0 como O
 const RE_TEMPO = /\b[O0o\d][\d,]*\s*(?:min|h|d)\b/;
+
+// "KituSistema" -> "Kitu Sistema"
+function tipoCanonico(lido: string | undefined): string | undefined
+{
+  if (!lido) return undefined;
+  const sem = semAcento(lido).replace(/\s+/g, '');
+  return sem === 'kitusistema' ? 'Kitu Sistema' : sem === 'suportekitu' ? 'Suporte Kitu' : lido;
+}
 
 // nome completo, ou nome e sobrenome em linhas diferentes (a coluna quebra "Mariana / Coutinho")
 function pessoasNoTexto(normal: string, pessoas: Pessoa[]): Pessoa[]
@@ -129,13 +143,16 @@ function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[]): CardSnap
   const status = aposTempo.match(RE_STATUS_CARD)?.[0];
   if (status)
   {
-    card.statusCard = status[0]!.toUpperCase() + status.slice(1).toLowerCase().replace(/time (\S)/, (_, l: string) => `Time ${l.toUpperCase()}`);
+    const statusLido = /^em\s*andamento$/i.test(status) ? 'Em andamento' : status;
+    card.statusCard = statusLido[0]!.toUpperCase() + statusLido.slice(1).toLowerCase().replace(/time (\S)/, (_, l: string) => `Time ${l.toUpperCase()}`);
     const stNorm = semAcento(card.statusCard).toLowerCase();
     if (stNorm === 'resolvido') card.situacao = 'concluido';
     else if (stNorm === 'em andamento') card.situacao = 'em_execucao';
     else if (stNorm === 'novo' || stNorm === 'planejado') card.situacao = 'a_iniciar';
   }
-  card.sistema = trecho.match(RE_TIPO)?.[0];
+  card.sistema = tipoCanonico(trecho.match(RE_TIPO)?.[0]);
+  // uma linha de card que perdeu o código (a imagem leu "DEV28A" ou só "DEV") fica dentro do trecho do card de cima: cada card tem uma linha começando pela data
+  if ((trecho.match(/(?:^|\n)[ \t]*\d{2}\/\d{2}\/\d{2,4}/g) ?? []).length > 1) card.avisosLeitura = ['mais de um card no mesmo trecho, confira'];
 
   if (trecho.includes('\t'))
   {
@@ -176,12 +193,34 @@ function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[]): CardSnap
     {
       l = l.slice(l.indexOf(mTipo[0]) + mTipo[0].length);
     }
-    // Remove datas e selos de prioridade no início em qualquer ordem
-    l = l.replace(/^(\d{2}\/\d{2}\/\d{2,4}\s*|[•·-]?\s*(?:cr[ií]tic[ao]|urgente|alta|m[eé]dia|baixa)\s+)+/i, '');
+    // Remove datas e selos de prioridade no início em qualquer ordem; a bolinha do selo às vezes vira uma letra solta ("e crítico")
+    l = l.replace(/^(\d{2}\/\d{2}\/\d{2,4}\s*|[•·*-]?\s*(?:[eo]\s+)?(?:cr[ií]tic[ao]|urgente|alta|m[eé]dia|baixa)\s+)+/i, '');
     const cTempo = l.search(RE_TEMPO);
     if (cTempo >= 0)
     {
       l = l.slice(0, cTempo);
+    }
+    else
+    {
+      // sem tempo legível, o que vem depois do nome do responsável, perto do fim da linha, são as colunas Tempo e Status
+      for (const p of achadas)
+      {
+        const reNome = new RegExp(`\\b(?:${p.nome}|${p.nome.split(' ')[0]})\\b`, 'gi');
+        const ultimo = [...l.matchAll(reNome)].at(-1);
+        if (!ultimo) continue;
+        const resto = l.slice(ultimo.index + ultimo[0].length);
+        if (resto.length <= 30 && RE_COLUNAS_FINAIS.test(resto))
+        {
+          l = l.slice(0, ultimo.index);
+          break;
+        }
+      }
+    }
+    // tempo lido pela metade ("Mariana Coutinho B,2h" vira "Mariana Coutinho B,"): sobra uma letra solta depois do nome
+    for (const p of achadas)
+    {
+      const m = l.match(new RegExp(`\\b${p.nome}\\b([^A-Za-z]*[A-Za-z][^A-Za-z]*)$`, 'i'));
+      if (m) l = l.slice(0, m.index);
     }
     for (const p of achadas)
     {
@@ -220,6 +259,24 @@ const situacaoEtapa = (texto: string): EtapaCard['situacao'] | undefined =>
   if (/rodando|em andamento|iniciada/.test(t)) return 'rodando';
   return undefined;
 };
+
+// "rodando há 15,8 h" -> 15.8 (horas)
+function tempoRodandoEmHoras(texto: string): number | undefined
+{
+  const m = texto.match(/rodando h[aá]\s*([\d,.]+)\s*(h|min|d)/i);
+  if (!m) return undefined;
+  const v = numeroBr(m[1]!);
+  const u = m[2]!.toLowerCase();
+  return Math.round((u === 'min' ? v / 60 : u === 'd' ? v * 8 : v) * 10) / 10;
+}
+
+// "desde 16/11/2026 16:25" -> 2026-11-16T16:25
+function desdeDe(texto: string): string | undefined
+{
+  const m = texto.match(/desde\s+(\d{2}\/\d{2}\/\d{2,4})(?:\s+(\d{2}:\d{2}))?/i);
+  const data = m ? lerDatas(m[1]!).datas[0] : undefined;
+  return data ? (m?.[2] ? `${data}T${m[2]}` : data) : undefined;
+}
 
 // extrai etapas no formato moderno do painel ("1 Validação dos requisitos Rodrigo Cinelli • rodando há 15,8 h desde 16/11/2026 16:25")
 function lerEtapasModernas(texto: string, pessoas: Pessoa[]): EtapaCard[]
@@ -271,18 +328,8 @@ function lerEtapasModernas(texto: string, pessoas: Pessoa[]): EtapaCard[]
     if (!nomeEtapa) continue;
 
     const sit = situacaoEtapa(bruto) ?? 'outra';
-    const mHoras = bruto.match(/rodando h[aá]\s*([\d,.]+)\s*(h|min|d)/i);
-    let tempoRodandoHoras: number | undefined;
-    if (mHoras)
-    {
-      const v = numeroBr(mHoras[1]!);
-      const u = mHoras[2]!.toLowerCase();
-      tempoRodandoHoras = Math.round((u === 'min' ? v / 60 : u === 'd' ? v * 8 : v) * 10) / 10;
-    }
-
-    const mDesde = bruto.match(/desde\s+(\d{2}\/\d{2}\/\d{2,4})(?:\s+(\d{2}:\d{2}))?/i);
-    const desdeData = mDesde ? lerDatas(mDesde[1]!).datas[0] : undefined;
-    const desde = desdeData ? (mDesde?.[2] ? `${desdeData}T${mDesde[2]}` : desdeData) : undefined;
+    const tempoRodandoHoras = tempoRodandoEmHoras(bruto);
+    const desde = desdeDe(bruto);
 
     resultado.push({
       ordem: b.ordem,
@@ -314,7 +361,7 @@ function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
       responsaveis: [],
       origens: ['card'],
       fontesCorrelacionadas: ['pedido'],
-      avisosLeitura: ['continuação do texto, sem código'],
+      avisosLeitura: [AVISO_CONTINUACAO],
     }];
   }
 
@@ -329,7 +376,7 @@ function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
   }
   const prazo = texto.match(/prazo de resposta[\s\S]*?(\d{2}\/\d{2}\/\d{4})/i);
   if (prazo) card.vencimento = lerDatas(prazo[1]!).datas[0]!;
-  const tipo = texto.match(RE_TIPO)?.[0];
+  const tipo = tipoCanonico(texto.match(RE_TIPO)?.[0]);
   if (tipo) card.sistema = tipo;
   const posPrazoConsumido = texto.search(/prazo consumido/i);
   if (posPrazoConsumido >= 0)
@@ -375,6 +422,8 @@ function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
   }
 
   const etapas: EtapaCard[] = [];
+  // o Tesseract lê a linha da etapa em três: número e selo de tempo (antes do nome), "nome responsável v" e "desde ..." (depois)
+  const contextos: { etapa: EtapaCard; antes: string; resto: string; depois: string }[] = [];
   let pendente = '';
   for (const linha of texto.split(/\r?\n/))
   {
@@ -390,10 +439,24 @@ function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
     if (m && !/^(etapa|responsavel)/i.test(semAcento(m[1]!)))
     {
       const pessoa = m[2] ? opcoes.pessoas.find((p) => semAcento(p.nome) === semAcento(m[2]!)) : undefined;
-      etapas.push({ ordem: etapas.length + 1, nome: m[1]!.trim(), pessoa: pessoa?.id ?? m[2], situacao: situacaoEtapa(pendente) ?? situacaoEtapa(linha) ?? 'outra' });
+      const etapa: EtapaCard = { ordem: etapas.length + 1, nome: m[1]!.trim(), pessoa: pessoa?.id ?? m[2], situacao: situacaoEtapa(pendente) ?? situacaoEtapa(linha) ?? 'outra', origemEtapa: 'print' };
+      etapas.push(etapa);
+      contextos.push({ etapa, antes: pendente, resto: linha.slice(m[0].length), depois: '' });
       pendente = '';
     }
-    else pendente += ` ${linha}`;
+    else
+    {
+      pendente += ` ${linha}`;
+      if (contextos.length) contextos.at(-1)!.depois += ` ${linha}`;
+    }
+  }
+  // o tempo rodando vem antes do nome (ou na mesma linha) e o "desde" vem depois; o tempo da etapa seguinte, que vem nas linhas de "depois", não entra
+  for (const { etapa, antes, resto, depois } of contextos)
+  {
+    const horas = tempoRodandoEmHoras(`${antes} ${resto}`);
+    const desde = desdeDe(`${resto} ${depois}`);
+    if (horas !== undefined) etapa.tempoRodandoHoras = horas;
+    if (desde) etapa.desde = desde;
   }
 
   if (etapas.length === 0)
@@ -678,10 +741,13 @@ function lerTrecho(codigo: string, trechoBruto: string, origem: OrigemLeitura, p
 }
 
 // une duas leituras do mesmo card; o que veio depois tem prioridade, preservando descrição completa e fontes
+const ORDEM_FONTES = ['lista', 'pedido', 'etapas'];
 export function juntarCard(antigo: CardSnapshot, novo: CardSnapshot): CardSnapshot
 {
   const definidos = Object.fromEntries(Object.entries(novo).filter(([, v]) => v !== undefined));
-  const fontes = [...new Set([...(antigo.fontesCorrelacionadas ?? []), ...(novo.fontesCorrelacionadas ?? [])])];
+  // a ordem das fontes é fixa (lista, pedido, etapas); senão ela dependeria de qual print foi mesclado primeiro
+  const posicaoFonte = (f: string): number => (ORDEM_FONTES.includes(f) ? ORDEM_FONTES.indexOf(f) : ORDEM_FONTES.length);
+  const fontes = [...new Set([...(antigo.fontesCorrelacionadas ?? []), ...(novo.fontesCorrelacionadas ?? [])])].sort((a, b) => posicaoFonte(a) - posicaoFonte(b));
   const descricaoCompleta = (novo.descricaoCompleta?.length ?? 0) >= (antigo.descricaoCompleta?.length ?? 0)
     ? (novo.descricaoCompleta ?? antigo.descricaoCompleta)
     : antigo.descricaoCompleta;

@@ -45,8 +45,18 @@ export const roadmap: EtapaRoadmap[] = [
   {
     periodo: '2027, segundo semestre',
     itens: [
-      { titulo: 'Equipe na mesma conta', texto: 'Mais de uma pessoa editando o mesmo checklist diário.', situacao: 'planejado' },
+      { titulo: 'Equipe na mesma conta', texto: 'Mais de uma pessoa editando o mesmo checklist diário. A base (papéis, convites e espaços compartilhados) já existe; falta a edição simultânea sem sobrescrever.', situacao: 'andando' },
       { titulo: 'Visão anual', texto: 'O ano em uma tela: meses, entregas, riscos e decisões.', situacao: 'planejado' },
+    ],
+  },
+  {
+    periodo: 'Futuro: etapa com servidor',
+    itens: [
+      { titulo: 'Coleta automática diária do painel', texto: 'Buscar o painel todo dia sem colar print, para o histórico (e a calibração da probabilidade) crescer sozinho. Precisa de agendador e de credenciais guardadas fora do navegador.', situacao: 'planejado' },
+      { titulo: 'Avisos e relatório semanal automático', texto: 'Aviso no Teams ou por e-mail quando alguém entrar em sobrecarga crítica, e relatório semanal enviado sozinho. Precisa de agendador e de um segredo (webhook ou chave de e-mail).', situacao: 'planejado' },
+      { titulo: 'Link interativo mais seguro', texto: 'Limite de respostas por link, validação mais forte e proteção contra abuso. Hoje a proteção é o código de 24 letras mais as regras.', situacao: 'planejado' },
+      { titulo: 'Convites e papéis, fase 2', texto: 'Convite por e-mail com verificação, pastas liberadas por pessoa valendo de verdade e mesclagem de edições simultâneas.', situacao: 'planejado' },
+      { titulo: 'OCR no servidor', texto: 'Leitura de imagem mais rápida e precisa fora do navegador. Só vale se a privacidade dos prints não for um problema.', situacao: 'planejado' },
     ],
   },
 ];

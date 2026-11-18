@@ -7,6 +7,14 @@ export type Situacao = 'concluido' | 'atrasado' | 'vence_15_dias' | 'a_iniciar' 
 
 export type OrigemLeitura = 'em_execucao' | 'fila' | 'cronograma' | 'demandas' | 'card' | (string & {});
 
+// período em que a pessoa não está disponível (férias, atestado, folga); conta como dia sem expediente no cronograma
+export interface Ausencia
+{
+  de: string;
+  ate: string;
+  motivo?: string | undefined;
+}
+
 export interface Pessoa
 {
   id: string;
@@ -17,6 +25,7 @@ export interface Pessoa
   removidaDaOrganizacao?: boolean | undefined;
   historicoDe?: string | undefined;
   historicoAte?: string | undefined;
+  ausencias?: Ausencia[] | undefined;
 }
 
 // tudo opcional porque cada tela do painel mostra só parte do card
@@ -57,6 +66,9 @@ export interface CardSnapshot
   tempoTotalMin?: number | undefined;
   ociosoEtapasMin?: number | undefined;
   horasEstimadas?: number | undefined;
+  // de onde veio o tempo estipulado: digitado pela pessoa, regra fixa ou mediana das demandas parecidas já concluídas
+  origemHoras?: 'manual' | 'regra' | 'historico' | undefined;
+  notaHoras?: string | undefined;
   fontesCorrelacionadas?: string[] | undefined;
   cardsRelacionados?: string[] | undefined;
   impactoSemana?: string | undefined;

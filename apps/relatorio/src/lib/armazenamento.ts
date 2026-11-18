@@ -2,7 +2,7 @@ import
 {
   agoraLocal, dicionarioPadrao, migrarFluxograma, migrarLista, migrarVivo, type Fluxograma, type RelatorioVivo, pessoasExemplo, type Bloco, type ControleCard, type Lista, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type RegistroPainel, type Risco, type Snapshot,
 } from '@supervisao/core';
-import { agendarEnvio, baixarImagem, imagemConfirmada, iniciarNuvem, marcarLocal, nuvemPronta } from './nuvem.svelte.ts';
+import { agendarEnvio, baixarImagem, chaveDoEspaco, imagemConfirmada, iniciarNuvem, marcarLocal, nuvemPronta, somenteLeitura } from './nuvem.svelte.ts';
 import { capturasSemImagem, separarImagens } from './imagens.ts';
 
 // o que eu escrevo no relatório de cada foto
@@ -31,7 +31,8 @@ export interface Identificacao
   destinatario: string;
 }
 
-const CHAVE = 'relatorio-semanal-v1';
+// cada espaço compartilhado tem a própria cópia local; o espaço próprio mantém a chave de sempre
+const chave = (): string => chaveDoEspaco('relatorio-semanal-v1');
 
 export interface Dados
 {
@@ -61,6 +62,8 @@ export interface Dados
   origensPersonalizadas?: string[];
   // lista de projetos / pastas criados na organização
   projetos?: string[];
+  // ordem da fila de cada pessoa no cronograma, escolhida arrastando (chave PROJETO|pessoaId)
+  filaManual?: Record<string, string[]>;
 }
 
 function padrao(): Dados
@@ -79,7 +82,7 @@ function lerLocal(): Dados
 {
   try
   {
-    const bruto = localStorage.getItem(CHAVE);
+    const bruto = localStorage.getItem(chave());
     return bruto ? completar(JSON.parse(bruto) as Partial<Dados>) : padrao();
   }
   catch
@@ -92,11 +95,11 @@ function lerLocal(): Dados
 function receberDaNuvem(dados: Dados, quando: string, primeiraVez: boolean): void
 {
   const json = JSON.stringify(completar(dados));
-  const mudou = json !== localStorage.getItem(CHAVE);
+  const mudou = json !== localStorage.getItem(chave());
   // primeira vez nesta conta: o que havia só neste navegador vira um backup baixado antes de ser trocado
   const local = lerLocal();
   if (primeiraVez && mudou && (local.fotos.length || local.planos.length)) exportarJson(local);
-  localStorage.setItem(CHAVE, json);
+  localStorage.setItem(chave(), json);
   marcarLocal(quando);
   if (mudou) location.reload();
 }
@@ -109,16 +112,18 @@ export function carregar(): Dados
 
 export function salvar(dados: Dados): void
 {
+  // leitor não grava nada, nem no navegador: a tela mostra o que o dono tem
+  if (somenteLeitura()) return;
   // com a nuvem conectada, as imagens saem do navegador e ficam só nos documentos de imagem (o localStorage tem ~5 MB)
   const { leve, imagens } = nuvemPronta() ? separarImagens(dados, imagemConfirmada) : { leve: dados, imagens: new Map<string, string>() };
   const json = JSON.stringify(leve);
-  if (json === localStorage.getItem(CHAVE))
+  if (json === localStorage.getItem(chave()))
   {
     // dados iguais, mas pode haver imagem nova esperando para subir
     if (imagens.size) agendarEnvio(leve, imagens);
     return;
   }
-  localStorage.setItem(CHAVE, json);
+  localStorage.setItem(chave(), json);
   marcarLocal();
   agendarEnvio(leve, imagens);
 }

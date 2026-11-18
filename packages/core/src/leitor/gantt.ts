@@ -37,6 +37,8 @@ export interface LinhaGantt
   pessoa: string;
   horasDia: number;
   barras: BarraGantt[];
+  // por dia da semana: sem expediente por feriado ou por ausência da pessoa
+  semExpediente: ('feriado' | 'ausencia' | null)[];
   // primeiro instante livre da semana (dia e hora dentro do dia); vazio se a semana toda está ocupada
   livreAPartirDe?: { dia: number; hora: number } | undefined;
   horasLivresSemana: number;
@@ -59,6 +61,7 @@ export interface DiaGantt
   rotulo: string;
   passado: boolean;
   hoje: boolean;
+  feriado: boolean;
 }
 
 export interface GanttSemana
@@ -90,16 +93,27 @@ function arredondar(v: number): number
   return Math.round(v * 100) / 100;
 }
 
-// distribui as tarefas abertas de cada pessoa em fila (em andamento primeiro, depois prioridade e prazo),
-// dia útil por dia útil, dentro da jornada dela: mostra quando cada uma termina e quando a pessoa fica livre
-export function montarGanttSemana(resumo: ResumoPessoaProjeto[], opcoes: { semanaInicio: string; hoje: string }): GanttSemana
+// distribui as tarefas abertas de cada pessoa em fila (a ordem escolhida à mão primeiro; depois em andamento, prioridade e prazo),
+// dia útil por dia útil, dentro da jornada dela: mostra quando cada uma termina e quando a pessoa fica livre.
+// Feriados e ausências da pessoa (férias, atestado, folga) são dias sem expediente.
+export interface OpcoesGantt
+{
+  semanaInicio: string;
+  hoje: string;
+  feriados?: string[];
+  // pessoaId -> códigos na ordem escolhida (os que não estiverem na lista vêm depois, na ordem automática)
+  ordemManual?: Record<string, string[]>;
+}
+
+export function montarGanttSemana(resumo: ResumoPessoaProjeto[], opcoes: OpcoesGantt): GanttSemana
 {
   const { semanaInicio, hoje } = opcoes;
+  const feriados = opcoes.feriados ?? [];
   const dias: DiaGantt[] = Array.from({ length: DIAS_UTEIS }, (_, i) =>
   {
     const iso = somarDias(semanaInicio, i);
     const [, m, d] = iso.split('-');
-    return { iso, rotulo: `${nomesDias[i]} ${d}/${m}`, passado: iso < hoje, hoje: iso === hoje };
+    return { iso, rotulo: `${nomesDias[i]} ${d}/${m}`, passado: iso < hoje, hoje: iso === hoje, feriado: feriados.includes(iso) };
   });
   // semana ainda por vir ou já passada: a fila começa na segunda; no meio dela, começa em hoje
   const indiceHoje = dias.findIndex((d) => d.iso >= hoje);
@@ -112,16 +126,32 @@ export function montarGanttSemana(resumo: ResumoPessoaProjeto[], opcoes: { seman
   for (const r of resumo)
   {
     const horasDia = Math.max(1, (r.capacidadeHorasSemana || 40) / DIAS_UTEIS);
+    // dia sem expediente: feriado para todos, ausência (férias, atestado, folga) só para a pessoa
+    const semExpediente = dias.map((d): 'feriado' | 'ausencia' | null =>
+      d.feriado ? 'feriado' : (r.pessoa.ausencias ?? []).some((a) => a.de <= d.iso && d.iso <= a.ate) ? 'ausencia' : null);
+    const capacidadeDoDia = (i: number) => (semExpediente[i] ? 0 : horasDia);
+
+    const posicaoManual = new Map((opcoes.ordemManual?.[r.pessoa.id] ?? []).map((codigo, i) => [codigo, i] as const));
     const fila = r.tarefas
       .filter(aberta)
       .sort((a, b) =>
-        Number(emAndamento(b)) - Number(emAndamento(a))
+        (posicaoManual.get(a.codigo) ?? Infinity) - (posicaoManual.get(b.codigo) ?? Infinity)
+        || Number(emAndamento(b)) - Number(emAndamento(a))
         || pesoPrioridade(b) - pesoPrioridade(a)
         || (a.previsao ?? a.vencimento ?? '9999').localeCompare(b.previsao ?? b.vencimento ?? '9999')
         || numeroDoCodigo(a.codigo) - numeroDoCodigo(b.codigo));
 
     let dia = diaInicial;
     let usado = 0;
+    const pularSemExpediente = () =>
+    {
+      while (dia < DIAS_UTEIS && capacidadeDoDia(dia) === 0)
+      {
+        dia++;
+        usado = 0;
+      }
+    };
+    pularSemExpediente();
     const barras: BarraGantt[] = [];
     let anterior: BarraGantt | undefined;
 
@@ -146,6 +176,7 @@ export function montarGanttSemana(resumo: ResumoPessoaProjeto[], opcoes: { seman
         {
           dia++;
           usado = 0;
+          pularSemExpediente();
         }
       }
       const ultimo = segmentos.at(-1);
@@ -172,15 +203,16 @@ export function montarGanttSemana(resumo: ResumoPessoaProjeto[], opcoes: { seman
     }
 
     const ocupadas = barras.reduce((acc, b) => acc + b.segmentos.reduce((s, g) => s + (g.ate - g.de), 0), 0);
-    const totalSemana = horasDia * DIAS_UTEIS;
+    const disponivel = dias.reduce((acc, _, i) => acc + (i >= diaInicial ? capacidadeDoDia(i) : 0), 0);
     const horasAlem = arredondar(barras.reduce((acc, b) => acc + b.horasAlemDaSemana, 0));
     linhas.push({
       pessoaId: r.pessoa.id,
       pessoa: r.pessoa.nome,
       horasDia: arredondar(horasDia),
       barras,
+      semExpediente,
       livreAPartirDe: dia < DIAS_UTEIS ? { dia, hora: arredondar(usado) } : undefined,
-      horasLivresSemana: arredondar(Math.max(0, totalSemana - diaInicial * horasDia - ocupadas)),
+      horasLivresSemana: arredondar(Math.max(0, disponivel - ocupadas)),
       horasAlemDaSemana: horasAlem,
       sobrecarga: horasAlem > 0 || !!r.estagioCritico,
     });

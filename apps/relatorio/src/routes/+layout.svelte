@@ -10,6 +10,7 @@
   import { carregar, exportarJson } from '#lib/armazenamento.ts';
   import { chuva } from '#lib/chuva.ts';
   import Abertura from '#lib/Abertura.svelte';
+  import FaixaSomenteLeitura from '#lib/FaixaSomenteLeitura.svelte';
   import Paleta from '#lib/Paleta.svelte';
   import { onMount } from 'svelte';
   import { nuvem, sairDaNuvem } from '#lib/nuvem.svelte.ts';
@@ -197,6 +198,10 @@
         </DropdownMenu.Root>
       </div>
     </nav>
+  {/if}
+
+  {#if !aberta}
+    <FaixaSomenteLeitura />
   {/if}
 
   <div class="conteudo">

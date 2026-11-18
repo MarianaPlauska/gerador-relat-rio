@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { calcularPeriodoHistoricoPessoa, type Pessoa, type RegistroPainel, type ResumoPessoaProjeto, type Snapshot } from '@supervisao/core';
+  import { calcularPeriodoHistoricoPessoa, type Ausencia, type Pessoa, type RegistroPainel, type ResumoPessoaProjeto, type Snapshot } from '@supervisao/core';
   import { dataCurta, dataMedia } from '#lib/semana.ts';
+  import AcessoEquipe from './AcessoEquipe.svelte';
+  import AusenciasPessoa from './AusenciasPessoa.svelte';
 
   let {
     pastaAtual,
@@ -17,6 +19,7 @@
     aoConfirmarRemocao,
     aoCancelarRemocao,
     aoReativarPessoa,
+    aoAtualizarAusencias,
   }: {
     pastaAtual: string;
     dataRegistro: string;
@@ -32,6 +35,7 @@
     aoConfirmarRemocao: () => void;
     aoCancelarRemocao: () => void;
     aoReativarPessoa: (nome: string) => void;
+    aoAtualizarAusencias: (pessoa: Pessoa, ausencias: Ausencia[]) => void;
   } = $props();
 </script>
 
@@ -109,6 +113,8 @@
         </table>
       </div>
 
+      <AusenciasPessoa pessoas={analiseEnvio.map((a) => a.pessoa)} aoMudar={aoAtualizarAusencias} />
+
       {#if todasPessoas.some((p) => p.removidaDaOrganizacao || (p.pastasRemovidas?.length ?? 0) > 0)}
         <div class="historico-removidos-bloco">
           <span class="etiqueta">Pessoas inativas (com histórico preservado na organização)</span>
@@ -124,6 +130,8 @@
           </div>
         </div>
       {/if}
+
+      <AcessoEquipe />
     </div>
   </div>
 {/if}
