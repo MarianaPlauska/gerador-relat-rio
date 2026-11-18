@@ -12,19 +12,29 @@ export interface AjusteEtapa
   removida?: boolean;
 }
 
-// campos do card que a pessoa pode corrigir à mão
+// campos do card que a pessoa pode corrigir à mão (inclui o código, para consertar leitura errada do print)
 export type CamposAjustaveis = Partial<Pick<CardSnapshot,
-  'prioridadeCard' | 'criticidade' | 'statusCard' | 'situacao' | 'responsavelEtapaAtual' | 'responsaveis' |
-  'horasEstimadas' | 'origemHoras' | 'notaHoras' | 'descricaoCompleta' | 'titulo' | 'assunto' | 'comentario' | 'previsao' | 'vencimento'>>;
+  'codigo' | 'prioridadeCard' | 'criticidade' | 'statusCard' | 'situacao' | 'responsavelEtapaAtual' | 'responsaveis' |
+  'horasEstimadas' | 'origemHoras' | 'notaHoras' | 'descricaoCompleta' | 'titulo' | 'assunto' | 'comentario' | 'previsao' | 'vencimento' |
+  'inicio' | 'etapaAtual' | 'ritmoPainel'>>;
 
 export interface AjusteCard
 {
   campos?: CamposAjustaveis;
+  // card tirado da lista à mão
+  removido?: boolean;
   // chave da etapa (ver chaveDaEtapa) -> o que mudou nela
   etapas?: Record<string, AjusteEtapa>;
   etapasNovas?: EtapaCard[];
   relacionadosAdicionados?: string[];
   relacionadosRemovidos?: string[];
+}
+
+// Os ajustes são guardados pelo código que veio do print. Se a pessoa corrigiu o código (campos.codigo),
+// a tela passa a mostrar o novo; `codigoLido` volta do código mostrado para o do print.
+export function codigoLido(ajustes: Ajustes, codigoMostrado: string): string
+{
+  return Object.entries(ajustes).find(([, a]) => a.campos?.codigo === codigoMostrado)?.[0] ?? codigoMostrado;
 }
 
 export type Ajustes = Record<string, AjusteCard>;
@@ -46,7 +56,14 @@ const unico = <T>(lista: T[]): T[] => [...new Set(lista)];
 
 function com(ajustes: Ajustes, codigo: string, mudar: (atual: AjusteCard) => AjusteCard): Ajustes
 {
-  return { ...ajustes, [codigo]: mudar(ajustes[codigo] ?? {}) };
+  const chave = codigoLido(ajustes, codigo);
+  return { ...ajustes, [chave]: mudar(ajustes[chave] ?? {}) };
+}
+
+// tirar o card da lista (ele volta se o ajuste for desfeito)
+export function removerCardAjustado(ajustes: Ajustes, codigo: string): Ajustes
+{
+  return com(ajustes, codigo, (a) => ({ ...a, removido: true }));
 }
 
 export function ajustarCampos(ajustes: Ajustes, codigo: string, parcial: CamposAjustaveis): Ajustes
@@ -135,13 +152,15 @@ function aplicarNasEtapas(card: CardSnapshot, ajuste: AjusteCard): CardSnapshot
 // aplica os ajustes (campos e etapas) por cima dos cards lidos; o que a pessoa digitou diretamente em um campo vale mais do que a regra
 export function aplicarAjustes(cards: CardSnapshot[], ajustes: Ajustes): CardSnapshot[]
 {
-  return cards.map((card) =>
-  {
-    const ajuste = ajustes[card.codigo];
-    if (!ajuste) return card;
-    const comEtapas = aplicarNasEtapas(card, ajuste);
-    return { ...comEtapas, ...ajuste.campos };
-  });
+  return cards
+    .filter((card) => !ajustes[card.codigo]?.removido)
+    .map((card) =>
+    {
+      const ajuste = ajustes[card.codigo];
+      if (!ajuste) return card;
+      const comEtapas = aplicarNasEtapas(card, ajuste);
+      return { ...comEtapas, ...ajuste.campos };
+    });
 }
 
 // depois de calculadas as relações automáticas entre cards: o que a pessoa ligou ou desligou à mão prevalece
@@ -149,7 +168,7 @@ export function aplicarRelacionados(cards: CardSnapshot[], ajustes: Ajustes): Ca
 {
   return cards.map((card) =>
   {
-    const ajuste = ajustes[card.codigo];
+    const ajuste = ajustes[codigoLido(ajustes, card.codigo)];
     if (!ajuste?.relacionadosAdicionados?.length && !ajuste?.relacionadosRemovidos?.length) return card;
     const removidos = new Set(ajuste.relacionadosRemovidos ?? []);
     const lista = unico([...(card.cardsRelacionados ?? []), ...(ajuste.relacionadosAdicionados ?? [])]).filter((c) => !removidos.has(c));

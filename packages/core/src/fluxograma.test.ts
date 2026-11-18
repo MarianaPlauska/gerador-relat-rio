@@ -141,9 +141,8 @@ describe('organizar e outras entradas', () =>
 
     const fSemana = fluxoDaSemana({
       inicio: '2026-11-16',
-      fim: '2026-11-20',
       pessoas: [
-        { pessoaId: 'p1', itens: [{ id: 'i1', descricao: 'Homologar módulo', cardCodigo: 'CARD-10' }] },
+        { pessoaId: 'p1', itens: [{ id: 'i1', descricao: 'Homologar módulo', cardCodigo: 'CARD-10', tipo: 'planejado', status: 'a_fazer' }] },
       ],
     }, () => 'Mariana Coutinho');
     expect(fSemana.nos.length).toBe(3);

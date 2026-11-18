@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { CardSnapshot, EtapaCard, Snapshot } from '../tipos';
 import {
-  adicionarEtapaAjustada, ajustarCampos, ajustarEtapa, ajustarHoras, aplicarAjustes, aplicarRelacionados, chaveDaEtapa,
-  desvincularAjustado, removerEtapaAjustada, vincularAjustado, type Ajustes,
+  adicionarEtapaAjustada, ajustarCampos, ajustarEtapa, ajustarHoras, aplicarAjustes, aplicarRelacionados, chaveDaEtapa, codigoLido,
+  desvincularAjustado, removerCardAjustado, removerEtapaAjustada, vincularAjustado, type Ajustes,
 } from './ajustes';
 import { calcularRelacoesEImpactoSemana, detalharEstimativa, enriquecerCard } from './etapas-auto';
 import { aprenderEstimativas, MINIMO_AMOSTRAS } from './estimativa';
@@ -98,6 +98,28 @@ describe('ajustes manuais que sobrevivem ao recálculo', () =>
     expect(aplicarAjustes(base, {})).toEqual(base);
     const repetidas = [etapa(1, 'Teste'), etapa(2, 'Teste')];
     expect(chaveDaEtapa(repetidas[0]!, repetidas)).not.toBe(chaveDaEtapa(repetidas[1]!, repetidas));
+  });
+
+  it('código corrigido à mão vale depois do recálculo, e os ajustes seguintes acham o card pelo código novo', () =>
+  {
+    // o print leu DEV-6A7 em vez de DEV-047; a pessoa corrige o código e depois muda o tempo pelo código novo
+    const lido = (): CardSnapshot[] => [card('DEV-6A7', { descricaoCompleta: 'CNPJ alfanumérico' })];
+    let ajustes = ajustarCampos({}, 'DEV-6A7', { codigo: 'DEV-0' });
+    ajustes = ajustarCampos(ajustes, 'DEV-0', { codigo: 'DEV-047' });
+    ajustes = ajustarHoras(ajustes, 'DEV-047', 6);
+    expect(Object.keys(ajustes)).toEqual(['DEV-6A7']);
+    expect(recalcular(ajustes, lido())[0]).toMatchObject({ codigo: 'DEV-047', horasEstimadas: 6, origemHoras: 'manual' });
+    expect(codigoLido(ajustes, 'DEV-047')).toBe('DEV-6A7');
+    expect(codigoLido(ajustes, 'DEV-999')).toBe('DEV-999');
+  });
+
+  it('card tirado da lista à mão continua fora quando os prints são lidos de novo', () =>
+  {
+    const ajustes = removerCardAjustado({}, 'DEV-2');
+    expect(recalcular(ajustes, baseDosPrints()).map((c) => c.codigo)).toEqual(['DEV-1']);
+    // vale também depois de corrigir o código
+    const comCodigo = removerCardAjustado(ajustarCampos({}, 'DEV-2', { codigo: 'DEV-22' }), 'DEV-22');
+    expect(recalcular(comCodigo, baseDosPrints()).map((c) => c.codigo)).toEqual(['DEV-1']);
   });
 });
 

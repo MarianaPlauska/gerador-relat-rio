@@ -581,7 +581,10 @@ export function fluxoDosCards(cards: CardSnapshot[], titulo = 'Fluxo de Demandas
 
 // gera fluxo a partir de um registro do diário do painel com transcrições e anotações
 export function fluxoDoRegistroPainel(
-  registro: Pick<RegistroPainel, 'data' | 'motivo' | 'pasta' | 'texto' | 'capturas'>,
+  registro: Pick<RegistroPainel, 'data' | 'motivo' | 'pasta'> & {
+    texto?: string | undefined;
+    capturas?: Array<Partial<CapturaLida> & { etapa?: string; titulo?: string; textoLido?: string }> | undefined;
+  },
   agora = agoraLocal()
 ): Fluxograma
 {

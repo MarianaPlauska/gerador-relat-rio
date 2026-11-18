@@ -1,10 +1,25 @@
 <script lang="ts">
   import type { CardSnapshot, Pessoa, Ritmo, Situacao } from '@supervisao/core';
 
-  let { cards = $bindable(), pessoas }: { cards: CardSnapshot[]; pessoas: Pessoa[] } = $props();
+  // Sem `aoEditar`/`aoRemover`, edita direto os cards recebidos (foto já guardada).
+  // Com eles, cada mudança vai para a camada de ajustes manuais da tela (sobrevive quando os prints são lidos de novo).
+  let { cards = $bindable(), pessoas, aoEditar, aoRemover }: {
+    cards: CardSnapshot[];
+    pessoas: Pessoa[];
+    aoEditar?: (codigo: string, parcial: Partial<CardSnapshot>) => void;
+    aoRemover?: (codigo: string) => void;
+  } = $props();
 
   const ritmos: Ritmo[] = ['no_ritmo', 'em_risco', 'atrasado'];
   const situacoes: Situacao[] = ['concluido', 'atrasado', 'vence_15_dias', 'a_iniciar', 'em_execucao', 'sem_data'];
+
+  function editar(card: CardSnapshot, parcial: Partial<CardSnapshot>)
+  {
+    if (aoEditar) aoEditar(card.codigo, parcial);
+    else Object.assign(card, parcial);
+  }
+
+  const opcional = (valor: string) => valor || undefined;
 </script>
 
 <div class="rolagem">
@@ -19,38 +34,38 @@
       <!-- chave pela posição: editar o código não pode recriar a linha a cada letra -->
       {#each cards as card, i (i)}
         <tr class:conferir={card.avisosLeitura?.length}>
-          <td><input class="curto" bind:value={card.codigo} /></td>
-          <td><input bind:value={card.titulo} /></td>
+          <td><input class="curto" value={card.codigo} oninput={(e) => editar(card, { codigo: e.currentTarget.value })} /></td>
+          <td><input value={card.titulo ?? ''} oninput={(e) => editar(card, { titulo: opcional(e.currentTarget.value) })} /></td>
           <td>
-            <select bind:value={card.responsavelEtapaAtual}>
-              <option value={undefined}>-</option>
+            <select value={card.responsavelEtapaAtual ?? ''} onchange={(e) => editar(card, { responsavelEtapaAtual: opcional(e.currentTarget.value) })}>
+              <option value="">-</option>
               {#each pessoas as p (p.id)}<option value={p.id}>{p.nome}</option>{/each}
               {#if card.responsavelEtapaAtual && !pessoas.some((p) => p.id === card.responsavelEtapaAtual)}
                 <option value={card.responsavelEtapaAtual}>{card.responsavelEtapaAtual}</option>
               {/if}
             </select>
           </td>
-          <td><input bind:value={card.etapaAtual} /></td>
+          <td><input value={card.etapaAtual ?? ''} oninput={(e) => editar(card, { etapaAtual: opcional(e.currentTarget.value) })} /></td>
           <td>
-            <input class="comentario-card" bind:value={card.comentario} placeholder="Adicionar comentário" />
+            <input class="comentario-card" value={card.comentario ?? ''} oninput={(e) => editar(card, { comentario: opcional(e.currentTarget.value) })} placeholder="Adicionar comentário" />
           </td>
-          <td><input type="date" bind:value={card.inicio} /></td>
-          <td><input type="date" bind:value={card.previsao} /></td>
-          <td><input type="date" bind:value={card.vencimento} /></td>
+          <td><input type="date" value={card.inicio ?? ''} onchange={(e) => editar(card, { inicio: opcional(e.currentTarget.value) })} /></td>
+          <td><input type="date" value={card.previsao ?? ''} onchange={(e) => editar(card, { previsao: opcional(e.currentTarget.value) })} /></td>
+          <td><input type="date" value={card.vencimento ?? ''} onchange={(e) => editar(card, { vencimento: opcional(e.currentTarget.value) })} /></td>
           <td>
-            <select bind:value={card.ritmoPainel}>
-              <option value={undefined}>-</option>
+            <select value={card.ritmoPainel ?? ''} onchange={(e) => editar(card, { ritmoPainel: ritmos.find((r) => r === e.currentTarget.value) })}>
+              <option value="">-</option>
               {#each ritmos as r (r)}<option value={r}>{r.replace('_', ' ')}</option>{/each}
             </select>
           </td>
           <td>
-            <select bind:value={card.situacao}>
-              <option value={undefined}>-</option>
+            <select value={card.situacao ?? ''} onchange={(e) => editar(card, { situacao: situacoes.find((s) => s === e.currentTarget.value) })}>
+              <option value="">-</option>
               {#each situacoes as s (s)}<option value={s}>{s.replaceAll('_', ' ')}</option>{/each}
             </select>
           </td>
           <td>
-            <input class="curto" bind:value={card.statusCard} />
+            <input class="curto" value={card.statusCard ?? ''} oninput={(e) => editar(card, { statusCard: opcional(e.currentTarget.value) })} />
             {#if card.abertura || card.planejadoPara || (!card.responsavelEtapaAtual && card.responsaveis.length)}
               <small>
                 {[
@@ -62,7 +77,7 @@
             {/if}
           </td>
           <td class="avisos">{card.avisosLeitura?.join(', ')}</td>
-          <td><button onclick={() => cards.splice(i, 1)}>remover</button></td>
+          <td><button onclick={() => (aoRemover ? aoRemover(card.codigo) : cards.splice(i, 1))}>remover</button></td>
         </tr>
       {/each}
     </tbody>
