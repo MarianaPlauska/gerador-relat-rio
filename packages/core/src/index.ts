@@ -17,6 +17,7 @@ export * from './leitor/ondas';
 export * from './leitor/csv';
 export * from './leitor/anotacao';
 export * from './leitor/complemento';
+export * from './leitor/descarte';
 export * from './leitor/correlacao';
 export * from './leitor/calibracao';
 export * from './leitor/ajustes';

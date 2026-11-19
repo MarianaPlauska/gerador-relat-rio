@@ -1,4 +1,5 @@
 import type { CapturaLida, CardSnapshot, RegistroPainel } from '../tipos';
+import { aplicarRegrasDescarte } from './descarte';
 import { nomesTotais } from './totais';
 import { semAcento } from './normalizar';
 
@@ -16,12 +17,13 @@ const rotulosTotais = Object.values(nomesTotais).map((n) => semAcento(n));
 const RE_DATA = /\d{2}\/\d{2}\/\d{2,4}/;
 
 // linhas do texto lido que não viraram card nem total: o "restante" do print para a supervisora revisar
-export function linhasNaoReconhecidas(texto: string, prefixo: string): string[]
+export function linhasNaoReconhecidas(texto: string, prefixo: string, regrasDescarte?: string[]): string[]
 {
+  const limpo = aplicarRegrasDescarte(texto, regrasDescarte);
   const re = new RegExp(`\\b${prefixo} ?-? ?[0-9A-Z]{2,4}\\b`, 'i');
   const vistas = new Set<string>();
   const saida: string[] = [];
-  for (const bruta of texto.split(/\r?\n/))
+  for (const bruta of limpo.split(/\r?\n/))
   {
     const linha = bruta.replace(/\s+/g, ' ').trim();
     if (linha.length < 8 || re.test(linha) || RE_DATA.test(linha)) continue;

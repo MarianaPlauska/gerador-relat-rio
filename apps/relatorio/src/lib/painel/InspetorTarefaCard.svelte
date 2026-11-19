@@ -256,7 +256,7 @@
   .topo-painel-direita h3 { margin: 2px 0 0; font-size: 1rem; display: flex; align-items: center; gap: 6px; }
   .modo-modal .topo-painel-direita h3 { font-size: 1.15rem; }
   .acoes-topo-direita { display: flex; align-items: center; gap: 6px; }
-  .btn-ampliar-modal { font-size: 0.76rem; padding: 4px 10px; background: var(--marca-clara); border: 1px solid var(--marca); color: var(--marca); font-weight: 600; cursor: pointer; }
+  .btn-ampliar-modal { font-size: 0.76rem; padding: 4px 10px; background: var(--marca-clara); border: 1px solid var(--marca); color: var(--marca); font-weight: 600; cursor: var(--cursor-clique); }
   .btn-fechar-direita { font-size: 1.1rem; padding: 2px 8px; line-height: 1; }
   .grade-campos-card-direita { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .grade-campos-card-direita label { display: flex; flex-direction: column; gap: 3px; font-size: 0.78rem; font-weight: 600; }
@@ -265,7 +265,7 @@
   .lista-etapas-editor { display: flex; flex-direction: column; gap: 6px; }
   .item-etapa-editor { padding: 8px; border-radius: 6px; background: var(--superficie-2); border: 1px solid var(--borda); display: flex; flex-direction: column; gap: 5px; }
   .item-etapa-editor.concluida { border-left: 3px solid var(--verde); }
-  .check-etapa-titulo { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; cursor: pointer; }
+  .check-etapa-titulo { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; cursor: var(--cursor-clique); }
   .controles-etapa-mini { display: flex; align-items: center; gap: 6px; }
   .controles-etapa-mini select { font-size: 0.74rem; padding: 2px 4px; }
   .input-desc-etapa { width: 100%; font-size: 0.78rem; padding: 4px 6px; }
@@ -275,11 +275,11 @@
   .texto-impacto-semana { margin: 0; font-size: 0.78rem; color: var(--texto); line-height: 1.35; }
   .chips-relacionados { display: flex; flex-wrap: wrap; gap: 6px; }
   .pilula-rel-card { display: inline-flex; align-items: center; gap: 4px; background: var(--superficie); border: 1px solid var(--marca); }
-  .btn-ir-card, .btn-rem-rel { border: none; background: none; padding: 0; font-size: 0.75rem; cursor: pointer; color: var(--marca); }
+  .btn-ir-card, .btn-rem-rel { border: none; background: none; padding: 0; font-size: 0.75rem; cursor: var(--cursor-clique); color: var(--marca); }
   .btn-rem-rel { color: var(--vermelho); font-weight: 700; }
   .linha-vincular-rel { display: flex; gap: 6px; align-items: center; }
   .linha-vincular-rel select { flex: 1; font-size: 0.76rem; padding: 3px 6px; }
-  .link { border: none; background: none; padding: 0; margin-left: 6px; text-decoration: underline; font-size: 0.82rem; cursor: pointer; }
+  .link { border: none; background: none; padding: 0; margin-left: 6px; text-decoration: underline; font-size: 0.82rem; cursor: var(--cursor-clique); }
   .perigo { color: var(--vermelho); }
   .pilula.prio-crítica, .pilula.prio-critica, .pilula.prio-urgente { background: var(--vermelho-fundo); color: var(--vermelho); }
   .pilula.prio-alta { background: var(--amarelo-fundo); color: var(--amarelo); }

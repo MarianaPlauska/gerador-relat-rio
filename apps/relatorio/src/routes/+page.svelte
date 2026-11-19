@@ -949,7 +949,7 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
-    cursor: pointer;
+    cursor: var(--cursor-clique);
   }
   .pessoa-linha-topo
   {

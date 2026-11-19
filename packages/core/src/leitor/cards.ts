@@ -1,4 +1,5 @@
 import type { CardSnapshot, EtapaCard, OrigemLeitura, Pessoa, Ritmo, Situacao } from '../tipos';
+import { aplicarRegrasDescarte } from './descarte';
 import { dataBrParaIso, numeroBr, semAcento } from './normalizar';
 
 const RE_DATA = /(\d{2})\/(\d{2})\/(\d{4}|\d{2})/g;
@@ -38,6 +39,7 @@ export interface OpcoesLeitura
   pessoas: Pessoa[];
   origem?: OrigemLeitura;
   hoje?: string;
+  regrasDescarte?: string[] | undefined;
 }
 
 export function detectarOrigem(texto: string): OrigemLeitura
@@ -55,9 +57,11 @@ export function detectarOrigem(texto: string): OrigemLeitura
 // separa o texto em pedaços que começam no código do card (ex.: DEV-218)
 export function lerCards(textoLido: string, opcoes: OpcoesLeitura): CardSnapshot[]
 {
+  // detecta a tela pelo texto original antes de remover cabeçalhos/palavras descartadas
+  const origem = opcoes.origem ?? detectarOrigem(textoLido);
+  const textoLimpo = aplicarRegrasDescarte(textoLido, opcoes.regrasDescarte);
   // a imagem às vezes separa o código: "DEV -077"
-  const texto = textoLido.replace(new RegExp(`\\b${opcoes.prefixo} ?- ?(?=[0-9A-Z]{2,4}\\b)`, 'g'), `${opcoes.prefixo}-`);
-  const origem = opcoes.origem ?? detectarOrigem(texto);
+  const texto = textoLimpo.replace(new RegExp(`\\b${opcoes.prefixo} ?- ?(?=[0-9A-Z]{2,4}\\b)`, 'g'), `${opcoes.prefixo}-`);
   if (origem === 'card') return lerCardAberto(texto, opcoes);
   if (origem === 'cronograma' && /item\s+venc\.?\s+card\s+onda/.test(semAcento(texto))) return lerVencimentos(texto, opcoes);
   // aceita letras depois do prefixo para não perder card que a imagem leu errado (ex.: DEV-NS)
@@ -70,7 +74,7 @@ export function lerCards(textoLido: string, opcoes: OpcoesLeitura): CardSnapshot
     const fim = marcas[i + 1]?.index ?? texto.length;
     const { codigo, corrigido } = corrigirCodigo(m[0], opcoes.prefixo);
     const trecho = texto.slice(inicio, fim);
-    const card = origem === 'demandas' ? lerDemanda(codigo, trecho, opcoes.pessoas) : lerTrecho(codigo, trecho, origem, opcoes.pessoas);
+    const card = origem === 'demandas' ? lerDemanda(codigo, trecho, opcoes.pessoas, opcoes.regrasDescarte) : lerTrecho(codigo, trecho, origem, opcoes.pessoas);
     card.avisosLeitura = [...(corrigido ? ['código corrigido, confira'] : []), ...(card.avisosLeitura ?? []), ...avisar(card, origem, opcoes.hoje)];
     const anterior = porCodigo.get(card.codigo);
     porCodigo.set(card.codigo, anterior ? juntarCard(anterior, card) : card);
@@ -105,7 +109,7 @@ function pessoasNoTexto(normal: string, pessoas: Pessoa[]): Pessoa[]
 }
 
 // lista de Demandas: ID + abertura, solicitante, tipo, descrição, responsável, tempo, status
-function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[]): CardSnapshot
+function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[], regrasDescarte?: string[]): CardSnapshot
 {
   const card: CardSnapshot = { codigo, responsaveis: [], origens: ['demandas'], fontesCorrelacionadas: ['lista'] };
   const normal = semAcento(trecho);
@@ -240,7 +244,8 @@ function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[]): CardSnap
   };
 
   const partesDescricao = linhasUteis.map(limparLinha).filter(Boolean);
-  const textoDescricao = partesDescricao.join(' ').replace(/\s{2,}/g, ' ').trim();
+  const textoJunto = partesDescricao.join(' ').replace(/\s{2,}/g, ' ').trim();
+  const textoDescricao = aplicarRegrasDescarte(textoJunto, regrasDescarte).replace(/\s{2,}/g, ' ').trim();
 
   if (textoDescricao)
   {
@@ -389,12 +394,13 @@ function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
   const mPedido = texto.match(/o que foi pedido\b[^\n]*\r?\n([\s\S]+?)(?=\r?\n\s*(?:Etapas\b|\d+\s+de\s+\d+\s+conclu[ií]das|#\s*ETAPA\b|TIME\b|ABERTURA\b)|$)/i);
   if (mPedido)
   {
-    const limpo = mPedido[1]!
+    const brutoLimpo = mPedido[1]!
       .split(/\r?\n/)
       .map((l) => l.replace(/^\s*\[?editar\]?\s*$/i, '').trim())
       .filter(Boolean)
       .join('\n')
       .trim();
+    const limpo = aplicarRegrasDescarte(brutoLimpo, opcoes.regrasDescarte).trim();
     if (limpo.length > 3)
     {
       card.descricaoCompleta = limpo;

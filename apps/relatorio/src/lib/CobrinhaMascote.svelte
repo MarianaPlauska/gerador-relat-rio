@@ -272,7 +272,7 @@
     background: none;
     border: none;
     padding: 0;
-    cursor: pointer;
+    cursor: var(--cursor-clique);
     transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
   .bichinho-botao:hover
@@ -402,7 +402,7 @@
     background: transparent;
     border: 1px solid var(--borda);
     border-radius: var(--raio-pequeno);
-    cursor: pointer;
+    cursor: var(--cursor-clique);
     opacity: 0.6;
     transition: opacity 0.15s;
   }

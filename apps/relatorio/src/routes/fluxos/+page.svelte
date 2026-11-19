@@ -444,7 +444,7 @@
     border: 1px solid var(--borda);
     border-radius: var(--raio-pequeno);
     color: var(--suave);
-    cursor: pointer;
+    cursor: var(--cursor-clique);
     font-weight: 500;
     transition: all 0.15s;
   }
@@ -499,7 +499,7 @@
     background: var(--superficie-2);
     border: 1px dashed var(--borda-forte);
     border-radius: 4px;
-    cursor: pointer;
+    cursor: var(--cursor-clique);
     color: var(--texto);
   }
   .btn-exemplo:hover
@@ -639,7 +639,7 @@
     border-radius: var(--raio-pequeno);
     border: 1px solid var(--borda);
     overflow: hidden;
-    cursor: pointer;
+    cursor: var(--cursor-clique);
   }
   .miniatura :global(svg)
   {

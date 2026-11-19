@@ -108,7 +108,7 @@
   .modal-area-imagem img { width: 100%; height: auto; object-fit: contain; display: block; }
   .modal-area-imagem img.img-zoom { width: auto; max-width: none; }
   .modal-area-dados { display: flex; flex-direction: column; gap: 10px; }
-  .btn-card-modal-jump { cursor: pointer; border: 1px solid var(--marca); color: var(--marca); }
+  .btn-card-modal-jump { cursor: var(--cursor-clique); border: 1px solid var(--marca); color: var(--marca); }
   .por-pessoa-print { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; padding: 6px 10px; background: var(--superficie-2); border-radius: 4px; border: 1px solid var(--borda); font-size: 0.82rem; }
   .item-pessoa-print { color: var(--texto); }
   .comentario { display: block; font-weight: 600; font-size: 0.86rem; }

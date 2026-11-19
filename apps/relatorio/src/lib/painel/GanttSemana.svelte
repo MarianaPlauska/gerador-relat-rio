@@ -167,7 +167,7 @@
   .barra.arrastavel { cursor: grab; }
   .barra.arrastavel:active { cursor: grabbing; }
   .faixa { position: relative; height: 22px; }
-  .barra { position: absolute; top: 0; height: 22px; min-width: 4px; padding: 0 4px; font-family: var(--fonte-maquina); font-size: 0.68rem; line-height: 20px; text-align: left; overflow: hidden; white-space: nowrap; border-radius: 3px; border: 1px solid var(--borda-forte); background: var(--superficie-2); color: var(--texto); cursor: pointer; }
+  .barra { position: absolute; top: 0; height: 22px; min-width: 4px; padding: 0 4px; font-family: var(--fonte-maquina); font-size: 0.68rem; line-height: 20px; text-align: left; overflow: hidden; white-space: nowrap; border-radius: 3px; border: 1px solid var(--borda-forte); background: var(--superficie-2); color: var(--texto); cursor: var(--cursor-clique); }
   .barra.andamento { background: var(--marca-clara); border-color: var(--marca); color: var(--marca); }
   .barra.critica { background: var(--vermelho-fundo); border-color: var(--vermelho); color: var(--vermelho); }
   .barra.estoura { outline: 1px dashed var(--vermelho); outline-offset: 1px; }

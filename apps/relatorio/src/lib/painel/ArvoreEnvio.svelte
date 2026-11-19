@@ -263,7 +263,7 @@
     font-weight: 700;
     font-size: 0.7rem;
   }
-  .item-tarefa-resumo { flex-shrink: 0; width: 100%; text-align: left; background: var(--superficie); border: 1px solid var(--borda); border-left: 3px solid var(--cor-barra); border-radius: 6px; padding: 9px 12px; font-size: 0.82rem; display: flex; flex-direction: column; gap: 4px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+  .item-tarefa-resumo { flex-shrink: 0; width: 100%; text-align: left; background: var(--superficie); border: 1px solid var(--borda); border-left: 3px solid var(--cor-barra); border-radius: 6px; padding: 9px 12px; font-size: 0.82rem; display: flex; flex-direction: column; gap: 4px; cursor: var(--cursor-clique); transition: border-color 0.15s, background 0.15s; }
   .item-tarefa-resumo:hover, .item-tarefa-resumo.selecionado { border-color: var(--marca); border-left-color: var(--marca); background: var(--marca-clara); }
   .assunto-tarefa { color: var(--texto); line-height: 1.35; font-weight: 500; }
   .mini-relacoes-resumo { font-size: 0.72rem; color: var(--marca); font-family: var(--fonte-maquina); }
@@ -275,7 +275,7 @@
 
   .pessoa-no-arvore { flex-shrink: 0; background: var(--superficie); border: 1px solid var(--borda); border-radius: 8px; margin-bottom: 2px; }
   .pessoa-no-arvore.aberta { border-color: var(--marca); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); }
-  .cabecalho-pessoa-arvore { width: 100%; min-height: 46px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; background: none; border: none; text-align: left; color: var(--texto); font-family: inherit; cursor: pointer; }
+  .cabecalho-pessoa-arvore { width: 100%; min-height: 46px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; background: none; border: none; text-align: left; color: var(--texto); font-family: inherit; cursor: var(--cursor-clique); }
   .nome-pessoa-arvore-bloco { display: flex; align-items: center; gap: 6px; font-size: 0.92rem; }
   .seta-arvore { color: var(--marca); font-family: var(--fonte-maquina); }
   .metricas-pessoa-arvore { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -284,10 +284,10 @@
   .resumo-probabilistico b { color: var(--texto); }
   .card-filho-arvore { flex-shrink: 0; background: var(--superficie); border: 1px solid var(--borda); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
   .card-filho-arvore.selecionado { border-color: var(--marca); }
-  .btn-titulo-card-filho { border: none; background: none; padding: 0; text-align: left; color: var(--texto); font-size: 0.84rem; cursor: pointer; }
+  .btn-titulo-card-filho { border: none; background: none; padding: 0; text-align: left; color: var(--texto); font-size: 0.84rem; cursor: var(--cursor-clique); }
   .btn-titulo-card-filho:hover { color: var(--marca); }
   .acoes-card-filho { display: flex; align-items: center; gap: 8px; }
-  .btn-abrir-direita { font-size: 0.74rem; padding: 2px 8px; background: var(--superficie-2); border: 1px solid var(--borda-forte); color: var(--marca); border-radius: 4px; cursor: pointer; }
+  .btn-abrir-direita { font-size: 0.74rem; padding: 2px 8px; background: var(--superficie-2); border: 1px solid var(--borda-forte); color: var(--marca); border-radius: 4px; cursor: var(--cursor-clique); }
   .input-horas-curto { width: 64px; font-size: 0.78rem; padding: 2px 5px; }
   .pedido-completo { margin: 2px 0 0; font-size: 0.78rem; line-height: 1.4; color: var(--suave); white-space: pre-line; background: var(--superficie-2); padding: 6px 8px; border-radius: 4px; }
   .bloco-etapas-filhas { background: var(--superficie-2); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--borda); }
@@ -295,7 +295,7 @@
   .etapas-filhas-interativas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 0.78rem; }
   .etapas-filhas-interativas li { padding: 4px 6px; border-radius: 4px; background: var(--superficie); border: 1px solid var(--borda); }
   .etapas-filhas-interativas li.etapa-concluida { opacity: 0.75; border-left: 3px solid var(--verde); }
-  .check-etapa-linha { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .check-etapa-linha { display: flex; align-items: center; gap: 6px; cursor: var(--cursor-clique); }
   .status-etapa-tag { color: var(--suave); margin-left: 4px; font-family: var(--fonte-maquina); }
   .desc-etapa-fazer { margin: 3px 0 0 22px; font-size: 0.75rem; color: var(--suave); line-height: 1.3; }
   .impacto-card-filho { font-size: 0.75rem; color: var(--suave); padding: 5px 8px; background: var(--superficie-2); border-left: 2px solid var(--marca); border-radius: 4px; }

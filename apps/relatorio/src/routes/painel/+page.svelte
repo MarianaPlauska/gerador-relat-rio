@@ -1,11 +1,11 @@
 <script lang="ts">
   import
   {
-    adicionarEtapaAjustada, agruparPorPessoa, agoraLocal, ajustarCampos, ajustarEtapa, ajustarHoras, analisarTimeNoProjeto, aplicarAjustes, aplicarRelacionados,
+    adicionarEtapaAjustada, adicionarRegrasDescarte, agruparPorPessoa, agoraLocal, ajustarCampos, ajustarEtapa, ajustarHoras, analisarTimeNoProjeto, aplicarAjustes, aplicarRegrasDescarte, aplicarRelacionados,
     aprenderEstimativas, calcularMetricasAutomaticasDosCards, calcularPeriodoHistoricoPessoa, calcularRelacoesEImpactoSemana, chaveDaEtapa,
     compararComAnteriores, consolidarArvoreDeCards, correlacionarLote, definicoesPadrao, desvincularAjustado,
     detectarOrigem, ehCsvDeDemandas, enriquecerCard, fotoVazia, idCurto, lerCards, lerCsvDemandas, lerOndas, lerTotais,
-    linhasNaoReconhecidas, mesclarNaFoto, montarGanttSemana, nomesTotais, pessoasDoProjeto, removerCardAjustado, removerEtapaAjustada, segundaDaSemana, somarDias, sugerirDaCaptura, unirCapturas, vincularAjustado,
+    linhasNaoReconhecidas, mesclarNaFoto, montarGanttSemana, nomesTotais, pessoasDoProjeto, removerCardAjustado, removerEtapaAjustada, removerRegraDescarte, segundaDaSemana, somarDias, sugerirDaCaptura, unirCapturas, vincularAjustado,
     type Ajustes, type AjusteEtapa, type Ausencia, type CapturaLida, type CardSnapshot, type EtapaCard, type Onda, type OrigemLeitura, type Pessoa, type RegistroPainel, type SaidaCapturaLote, type Snapshot, type TotaisPainel,
   } from '@supervisao/core';
   import { goto } from '$app/navigation';
@@ -20,6 +20,7 @@
   import ModalCapturaAmpliada from '#lib/painel/ModalCapturaAmpliada.svelte';
   import ModalGerenciarEquipe from '#lib/painel/ModalGerenciarEquipe.svelte';
   import PainelMetricasAutomaticas from '#lib/painel/PainelMetricasAutomaticas.svelte';
+  import RegrasDescartePainel from '#lib/painel/RegrasDescartePainel.svelte';
   import TabelaCards from '#lib/TabelaCards.svelte';
   import { dataCurta, dataMedia } from '#lib/semana.ts';
 
@@ -255,7 +256,7 @@
     const csv = ehCsvDeDemandas(conteudo) ? lerCsvDemandas(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas }) : undefined;
     return {
       totais: csv ? {} : lerTotais(conteudo),
-      cards: csv ? csv.cards : lerCards(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas, origem, hoje: dataRegistro }),
+      cards: csv ? csv.cards : lerCards(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas, origem, hoje: dataRegistro, regrasDescarte: dados.regrasDescarte }),
     };
   }
 
@@ -283,7 +284,7 @@
       ondas,
       avisos,
       sugestoes,
-      naoReconhecido: linhasNaoReconhecidas(conteudo, pastaAtual),
+      naoReconhecido: linhasNaoReconhecidas(conteudo, pastaAtual, dados.regrasDescarte),
       repetidos: comp.repetidos,
       novos: comp.novos,
       porPessoa,
@@ -309,14 +310,41 @@
     totaisLidos = calcularMetricasAutomaticasDosCards(cardsLidos, totaisLidos, dados.pessoas, modeloEstimativa).totais;
   }
 
+  function adicionarRegras(novas: string[])
+  {
+    const atualizadas = adicionarRegrasDescarte(dados.regrasDescarte, novas);
+    dados.regrasDescarte = atualizadas;
+    capturas = capturas.map((cap) => ({
+      ...cap,
+      texto: aplicarRegrasDescarte(cap.texto, atualizadas),
+    }));
+    salvar($state.snapshot(dados));
+    if (capturas.length) recalcular();
+  }
+
+  function removerRegra(regra: string)
+  {
+    dados.regrasDescarte = removerRegraDescarte(dados.regrasDescarte, regra);
+    salvar($state.snapshot(dados));
+    if (capturas.length) recalcular();
+  }
+
+  function limparRegras()
+  {
+    dados.regrasDescarte = [];
+    salvar($state.snapshot(dados));
+    if (capturas.length) recalcular();
+  }
+
   // o print entra na lista e tudo é refeito: assim a ordem de envio não muda o resultado
   function registrarCaptura(conteudo: string, nome: string, imagemDataUrl?: string)
   {
     const origem = detectarOrigem(conteudo);
+    const textoLimpo = aplicarRegrasDescarte(conteudo, dados.regrasDescarte);
     capturas = [
       ...capturas,
       {
-        id: idCurto(), nome: `${nome} · ${nomesOrigem[origem]}`, origem, texto: conteudo, ...(imagemDataUrl ? { imagemDataUrl } : {}),
+        id: idCurto(), nome: `${nome} · ${nomesOrigem[origem]}`, origem, texto: textoLimpo, ...(imagemDataUrl ? { imagemDataUrl } : {}),
         totais: [], cards: [], ondas: 0, avisos: [], sugestoes: [], comentario: '',
       },
     ];
@@ -779,6 +807,14 @@
       </section>
     {/if}
 
+    <RegrasDescartePainel
+      regras={dados.regrasDescarte ?? []}
+      prefixo={pastaAtual}
+      aoAdicionarRegras={adicionarRegras}
+      aoRemoverRegra={removerRegra}
+      aoLimparRegras={limparRegras}
+    />
+
     {#if capturas.length}
       <section class="cartao passo" class:feito={comentados > 0}>
         <h2><span class="num">{comentados ? '✓' : '2'}</span> Árvore de correlação e conferência dos prints <small>({comentados}/{capturas.length} comentados)</small></h2>
@@ -789,7 +825,7 @@
         {/if}
 
         {#each capturas as cap, idx (cap.id)}
-          <CapturaItem {cap} indice={idx} {cardsLidos} {nomesOrigemPadrao} origensPersonalizadas={dados.origensPersonalizadas} {obterNomeOrigem} aoAmpliar={() => (capturaModalId = cap.id)} aoRecalcular={recalcular} aoRemover={() => removerCaptura(cap.id)} aoCriarOpcao={(nome) => criarOpcaoOrigem(cap.id, nome)} />
+          <CapturaItem {cap} indice={idx} {cardsLidos} {nomesOrigemPadrao} origensPersonalizadas={dados.origensPersonalizadas} {obterNomeOrigem} aoAmpliar={() => (capturaModalId = cap.id)} aoRecalcular={recalcular} aoRemover={() => removerCaptura(cap.id)} aoCriarOpcao={(nome) => criarOpcaoOrigem(cap.id, nome)} aoDescartarTexto={(l) => adicionarRegras([l])} />
         {/each}
 
         <details class="conferir painel-inteligencia-auto">
@@ -1037,9 +1073,9 @@
 
   .barra-equipe-projeto { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; margin-bottom: 12px; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-pequeno); }
   .pilula-pessoa-item { display: inline-flex; align-items: center; gap: 4px; background: var(--superficie-2); border: 1px solid var(--borda); color: var(--texto); padding: 2px 8px; }
-  .btn-nome-pilula { border: none; background: none; color: var(--texto); padding: 0; font-size: 0.8rem; cursor: pointer; }
+  .btn-nome-pilula { border: none; background: none; color: var(--texto); padding: 0; font-size: 0.8rem; cursor: var(--cursor-clique); }
   .btn-nome-pilula:hover { color: var(--marca); }
-  .btn-remover-pilula { border: none; background: none; color: var(--suave); padding: 0 2px; font-size: 0.9rem; line-height: 1; cursor: pointer; }
+  .btn-remover-pilula { border: none; background: none; color: var(--suave); padding: 0 2px; font-size: 0.9rem; line-height: 1; cursor: var(--cursor-clique); }
   .btn-remover-pilula:hover { color: var(--vermelho); }
   .add-pessoa-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; }
   .add-pessoa-inline input { font-size: 0.8rem; padding: 3px 8px; width: 190px; }
@@ -1059,7 +1095,7 @@
   .etapas-filhas-interativas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 0.78rem; }
   .etapas-filhas-interativas li { padding: 4px 6px; border-radius: 4px; background: var(--superficie); border: 1px solid var(--borda); }
   .etapas-filhas-interativas li.etapa-concluida { opacity: 0.75; border-left: 3px solid var(--verde); }
-  .check-etapa-linha { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .check-etapa-linha { display: flex; align-items: center; gap: 6px; cursor: var(--cursor-clique); }
   .input-desc-etapa { width: calc(100% - 22px); margin: 3px 0 0 22px; font-size: 0.74rem; padding: 2px 6px; }
 
   .modal-backdrop { position: fixed; inset: 0; background: rgba(8, 12, 20, 0.76); backdrop-filter: blur(3px); z-index: 900; display: grid; place-items: center; padding: 18px; overflow-y: auto; }
@@ -1068,7 +1104,7 @@
 
 
   .acoes-guardar { gap: 12px; }
-  .botao-pdf-destaque { background: var(--marca-clara); border: 1.5px solid var(--marca); color: var(--marca); font-weight: 700; padding: var(--size-2) var(--size-4); cursor: pointer; }
+  .botao-pdf-destaque { background: var(--marca-clara); border: 1.5px solid var(--marca); color: var(--marca); font-weight: 700; padding: var(--size-2) var(--size-4); cursor: var(--cursor-clique); }
   .botao-pdf-destaque:hover:not(:disabled) { background: var(--marca); color: var(--sobre-marca); }
   .mini { font-size: 0.78rem; display: flex; gap: 6px; align-items: center; }
   .chips { margin: 8px 0; }

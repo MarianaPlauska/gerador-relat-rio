@@ -184,6 +184,6 @@
   .faixa-leitura { margin: 0; padding: 8px 10px; border-left: 3px solid var(--amarelo); background: var(--superficie); font-size: 0.85rem; }
   .erro { margin: 0; color: var(--vermelho); font-size: 0.85rem; }
   .aviso-ok { margin: 0; font-size: 0.85rem; }
-  .link { border: none; background: none; padding: 0; text-decoration: underline; font-size: 0.82rem; cursor: pointer; }
+  .link { border: none; background: none; padding: 0; text-decoration: underline; font-size: 0.82rem; cursor: var(--cursor-clique); }
   .perigo { color: var(--vermelho); }
 </style>

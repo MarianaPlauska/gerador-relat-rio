@@ -662,7 +662,7 @@
     padding: 3px 10px;
     border-radius: 999px;
     font-weight: 600;
-    cursor: pointer;
+    cursor: var(--cursor-clique);
     border: none;
   }
   .badge-lacuna.alerta
@@ -685,7 +685,7 @@
     border: 1px solid var(--borda);
     border-radius: var(--raio-pequeno);
     color: var(--texto);
-    cursor: pointer;
+    cursor: var(--cursor-clique);
   }
   .botao-topo:hover
   {
@@ -700,7 +700,7 @@
     color: #ffffff;
     border: none;
     border-radius: var(--raio-pequeno);
-    cursor: pointer;
+    cursor: var(--cursor-clique);
     box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
     transition: transform 0.1s, background 0.15s;
   }
@@ -880,7 +880,7 @@
     border: none;
     color: var(--suave);
     font-size: 1rem;
-    cursor: pointer;
+    cursor: var(--cursor-clique);
   }
   .player-titulo
   {
@@ -936,7 +936,7 @@
     color: white;
     border: none;
     border-radius: var(--raio-pequeno);
-    cursor: pointer;
+    cursor: var(--cursor-clique);
     font-weight: 500;
   }
   .player-btn-opcao:hover
@@ -951,7 +951,7 @@
     border: 1px solid var(--borda);
     color: var(--suave);
     border-radius: var(--raio-pequeno);
-    cursor: pointer;
+    cursor: var(--cursor-clique);
   }
   .player-btn-concluir
   {
@@ -962,7 +962,7 @@
     border: none;
     border-radius: var(--raio-pequeno);
     font-weight: 600;
-    cursor: pointer;
+    cursor: var(--cursor-clique);
   }
   .player-sem-saida
   {
@@ -1014,7 +1014,7 @@
     border: none;
     color: var(--suave);
     font-size: 1.1rem;
-    cursor: pointer;
+    cursor: var(--cursor-clique);
     line-height: 1;
   }
   .seletor-tipos
@@ -1034,7 +1034,7 @@
     border: none;
     border-radius: 4px;
     color: var(--suave);
-    cursor: pointer;
+    cursor: var(--cursor-clique);
     text-align: center;
     transition: all 0.15s;
     font-weight: 500;
@@ -1136,7 +1136,7 @@
     background: none;
     border: none;
     color: var(--suave);
-    cursor: pointer;
+    cursor: var(--cursor-clique);
     font-size: 0.85rem;
   }
   .conexao-btn-remover:hover
@@ -1163,7 +1163,7 @@
     border: 1px dashed var(--borda-forte);
     border-radius: var(--raio-pequeno);
     color: var(--suave);
-    cursor: pointer;
+    cursor: var(--cursor-clique);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1193,7 +1193,7 @@
     border: 1px solid var(--borda);
     border-radius: var(--raio-pequeno);
     color: var(--texto);
-    cursor: pointer;
+    cursor: var(--cursor-clique);
   }
   .btn-percorrer-daqui:hover
   {
@@ -1209,7 +1209,7 @@
     background: transparent;
     border: none;
     color: var(--vermelho);
-    cursor: pointer;
+    cursor: var(--cursor-clique);
     text-align: center;
   }
   .btn-excluir-passo:hover
@@ -1230,7 +1230,7 @@
     border: 1px solid var(--borda);
     border-radius: 4px;
     color: var(--texto);
-    cursor: pointer;
+    cursor: var(--cursor-clique);
   }
   .dica-vazio
   {
@@ -1301,7 +1301,7 @@
     border: none;
     color: #f59e0b;
     padding: 2px 0;
-    cursor: pointer;
+    cursor: var(--cursor-clique);
     text-align: left;
     text-decoration: underline;
     font-size: inherit;

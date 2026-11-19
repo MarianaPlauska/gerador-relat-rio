@@ -64,11 +64,13 @@ export interface Dados
   projetos?: string[];
   // ordem da fila de cada pessoa no cronograma, escolhida arrastando (chave PROJETO|pessoaId)
   filaManual?: Record<string, string[]>;
+  // palavras ou frases que devem ser descartadas ao transcrever e interpretar prints
+  regrasDescarte?: string[];
 }
 
 function padrao(): Dados
 {
-  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [], vivos: [], registros: [], origensPersonalizadas: [], projetos: ['DEV'] };
+  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [], vivos: [], registros: [], origensPersonalizadas: [], projetos: ['DEV'], regrasDescarte: [] };
 }
 
 // campos que faltam ganham o padrão; listas antigas ganham fases e diário

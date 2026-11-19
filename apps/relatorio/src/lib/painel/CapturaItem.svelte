@@ -2,7 +2,7 @@
   import type { CapturaLida, CardSnapshot } from '@supervisao/core';
 
   // um print enviado: miniatura, "Entendi como", card ao qual pertence, resumo do que foi lido, comentÃ¡rio e texto lido
-  let { cap, indice, cardsLidos, nomesOrigemPadrao, origensPersonalizadas, obterNomeOrigem, aoAmpliar, aoRecalcular, aoRemover, aoCriarOpcao }: {
+  let { cap, indice, cardsLidos, nomesOrigemPadrao, origensPersonalizadas, obterNomeOrigem, aoAmpliar, aoRecalcular, aoRemover, aoCriarOpcao, aoDescartarTexto }: {
     cap: CapturaLida;
     indice: number;
     cardsLidos: CardSnapshot[];
@@ -13,6 +13,7 @@
     aoRecalcular: () => void;
     aoRemover: () => void;
     aoCriarOpcao: (nome: string) => void;
+    aoDescartarTexto?: (texto: string) => void;
   } = $props();
 
   let criando = $state(false);
@@ -156,7 +157,16 @@
         <summary>Texto lido e complemento {cap.naoReconhecido?.length ? `(${cap.naoReconhecido.length} linhas sem card)` : ''}</summary>
         {#if cap.naoReconhecido?.length}
           <p class="dica">Trechos do print que não viraram card nem número. Podem ser o complemento de algo já visto:</p>
-          <ul class="complemento">{#each cap.naoReconhecido as l, i (i)}<li>{l}</li>{/each}</ul>
+          <ul class="complemento">
+            {#each cap.naoReconhecido as l, i (i)}
+              <li>
+                <span>{l}</span>
+                {#if aoDescartarTexto}
+                  <button type="button" class="link" onclick={() => aoDescartarTexto(l)}>+ virar regra de descarte</button>
+                {/if}
+              </li>
+            {/each}
+          </ul>
         {/if}
         <textarea rows="5" value={cap.texto} oninput={(e) => { cap.texto = e.currentTarget.value; }}></textarea>
         <button onclick={aoRecalcular}>Reprocessar com o texto corrigido</button>
@@ -171,14 +181,14 @@
   .link { border: none; background: none; padding: 0; margin-left: 6px; text-decoration: underline; font-size: 0.84rem; }
   .perigo { color: var(--vermelho); }
   .linha-acoes-captura { display: flex; align-items: center; gap: 6px; }
-  .btn-adicionar-opcao { padding: 1px 7px; font-size: 0.85rem; font-weight: 700; background: var(--superficie); border: 1px solid var(--borda-forte); border-radius: 4px; color: var(--marca); cursor: pointer; line-height: 1.3; }
+  .btn-adicionar-opcao { padding: 1px 7px; font-size: 0.85rem; font-weight: 700; background: var(--superficie); border: 1px solid var(--borda-forte); border-radius: 4px; color: var(--marca); cursor: var(--cursor-clique); line-height: 1.3; }
   .btn-adicionar-opcao:hover { border-color: var(--marca); background: var(--marca-clara); }
   .linha-nova-opcao { display: flex; align-items: center; gap: 6px; background: var(--superficie); padding: 3px 6px; border: 1px solid var(--marca); border-radius: 4px; }
   .input-nova-opcao { font-size: 0.78rem; padding: 3px 6px; border: 1px solid var(--borda); border-radius: 3px; min-width: 150px; background: var(--fundo); color: var(--texto); }
-  .btn-salvar-opcao { font-size: 0.74rem; padding: 3px 8px; background: var(--marca); color: var(--sobre-marca); border: none; border-radius: 3px; cursor: pointer; font-weight: 600; }
-  .btn-img-modal { position: relative; border: none; background: none; padding: 0; cursor: pointer; display: block; text-align: left; }
+  .btn-salvar-opcao { font-size: 0.74rem; padding: 3px 8px; background: var(--marca); color: var(--sobre-marca); border: none; border-radius: 3px; cursor: var(--cursor-clique); font-weight: 600; }
+  .btn-img-modal { position: relative; border: none; background: none; padding: 0; cursor: var(--cursor-clique); display: block; text-align: left; }
   .selo-ampliar-img { display: block; margin-top: 4px; font-size: 0.74rem; color: var(--marca); text-align: center; font-weight: 600; }
-  .btn-ampliar-captura { font-size: 0.76rem; padding: 3px 8px; background: var(--superficie); border: 1px solid var(--marca); color: var(--marca); border-radius: 4px; cursor: pointer; }
+  .btn-ampliar-captura { font-size: 0.76rem; padding: 3px 8px; background: var(--superficie); border: 1px solid var(--marca); color: var(--marca); border-radius: 4px; cursor: var(--cursor-clique); }
   .vinculo-arvore-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; padding: 6px 10px; background: var(--superficie); border: 1px solid var(--borda); border-left: 3px solid var(--marca); border-radius: 4px; }
   .vinculo-arvore-barra select { font-size: 0.78rem; padding: 2px 6px; max-width: 280px; }
   .por-pessoa-print { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; padding: 6px 10px; background: var(--superficie); border-radius: 4px; border: 1px solid var(--borda); font-size: 0.82rem; }

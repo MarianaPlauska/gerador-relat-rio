@@ -180,6 +180,6 @@
   .caixa-periodo-preservado { padding: 12px; background: var(--superficie-2); border-left: 3px solid var(--amarelo); border-radius: 6px; font-size: 0.88rem; line-height: 1.4; }
   .btn-confirmar-perigo { background: var(--vermelho); color: #fff; border-color: var(--vermelho); }
   .curto { width: 80px; }
-  .link { border: none; background: none; padding: 0; margin-left: 6px; text-decoration: underline; font-size: 0.82rem; cursor: pointer; }
+  .link { border: none; background: none; padding: 0; margin-left: 6px; text-decoration: underline; font-size: 0.82rem; cursor: var(--cursor-clique); }
   .perigo { color: var(--vermelho); }
 </style>

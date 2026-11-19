@@ -83,5 +83,5 @@
   .eixo-txt { fill: var(--suave); font-size: 10px; font-family: var(--fonte-maquina); }
   .valor-ponto { fill: var(--texto); font-size: 10px; font-weight: 700; font-family: var(--fonte-maquina); }
   .rotulo-x { fill: var(--suave); font-size: 10px; font-family: var(--fonte-maquina); }
-  .ponto-interativo { cursor: pointer; }
+  .ponto-interativo { cursor: var(--cursor-clique); }
 </style>
