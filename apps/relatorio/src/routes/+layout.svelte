@@ -3,6 +3,8 @@
   import '@fontsource/courier-prime/700.css';
   import '@fontsource/ibm-plex-sans/400.css';
   import '@fontsource/ibm-plex-sans/600.css';
+  import '@fontsource/pixelify-sans/400.css';
+  import '@fontsource/pixelify-sans/700.css';
   import '../app.css';
   import { DropdownMenu } from 'bits-ui';
   import { goto } from '$app/navigation';

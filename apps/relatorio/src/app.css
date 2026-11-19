@@ -34,8 +34,10 @@
   --grade-fundo: rgb(0 229 153 / 11%);
   --sombra: 0 0 0 1px rgb(0 0 0 / 40%), 0 8px 24px rgb(0 0 0 / 45%);
   --brilho: 0 0 0 1px rgb(0 229 153 / 40%), 0 0 24px rgb(0 229 153 / 15%);
-  --raio: var(--radius-3);
-  --raio-pequeno: var(--radius-2);
+  --raio: var(--radius-2);
+  --raio-pequeno: 3px;
+  --fonte-pixel: "Pixelify Sans", "Courier Prime", monospace;
+  --padrao: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22420%22%20height%3D%22420%22%3E%3Crect%20x%3D%22100%22%20y%3D%22110%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.277%22%2F%3E%3Crect%20x%3D%22350%22%20y%3D%2230%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.166%22%2F%3E%3Crect%20x%3D%22330%22%20y%3D%22110%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.234%22%2F%3E%3Crect%20x%3D%22260%22%20y%3D%22160%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.207%22%2F%3E%3Crect%20x%3D%2250%22%20y%3D%22300%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.186%22%2F%3E%3Crect%20x%3D%2250%22%20y%3D%22240%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.199%22%2F%3E%3Crect%20x%3D%22380%22%20y%3D%22330%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.129%22%2F%3E%3Crect%20x%3D%22150%22%20y%3D%22320%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.166%22%2F%3E%3Crect%20x%3D%22360%22%20y%3D%2270%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.285%22%2F%3E%3Crect%20x%3D%22390%22%20y%3D%22300%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.221%22%2F%3E%3Crect%20x%3D%22240%22%20y%3D%22230%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.255%22%2F%3E%3Crect%20x%3D%22190%22%20y%3D%2210%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.127%22%2F%3E%3Crect%20x%3D%22290%22%20y%3D%22160%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.339%22%2F%3E%3Crect%20x%3D%2260%22%20y%3D%2260%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.233%22%2F%3E%3Crect%20x%3D%22110%22%20y%3D%22130%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.164%22%2F%3E%3Crect%20x%3D%22220%22%20y%3D%2280%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.152%22%2F%3E%3Crect%20x%3D%2220%22%20y%3D%22290%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.176%22%2F%3E%3Crect%20x%3D%22150%22%20y%3D%22330%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.335%22%2F%3E%3Crect%20x%3D%22230%22%20y%3D%22290%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.262%22%2F%3E%3Crect%20x%3D%22160%22%20y%3D%2260%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.226%22%2F%3E%3Crect%20x%3D%22400%22%20y%3D%22250%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.253%22%2F%3E%3Crect%20x%3D%22190%22%20y%3D%2240%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.171%22%2F%3E%3Crect%20x%3D%22210%22%20y%3D%22270%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.319%22%2F%3E%3Crect%20x%3D%22260%22%20y%3D%22230%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.290%22%2F%3E%3Crect%20x%3D%22290%22%20y%3D%22300%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.215%22%2F%3E%3Crect%20x%3D%22150%22%20y%3D%2220%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.132%22%2F%3E%3Crect%20x%3D%2230%22%20y%3D%22240%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.204%22%2F%3E%3Crect%20x%3D%22380%22%20y%3D%22170%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.207%22%2F%3E%3Crect%20x%3D%2260%22%20y%3D%22270%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.151%22%2F%3E%3Crect%20x%3D%22130%22%20y%3D%22210%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.259%22%2F%3E%3Crect%20x%3D%22250%22%20y%3D%22100%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.260%22%2F%3E%3Crect%20x%3D%22280%22%20y%3D%22290%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.175%22%2F%3E%3Crect%20x%3D%2230%22%20y%3D%22300%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.187%22%2F%3E%3Crect%20x%3D%22290%22%20y%3D%2230%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.279%22%2F%3E%3Crect%20x%3D%22400%22%20y%3D%22330%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.336%22%2F%3E%3Crect%20x%3D%22350%22%20y%3D%2290%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.338%22%2F%3E%3Crect%20x%3D%2250%22%20y%3D%22210%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.263%22%2F%3E%3Crect%20x%3D%22370%22%20y%3D%22250%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.293%22%2F%3E%3Crect%20x%3D%2220%22%20y%3D%220%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.150%22%2F%3E%3Crect%20x%3D%22170%22%20y%3D%220%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.241%22%2F%3E%3Crect%20x%3D%2260%22%20y%3D%2280%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.148%22%2F%3E%3Crect%20x%3D%22280%22%20y%3D%22260%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.191%22%2F%3E%3Crect%20x%3D%22280%22%20y%3D%22410%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.263%22%2F%3E%3Crect%20x%3D%22340%22%20y%3D%2280%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.125%22%2F%3E%3Crect%20x%3D%22270%22%20y%3D%22240%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.288%22%2F%3E%3Crect%20x%3D%22380%22%20y%3D%22260%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.289%22%2F%3E%3Crect%20x%3D%22290%22%20y%3D%2250%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.133%22%2F%3E%3Crect%20x%3D%2290%22%20y%3D%22290%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.198%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%22280%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.327%22%2F%3E%3Crect%20x%3D%22180%22%20y%3D%22100%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.265%22%2F%3E%3Crect%20x%3D%22160%22%20y%3D%22190%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.244%22%2F%3E%3Crect%20x%3D%22110%22%20y%3D%22260%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.338%22%2F%3E%3Crect%20x%3D%2210%22%20y%3D%22230%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.297%22%2F%3E%3Crect%20x%3D%2230%22%20y%3D%22390%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.132%22%2F%3E%3Crect%20x%3D%22110%22%20y%3D%22190%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.202%22%2F%3E%3Crect%20x%3D%22220%22%20y%3D%22250%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.139%22%2F%3E%3Crect%20x%3D%22190%22%20y%3D%22410%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.324%22%2F%3E%3Crect%20x%3D%22230%22%20y%3D%22360%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.298%22%2F%3E%3Crect%20x%3D%22250%22%20y%3D%2220%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.286%22%2F%3E%3Crect%20x%3D%22190%22%20y%3D%22110%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.325%22%2F%3E%3Crect%20x%3D%22330%22%20y%3D%22160%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.315%22%2F%3E%3Crect%20x%3D%22410%22%20y%3D%22380%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.259%22%2F%3E%3Crect%20x%3D%22370%22%20y%3D%22130%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.125%22%2F%3E%3Crect%20x%3D%2240%22%20y%3D%22150%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.313%22%2F%3E%3Crect%20x%3D%22370%22%20y%3D%22170%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.288%22%2F%3E%3Crect%20x%3D%22120%22%20y%3D%2290%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.161%22%2F%3E%3Crect%20x%3D%22130%22%20y%3D%22170%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.306%22%2F%3E%3Crect%20x%3D%22270%22%20y%3D%22400%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.161%22%2F%3E%3Crect%20x%3D%22290%22%20y%3D%2230%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.216%22%2F%3E%3Crect%20x%3D%22250%22%20y%3D%2230%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2300e599%22%20fill-opacity%3D%220.208%22%2F%3E%3C%2Fsvg%3E");
   --espaco: var(--size-5);
   --curva: var(--ease-3);
   --fonte-maquina: "Courier Prime", "Courier New", monospace;
@@ -76,6 +78,7 @@
   --brilho: 0 0 0 1px rgb(18 164 84 / 35%), 0 0 0 4px rgb(18 164 84 / 8%);
   --cor-barra: #12a454;
   --fundo-barra: #dceee3;
+  --padrao: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22420%22%20height%3D%22420%22%3E%3Crect%20x%3D%22100%22%20y%3D%22110%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.130%22%2F%3E%3Crect%20x%3D%22350%22%20y%3D%2230%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.078%22%2F%3E%3Crect%20x%3D%22330%22%20y%3D%22110%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.110%22%2F%3E%3Crect%20x%3D%22260%22%20y%3D%22160%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.098%22%2F%3E%3Crect%20x%3D%2250%22%20y%3D%22300%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.088%22%2F%3E%3Crect%20x%3D%2250%22%20y%3D%22240%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.094%22%2F%3E%3Crect%20x%3D%22380%22%20y%3D%22330%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.061%22%2F%3E%3Crect%20x%3D%22150%22%20y%3D%22320%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.078%22%2F%3E%3Crect%20x%3D%22360%22%20y%3D%2270%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.134%22%2F%3E%3Crect%20x%3D%22390%22%20y%3D%22300%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.104%22%2F%3E%3Crect%20x%3D%22240%22%20y%3D%22230%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.120%22%2F%3E%3Crect%20x%3D%22190%22%20y%3D%2210%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.060%22%2F%3E%3Crect%20x%3D%22290%22%20y%3D%22160%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.159%22%2F%3E%3Crect%20x%3D%2260%22%20y%3D%2260%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.110%22%2F%3E%3Crect%20x%3D%22110%22%20y%3D%22130%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.077%22%2F%3E%3Crect%20x%3D%22220%22%20y%3D%2280%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.072%22%2F%3E%3Crect%20x%3D%2220%22%20y%3D%22290%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.083%22%2F%3E%3Crect%20x%3D%22150%22%20y%3D%22330%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.157%22%2F%3E%3Crect%20x%3D%22230%22%20y%3D%22290%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.123%22%2F%3E%3Crect%20x%3D%22160%22%20y%3D%2260%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.106%22%2F%3E%3Crect%20x%3D%22400%22%20y%3D%22250%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.119%22%2F%3E%3Crect%20x%3D%22190%22%20y%3D%2240%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.081%22%2F%3E%3Crect%20x%3D%22210%22%20y%3D%22270%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.150%22%2F%3E%3Crect%20x%3D%22260%22%20y%3D%22230%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.137%22%2F%3E%3Crect%20x%3D%22290%22%20y%3D%22300%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.101%22%2F%3E%3Crect%20x%3D%22150%22%20y%3D%2220%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.062%22%2F%3E%3Crect%20x%3D%2230%22%20y%3D%22240%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.096%22%2F%3E%3Crect%20x%3D%22380%22%20y%3D%22170%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.098%22%2F%3E%3Crect%20x%3D%2260%22%20y%3D%22270%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.071%22%2F%3E%3Crect%20x%3D%22130%22%20y%3D%22210%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.122%22%2F%3E%3Crect%20x%3D%22250%22%20y%3D%22100%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.122%22%2F%3E%3Crect%20x%3D%22280%22%20y%3D%22290%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.082%22%2F%3E%3Crect%20x%3D%2230%22%20y%3D%22300%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.088%22%2F%3E%3Crect%20x%3D%22290%22%20y%3D%2230%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.132%22%2F%3E%3Crect%20x%3D%22400%22%20y%3D%22330%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.158%22%2F%3E%3Crect%20x%3D%22350%22%20y%3D%2290%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.159%22%2F%3E%3Crect%20x%3D%2250%22%20y%3D%22210%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.124%22%2F%3E%3Crect%20x%3D%22370%22%20y%3D%22250%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.138%22%2F%3E%3Crect%20x%3D%2220%22%20y%3D%220%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.071%22%2F%3E%3Crect%20x%3D%22170%22%20y%3D%220%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.114%22%2F%3E%3Crect%20x%3D%2260%22%20y%3D%2280%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.070%22%2F%3E%3Crect%20x%3D%22280%22%20y%3D%22260%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.090%22%2F%3E%3Crect%20x%3D%22280%22%20y%3D%22410%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.124%22%2F%3E%3Crect%20x%3D%22340%22%20y%3D%2280%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.059%22%2F%3E%3Crect%20x%3D%22270%22%20y%3D%22240%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.135%22%2F%3E%3Crect%20x%3D%22380%22%20y%3D%22260%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.136%22%2F%3E%3Crect%20x%3D%22290%22%20y%3D%2250%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.063%22%2F%3E%3Crect%20x%3D%2290%22%20y%3D%22290%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.093%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%22280%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.154%22%2F%3E%3Crect%20x%3D%22180%22%20y%3D%22100%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.125%22%2F%3E%3Crect%20x%3D%22160%22%20y%3D%22190%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.115%22%2F%3E%3Crect%20x%3D%22110%22%20y%3D%22260%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.159%22%2F%3E%3Crect%20x%3D%2210%22%20y%3D%22230%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.140%22%2F%3E%3Crect%20x%3D%2230%22%20y%3D%22390%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.062%22%2F%3E%3Crect%20x%3D%22110%22%20y%3D%22190%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.095%22%2F%3E%3Crect%20x%3D%22220%22%20y%3D%22250%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.066%22%2F%3E%3Crect%20x%3D%22190%22%20y%3D%22410%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.153%22%2F%3E%3Crect%20x%3D%22230%22%20y%3D%22360%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.140%22%2F%3E%3Crect%20x%3D%22250%22%20y%3D%2220%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.134%22%2F%3E%3Crect%20x%3D%22190%22%20y%3D%22110%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.153%22%2F%3E%3Crect%20x%3D%22330%22%20y%3D%22160%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.148%22%2F%3E%3Crect%20x%3D%22410%22%20y%3D%22380%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.122%22%2F%3E%3Crect%20x%3D%22370%22%20y%3D%22130%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.059%22%2F%3E%3Crect%20x%3D%2240%22%20y%3D%22150%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.147%22%2F%3E%3Crect%20x%3D%22370%22%20y%3D%22170%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.135%22%2F%3E%3Crect%20x%3D%22120%22%20y%3D%2290%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.076%22%2F%3E%3Crect%20x%3D%22130%22%20y%3D%22170%22%20width%3D%225%22%20height%3D%225%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.144%22%2F%3E%3Crect%20x%3D%22270%22%20y%3D%22400%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.076%22%2F%3E%3Crect%20x%3D%22290%22%20y%3D%2230%22%20width%3D%2220%22%20height%3D%2220%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.102%22%2F%3E%3Crect%20x%3D%22250%22%20y%3D%2230%22%20width%3D%2210%22%20height%3D%2210%22%20fill%3D%22%2314181d%22%20fill-opacity%3D%220.098%22%2F%3E%3C%2Fsvg%3E");
   --cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2720%27%20height%3D%2722%27%20viewBox%3D%270%200%2026%2028%27%3E%3Cpath%20d%3D%27M3%202%20L3%2021%20L8%2016%20L12%2025%20L16%2023.5%20L12%2015%20L19%2015%20Z%27%20fill%3D%27%2310141a%27%20stroke%3D%27%2312a454%27%20stroke-width%3D%272%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E") 2 2, auto;
   --cursor-clique: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2720%27%20height%3D%2722%27%20viewBox%3D%270%200%2026%2028%27%3E%3Cpath%20d%3D%27M3%202%20L3%2021%20L8%2016%20L12%2025%20L16%2023.5%20L12%2015%20L19%2015%20Z%27%20fill%3D%27%2312a454%27%20stroke%3D%27%2310141a%27%20stroke-width%3D%272%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E") 2 2, pointer;
 }
@@ -127,17 +130,24 @@ body
   margin: 0;
   font-family: var(--fonte-texto);
   background-color: var(--fundo);
-  background-image:
-    linear-gradient(var(--grade-fundo) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grade-fundo) 1px, transparent 1px),
-    radial-gradient(ellipse at 50% 0%, rgb(0 229 153 / 7%), transparent 70%);
-  background-size: 28px 28px, 28px 28px, 100% 640px;
-  background-position: -1px -1px, -1px -1px, 0 0;
-  background-repeat: repeat, repeat, no-repeat;
   color: var(--texto);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   transition: background-color var(--curva) 0.2s, color var(--curva) 0.2s;
+}
+
+/* mosaico de quadrados soltos: mais forte logo abaixo do topo e some em degradê para baixo */
+body::before
+{
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 640px;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--padrao);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 55%) 30%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 55%) 30%, transparent 100%);
 }
 
 a
@@ -154,7 +164,11 @@ h1, h2, h3
 }
 h1
 {
-  font-size: var(--font-size-6, 1.9rem);
+  font-family: var(--fonte-pixel);
+  font-weight: 700;
+  font-size: clamp(2rem, 4.2vw, 2.9rem);
+  line-height: 1.05;
+  letter-spacing: 0.01em;
 }
 h2
 {
@@ -199,6 +213,19 @@ main > header h1
 .cartao > h2:first-child
 {
   margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--size-3);
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+/* linha pontilhada depois do título de cada quadro */
+.cartao > h2:first-child::after
+{
+  content: '';
+  flex: 1;
+  border-top: 2px dotted var(--borda-forte);
 }
 @media (max-width: 700px)
 {
@@ -245,6 +272,15 @@ button.principal
 button.principal:hover:not(:disabled)
 {
   filter: brightness(1.1);
+}
+/* rótulos de ação entre colchetes */
+button.principal::before
+{
+  content: '[ ';
+}
+button.principal::after
+{
+  content: ' ]';
 }
 :focus-visible
 {
@@ -432,4 +468,27 @@ th, td
 ::-webkit-scrollbar-track
 {
   background: transparent;
+}
+
+/* placas de número: cantos cortados e uma luz de estado */
+.kpi
+{
+  position: relative;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}
+.kpi::after
+{
+  content: '';
+  position: absolute;
+  top: 14px;
+  right: 22px;
+  width: 8px;
+  height: 8px;
+  background: var(--marca);
+  box-shadow: 0 0 8px var(--marca);
+}
+.kpi.alerta::after
+{
+  background: var(--amarelo);
+  box-shadow: 0 0 8px var(--amarelo);
 }

@@ -593,9 +593,6 @@
     max-width: 1240px;
     margin: 0 auto;
     padding-bottom: var(--size-6);
-    background-image: linear-gradient(var(--grade-fundo) 1px, transparent 1px), linear-gradient(90deg, var(--grade-fundo) 1px, transparent 1px);
-    background-size: 28px 28px;
-    background-position: -1px -1px;
   }
 
   .topo-dashboard
