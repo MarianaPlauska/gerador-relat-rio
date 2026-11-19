@@ -52,10 +52,11 @@
     },
     {
       id: 'processos',
-      nome: 'Listas e Fluxos',
+      nome: 'Listas, Fluxos e Planilhas',
       itens: [
         { href: '/listas', nome: 'Listas', dica: 'Checklists de implantação por fase e empresa' },
         { href: '/fluxos', nome: 'Fluxos', dica: 'Editor visual de fluxogramas de processo' },
+        { href: '/planilhas', nome: 'Planilhas', dica: 'Organize material solto em planilha, com orçamento e .xlsx' },
       ],
     },
     {

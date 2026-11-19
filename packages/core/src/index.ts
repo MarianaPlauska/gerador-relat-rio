@@ -31,3 +31,4 @@ export * from './fluxograma';
 export * from './interativo';
 export * from './vivo';
 export * from './acesso';
+export * from './planilha';

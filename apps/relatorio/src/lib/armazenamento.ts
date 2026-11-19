@@ -1,6 +1,6 @@
 import
 {
-  agoraLocal, dicionarioPadrao, migrarFluxograma, migrarLista, migrarVivo, type Fluxograma, type RelatorioVivo, pessoasExemplo, type Bloco, type ControleCard, type Lista, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type RegistroPainel, type Risco, type Snapshot,
+  agoraLocal, dicionarioPadrao, migrarFluxograma, migrarLista, migrarPlanilha, migrarVivo, type Fluxograma, type Planilha, type RelatorioVivo, pessoasExemplo, type Bloco, type ControleCard, type Lista, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type RegistroPainel, type Risco, type Snapshot,
 } from '@supervisao/core';
 import { agendarEnvio, baixarImagem, chaveDoEspaco, imagemConfirmada, iniciarNuvem, marcarLocal, nuvemPronta, somenteLeitura } from './nuvem.svelte.ts';
 import { capturasSemImagem, separarImagens } from './imagens.ts';
@@ -56,6 +56,8 @@ export interface Dados
   fluxos: Fluxograma[];
   // relatórios vivos: preenchidos aos poucos, todo dia
   vivos: RelatorioVivo[];
+  // planilhas organizadas a partir de material solto, com orçamento
+  planilhas: Planilha[];
   // diário do painel: registros guardados por pasta, com dia, motivo, prints e comentários
   registros: RegistroPainel[];
   // opções personalizadas de tipo para "Entendi como"
@@ -70,14 +72,14 @@ export interface Dados
 
 function padrao(): Dados
 {
-  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [], vivos: [], registros: [], origensPersonalizadas: [], projetos: ['DEV'], regrasDescarte: [] };
+  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [], vivos: [], planilhas: [], registros: [], origensPersonalizadas: [], projetos: ['DEV'], regrasDescarte: [] };
 }
 
 // campos que faltam ganham o padrão; listas antigas ganham fases e diário
 function completar(bruto: Partial<Dados>): Dados
 {
   const d = { ...padrao(), ...bruto };
-  return { ...d, listas: d.listas.map(migrarLista), fluxos: d.fluxos.map(migrarFluxograma), vivos: d.vivos.map(migrarVivo) };
+  return { ...d, listas: d.listas.map(migrarLista), fluxos: d.fluxos.map(migrarFluxograma), vivos: d.vivos.map(migrarVivo), planilhas: d.planilhas.map(migrarPlanilha) };
 }
 
 function lerLocal(): Dados

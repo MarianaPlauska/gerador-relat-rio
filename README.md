@@ -42,6 +42,10 @@ A tela **Fluxos** desenha fluxogramas de processo: monte por passos em texto, co
 
 A tela **Vivos** guarda relatórios que ficam abertos: checklist com itens que zeram todo dia, registros por data que viram os campos do relatório e botão para abrir no Relatório com o período certo. A **Visão do mês** resume o mês (prazo semana a semana, time, compromissos) e gera o relatório do mês. O modelo **1:1 por pessoa** faz uma página por pessoa. **Ctrl+K** abre a paleta de comandos (telas, ações, listas, fluxos, vivos e cards) e a tela **Roadmap** mostra o que vem em 2027.
 
+### Planilhas
+
+A tela **Planilhas** transforma material solto (prompt, ideias e links) em planilha, para qualquer assunto. O OrbisOS não abre links nem pesquisa preço: ele monta o pedido, você cola num chat de IA gratuito com busca e cola o JSON de volta. O sistema valida (avisa link que não estava no seu material), organiza em grupos na ordem pedida, calcula totais mínimo, referência e máximo, mostra **quanto do orçamento está ocupado**, sugere cortes para caber (nunca o essencial) e baixa um .xlsx com 3 abas (Resumo com fórmulas, Itens com link clicável, Alternativas). Core em `packages/core/src/planilha/`, tela em `routes/planilhas` e componentes em `lib/planilhas/`.
+
 ### IA local (opcional)
 
 Os campos de texto do Relatório têm "escrever rascunho com IA local". Ela roda no navegador pelo WebLLM (WebGPU, Chrome ou Edge), sem servidor e sem custo: o modelo Qwen2.5 1.5B baixa uma vez (cerca de 1 GB) e fica guardado. Recebe só o pacote de fatos conferido e o sistema avisa se o texto trouxer um número que não está nele. Continua valendo: nenhuma IA paga.

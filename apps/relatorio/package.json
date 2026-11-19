@@ -17,6 +17,7 @@
     "@supervisao/core": "*",
     "@xyflow/svelte": "^1.7.1",
     "bits-ui": "^2.21.0",
+    "exceljs": "4.4.0",
     "firebase": "^13.2.0",
     "open-props": "^1.7.23",
     "pdfmake": "^0.3.12",

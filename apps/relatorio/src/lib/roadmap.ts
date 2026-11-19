@@ -24,6 +24,7 @@ export const roadmap: EtapaRoadmap[] = [
       { titulo: 'Conta e link interativo', texto: 'Entrar com e-mail e senha, guardar na nuvem e enviar relatório por link com marcas e comentários.', situacao: 'pronto' },
       { titulo: 'Checklist diário, visão do mês e 1:1', texto: 'Relatório preenchido todo dia, visão mensal e uma página por pessoa para a conversa 1:1.', situacao: 'pronto' },
       { titulo: 'Paleta de comandos', texto: 'Ctrl+K abre qualquer tela, lista, fluxo ou card.', situacao: 'pronto' },
+      { titulo: 'Planilhas', texto: 'Organizar material solto (prompt e links) em planilha com orçamento, ocupação e .xlsx, usando uma IA gratuita.', situacao: 'pronto' },
       { titulo: 'Escrever com IA local', texto: 'Rascunho de texto gerado no seu navegador, sem pagar nem enviar dados. Exige Chrome ou Edge com WebGPU.', situacao: 'andando' },
     ],
   },
