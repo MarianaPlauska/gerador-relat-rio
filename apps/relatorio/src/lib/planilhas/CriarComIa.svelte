@@ -8,6 +8,7 @@
   let ordem = $state('');
   let orcamento = $state('');
   let moeda = $state(true);
+  let comAlternativas = $state(false);
   let resposta = $state('');
   let erros = $state<string[]>([]);
   let copiado = $state(false);
@@ -16,14 +17,14 @@
 
   async function copiarPedido()
   {
-    await copiar(pedidoDePlanilha({ material, ordem, orcamento: valorOrcamento, moeda }));
+    await copiar(pedidoDePlanilha({ material, ordem, orcamento: valorOrcamento, moeda, comAlternativas }));
     copiado = true;
     setTimeout(() => (copiado = false), 2500);
   }
 
   function importar()
   {
-    const r = validarPlanilha(resposta, material);
+    const r = validarPlanilha(resposta, material, comAlternativas);
     erros = r.erros;
     if (!r.planilha) return;
     // o orçamento digitado aqui vale mesmo que a IA não o tenha devolvido
@@ -53,6 +54,7 @@
         <label>Ordem que eu quero <input bind:value={ordem} placeholder="ex.: cozinha, sala, quarto; do mais caro ao mais barato" /></label>
         <label>Orçamento (opcional) <input bind:value={orcamento} inputmode="decimal" placeholder="ex.: 25.000" /></label>
         <label class="marca"><input type="checkbox" bind:checked={moeda} /> valores em reais</label>
+        <label class="marca"><input type="checkbox" bind:checked={comAlternativas} /> gerar a aba Alternativas (comparar lojas e opções)</label>
       </div>
     </li>
     <li>

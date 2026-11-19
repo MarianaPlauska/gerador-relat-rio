@@ -97,7 +97,7 @@ function lerAlternativa(b: unknown, n: number, material: string, erros: string[]
 const lista = (x: unknown): string[] => (Array.isArray(x) ? x.map(texto).filter(Boolean) : []);
 
 // lê a resposta da IA colada pela usuária; o que não reconhece vira erro e fica de fora
-export function validarPlanilha(textoColado: string, material = ''): ResultadoPlanilha
+export function validarPlanilha(textoColado: string, material = '', comAlternativas = false): ResultadoPlanilha
 {
   const erros: string[] = [];
   const avisos: string[] = [];
@@ -116,7 +116,9 @@ export function validarPlanilha(textoColado: string, material = ''): ResultadoPl
 
   const linhas = o.linhas.map((b, i) => lerLinha(b, i + 1, material, erros, avisos)).filter((l): l is LinhaPlanilha => l !== undefined);
   if (!linhas.length) return { erros: [...erros, 'Nenhuma linha válida na resposta.'], avisos };
-  const alternativas = (Array.isArray(o.alternativas) ? o.alternativas : []).map((b, i) => lerAlternativa(b, i + 1, material, erros, avisos)).filter((a): a is Alternativa => a !== undefined);
+  const brutas = Array.isArray(o.alternativas) ? o.alternativas : [];
+  if (!comAlternativas && brutas.length) avisos.push(`A resposta trouxe ${brutas.length} alternativas, mas a aba Alternativas não foi pedida (descartadas). Ative-a nas Notas da planilha se quiser.`);
+  const alternativas = (comAlternativas ? brutas : []).map((b, i) => lerAlternativa(b, i + 1, material, erros, avisos)).filter((a): a is Alternativa => a !== undefined);
 
   // ordem dos grupos: a lista "grupos" da IA, depois os que só aparecem nas linhas, pela primeira aparição
   const grupos = [...new Set([...lista(o.grupos), ...linhas.map((l) => l.grupo)])];
@@ -131,6 +133,7 @@ export function validarPlanilha(textoColado: string, material = ''): ResultadoPl
       criadoEm: agora,
       atualizadoEm: agora,
       moeda: o.moeda !== false,
+      comAlternativas,
       orcamento: orcamento && orcamento > 0 ? orcamento : undefined,
       grupos,
       linhas,

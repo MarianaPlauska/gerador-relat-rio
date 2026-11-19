@@ -15,7 +15,7 @@ export async function gerarXlsx(p: Planilha): Promise<Blob>
   // o Resumo soma a aba Itens: as linhas dela começam na 2 e vão uma por linha da planilha
   abaResumo(wb, p, { primeira: 2, ultima: Math.max(p.linhas.length + 1, 2) });
   abaItens(wb, p);
-  abaAlternativas(wb, p);
+  if (p.comAlternativas) abaAlternativas(wb, p);
   const buffer = await wb.xlsx.writeBuffer();
   return new Blob([buffer], { type: tipoXlsx });
 }

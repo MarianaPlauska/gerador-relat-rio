@@ -52,6 +52,8 @@ export interface Planilha
   atualizadoEm: string;
   // valores em reais; sem moeda os números são só quantidades ou pontos
   moeda: boolean;
+  // a aba Alternativas só existe quando a usuária pede
+  comAlternativas: boolean;
   orcamento?: number | undefined;
   // ordem dos grupos
   grupos: string[];

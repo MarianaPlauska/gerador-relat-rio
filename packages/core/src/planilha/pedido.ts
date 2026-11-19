@@ -6,6 +6,8 @@ export interface EntradaPedidoPlanilha
   ordem: string;
   orcamento?: number | undefined;
   moeda: boolean;
+  // sem isso o pedido nem fala de alternativas
+  comAlternativas?: boolean | undefined;
 }
 
 const exemplo = {
@@ -25,6 +27,8 @@ const exemplo = {
 // texto para colar numa IA gratuita com busca; ela devolve o JSON que o OrbisOS valida
 export function pedidoDePlanilha(e: EntradaPedidoPlanilha): string
 {
+  const alternativas = e.comAlternativas === true;
+  const { alternativas: _alt, ...semAlternativas } = exemplo;
   return [
     'Você organiza material de pesquisa em uma planilha. Responda SOMENTE com um JSON válido, sem texto antes nem depois e, se possível, sem cercas de código.',
     '',
@@ -35,7 +39,9 @@ export function pedidoDePlanilha(e: EntradaPedidoPlanilha): string
     '- orcamento: número (opcional).',
     '- grupos: lista com a ordem dos grupos (setores, categorias, etapas).',
     '- linhas: cada item, com grupo, item, detalhe (produto ou descrição escolhida), qtd (número, padrão 1), loja (fonte), min, ref, max (valor unitário: menor, de referência e maior), situacao ("verificado" ou "estimativa"), prioridade ("essencial", "importante" ou "desejavel"), incluir (true ou false), link e observacao.',
-    '- alternativas: outras opções comparadas, com item, opcao, loja, valor, data (AAAA-MM-DD), link e observacao.',
+    alternativas
+      ? '- alternativas: outras opções comparadas, com item, opcao, loja, valor, data (AAAA-MM-DD), link e observacao.'
+      : '- NÃO inclua a chave "alternativas": a aba de alternativas não foi pedida.',
     '- notas: comoLer, premissas e atencao, cada uma uma lista de frases.',
     '',
     '## Regras',
@@ -49,7 +55,7 @@ export function pedidoDePlanilha(e: EntradaPedidoPlanilha): string
     '',
     '## Exemplo do formato',
     '',
-    JSON.stringify(exemplo, null, 2),
+    JSON.stringify(alternativas ? exemplo : semAlternativas, null, 2),
     '',
     '## Ordem que eu quero',
     '',

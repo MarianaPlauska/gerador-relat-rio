@@ -20,6 +20,7 @@
   <h2>Notas da planilha</h2>
   <p class="dica">Uma frase por linha. Vão para o Resumo do .xlsx.</p>
   <label class="campo">Nome <input bind:value={planilha.nome} /></label>
+  <label class="marca"><input type="checkbox" bind:checked={planilha.comAlternativas} /> Mostrar e exportar a aba Alternativas (comparar lojas e opções)</label>
   <label class="campo">Objetivo <input bind:value={planilha.objetivo} placeholder="Para que serve esta planilha" /></label>
   {#each campos as [chave, nome, dica] (chave)}
     <label class="campo">{nome}
@@ -29,6 +30,13 @@
 </section>
 
 <style>
+  .marca
+  {
+    display: flex;
+    align-items: center;
+    gap: var(--size-2);
+    margin-top: var(--size-3);
+  }
   .campo
   {
     display: grid;

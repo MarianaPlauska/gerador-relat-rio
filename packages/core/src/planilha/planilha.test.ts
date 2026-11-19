@@ -17,7 +17,7 @@ const resposta = {
   alternativas: [{ item: 'geladeira', opcao: 'Modelo maior', valor: 2600, data: '17/11/2026' }],
   notas: { atencao: ['Confirmar tensão'] },
 };
-const lida = () => validarPlanilha(JSON.stringify(resposta), material).planilha!;
+const lida = () => validarPlanilha(JSON.stringify(resposta), material, true).planilha!;
 
 describe('ler valores', () =>
 {
@@ -36,7 +36,7 @@ describe('validar a resposta da IA', () =>
 {
   it('aceita cercas de código e mantém a ordem dos grupos e das linhas', () =>
   {
-    const r = validarPlanilha('```json\n' + JSON.stringify(resposta) + '\n```', material);
+    const r = validarPlanilha('```json\n' + JSON.stringify(resposta) + '\n```', material, true);
     expect(r.erros).toEqual([]);
     expect(r.planilha!.grupos).toEqual(['Sala', 'Cozinha']);
     expect(r.planilha!.linhas.map((l) => l.item)).toEqual(['geladeira', 'sofá', 'tapete', 'fogão']);
@@ -50,6 +50,14 @@ describe('validar a resposta da IA', () =>
     expect(geladeira).toMatchObject({ situacao: 'verificado', prioridade: 'essencial', incluir: true });
     expect(sofa).toMatchObject({ situacao: 'estimativa', prioridade: 'desejavel', ref: 1500.5, qtd: 2 });
     expect(tapete!.incluir).toBe(false);
+  });
+
+  it('descarta as alternativas quando a aba não foi pedida', () =>
+  {
+    const r = validarPlanilha(JSON.stringify(resposta), material);
+    expect(r.planilha!.comAlternativas).toBe(false);
+    expect(r.planilha!.alternativas).toEqual([]);
+    expect(r.avisos.join(' ')).toContain('Alternativas não foi pedida');
   });
 
   it('JSON inválido e resposta sem linhas viram erro', () =>
@@ -121,6 +129,11 @@ describe('pedido e migração', () =>
     expect(t).toContain('12.000');
     expect(t).toContain('minha lista https://x.com');
     expect(t.indexOf('Ordem que eu quero')).toBeLessThan(t.indexOf('Meu material'));
+    expect(t).toContain('NÃO inclua a chave "alternativas"');
+    expect(t).not.toContain('Modelo 377 L');
+    const com = pedidoDePlanilha({ material: 'x', ordem: '', moeda: true, comAlternativas: true });
+    expect(com).toContain('outras opções comparadas');
+    expect(com).toContain('Modelo 377 L');
   });
 
   it('migrar completa os campos que faltam', () =>
@@ -128,6 +141,8 @@ describe('pedido e migração', () =>
     const p = migrarPlanilha({ nome: 'x', linhas: [] });
     expect(p.notas).toEqual({ comoLer: [], premissas: [], atencao: [] });
     expect(p.moeda).toBe(true);
+    expect(p.comAlternativas).toBe(false);
+    expect(migrarPlanilha({ alternativas: [{ id: '1', item: 'a', opcao: 'b', loja: '', observacao: '' }] }).comAlternativas).toBe(true);
     expect(p.id).toBeTruthy();
   });
 });

@@ -17,8 +17,11 @@
   const abertoId = $derived(page.url.searchParams.get('id'));
   const indice = $derived(dados.planilhas.findIndex((p) => p.id === abertoId));
   type Aba = 'resumo' | 'itens' | 'alternativas' | 'notas';
-  const abas: [Aba, string][] = [['resumo', 'Resumo e orçamento'], ['itens', 'Itens'], ['alternativas', 'Alternativas'], ['notas', 'Notas']];
   let aba = $state<Aba>('resumo');
+  const todasAbas: [Aba, string][] = [['resumo', 'Resumo e orçamento'], ['itens', 'Itens'], ['alternativas', 'Alternativas'], ['notas', 'Notas']];
+  // Alternativas só aparece quando a planilha pediu
+  const abas = $derived(todasAbas.filter(([id]) => id !== 'alternativas' || dados.planilhas[indice]?.comAlternativas));
+  const abaAtual = $derived(abas.some(([id]) => id === aba) ? aba : 'resumo');
   let avisos = $state<string[]>([]);
   let baixando = $state(false);
   let erroBaixar = $state('');
@@ -80,14 +83,14 @@
 
     <nav class="abas-planilha" aria-label="Partes da planilha">
       {#each abas as [id, nome] (id)}
-        <button class:ativa={aba === id} onclick={() => (aba = id)}>{nome}</button>
+        <button class:ativa={abaAtual === id} onclick={() => (aba = id)}>{nome}</button>
       {/each}
     </nav>
 
     <div class="conteudo-aba">
-      {#if aba === 'resumo'}<ResumoOrcamento bind:planilha={dados.planilhas[indice]!} />
-      {:else if aba === 'itens'}<TabelaItens bind:planilha={dados.planilhas[indice]!} />
-      {:else if aba === 'alternativas'}<AbaAlternativas bind:planilha={dados.planilhas[indice]!} />
+      {#if abaAtual === 'resumo'}<ResumoOrcamento bind:planilha={dados.planilhas[indice]!} />
+      {:else if abaAtual === 'itens'}<TabelaItens bind:planilha={dados.planilhas[indice]!} />
+      {:else if abaAtual === 'alternativas'}<AbaAlternativas bind:planilha={dados.planilhas[indice]!} />
       {:else}<AbaNotas bind:planilha={dados.planilhas[indice]!} />{/if}
     </div>
   {:else}

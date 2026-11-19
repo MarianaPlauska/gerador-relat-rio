@@ -4,7 +4,7 @@ import type { LinhaPlanilha, Planilha } from './tipos';
 export function novaPlanilha(nome: string, moeda = true): Planilha
 {
   const agora = agoraLocal();
-  return { id: idCurto(), nome: nome.trim() || 'Planilha sem nome', objetivo: '', criadoEm: agora, atualizadoEm: agora, moeda, grupos: [], linhas: [], alternativas: [], notas: { comoLer: [], premissas: [], atencao: [] } };
+  return { id: idCurto(), nome: nome.trim() || 'Planilha sem nome', objetivo: '', criadoEm: agora, atualizadoEm: agora, moeda, comAlternativas: false, grupos: [], linhas: [], alternativas: [], notas: { comoLer: [], premissas: [], atencao: [] } };
 }
 
 export function novaLinha(grupo: string): LinhaPlanilha
@@ -20,6 +20,7 @@ export function migrarPlanilha(p: Partial<Planilha>): Planilha
     ...base,
     ...p,
     id: p.id ?? base.id,
+    comAlternativas: p.comAlternativas ?? (p.alternativas?.length ?? 0) > 0,
     grupos: p.grupos ?? [],
     linhas: p.linhas ?? [],
     alternativas: p.alternativas ?? [],
