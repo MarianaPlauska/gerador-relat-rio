@@ -13,7 +13,7 @@ export function abaAlternativas(wb: Workbook, p: Planilha): void
   {
     const r = 5 + i;
     ws.getRow(r).values = [a.item, a.opcao, a.loja, a.valor, a.data ? dataBr(a.data) : '', undefined, a.observacao];
-    ws.getCell(`D${r}`).numFmt = formatoValor(p.moeda);
+    ws.getCell(`D${r}`).numFmt = formatoValor(p.moeda, p.unidade);
     ws.getCell(`E${r}`).alignment = { horizontal: 'center' };
     celulaDeLink(ws.getCell(`F${r}`), a.link);
     for (const col of ['B', 'G']) ws.getCell(`${col}${r}`).alignment = { wrapText: true, vertical: 'top' };

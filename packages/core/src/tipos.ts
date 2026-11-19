@@ -88,6 +88,10 @@ export interface EtapaCard
   tempoRodandoHoras?: number | undefined;
   horasEstimadas?: number | undefined;
   desde?: string | undefined;
+  // etapa feita: "feita · 10 d" e "09/11/26 → 19/11/26"
+  duracaoDias?: number | undefined;
+  inicio?: string | undefined;
+  fim?: string | undefined;
   origemEtapa?: 'print' | 'automatica' | 'manual' | undefined;
 }
 
@@ -179,6 +183,8 @@ export interface CapturaLida
   comentario?: string | undefined;
   // texto do print que não virou card nem total, e o que já tinha sido visto antes
   naoReconhecido?: string[] | undefined;
+  // % das linhas com conteúdo que viraram card, total ou foram descartadas por regra
+  coberturaPct?: number | undefined;
   repetidos?: { codigo: string; mudou: string[] }[] | undefined;
   novos?: string[] | undefined;
   porPessoa?: { pessoa: string; tarefas: string[] }[] | undefined;

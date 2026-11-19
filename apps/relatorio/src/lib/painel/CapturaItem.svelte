@@ -153,8 +153,11 @@
         <p class="dica"><b>Sugestões:</b> {cap.sugestoes.join(' ')}
           <button class="link" onclick={() => (cap.comentario = [cap.comentario, ...cap.sugestoes].filter(Boolean).join(' '))}>usar no comentário</button></p>
       {/if}
+      {#if cap.coberturaPct !== undefined && cap.coberturaPct < 70}
+        <p class="aviso">O leitor entendeu só {cap.coberturaPct}% das linhas deste texto. Confira as linhas sem card abaixo: o formato do painel pode ter mudado.</p>
+      {/if}
       <details>
-        <summary>Texto lido e complemento {cap.naoReconhecido?.length ? `(${cap.naoReconhecido.length} linhas sem card)` : ''}</summary>
+        <summary>Texto lido e complemento {cap.coberturaPct !== undefined ? `· leitura ${cap.coberturaPct}%` : ''} {cap.naoReconhecido?.length ? `(${cap.naoReconhecido.length} linhas sem card)` : ''}</summary>
         {#if cap.naoReconhecido?.length}
           <p class="dica">Trechos do print que não viraram card nem número. Podem ser o complemento de algo já visto:</p>
           <ul class="complemento">

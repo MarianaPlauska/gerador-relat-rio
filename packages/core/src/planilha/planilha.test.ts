@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { planilhaDeHoras } from './horas';
 import { aplicarCortes, foraDoTotal, lerValor, migrarPlanilha, ocupacao, pedidoDePlanilha, sugestaoDeCortes, totaisPorGrupo, totalGeral, validarPlanilha } from './index';
 
 const material = 'Quero geladeira https://loja.exemplo/geladeira e sofa https://loja.exemplo/sofa/';
@@ -115,6 +116,29 @@ describe('totais e orçamento', () =>
     expect(apertado).toMatchObject({ novoTotal: 2400, cabe: false });
     aplicarCortes(p, s.cortes.map((l) => l.id));
     expect(p.linhas.find((l) => l.item === 'sofá')!.incluir).toBe(false);
+    expect(sugestaoDeCortes(p).cabe).toBe(true);
+  });
+});
+
+describe('orçamento de horas', () =>
+{
+  it('cada pessoa vira um grupo com a capacidade como orçamento', () =>
+  {
+    const pessoas = [{ id: 'ana', nome: 'Ana', capacidadeHorasSemana: 40 }, { id: 'bia', nome: 'Bia', capacidadeHorasSemana: 20 }];
+    const cards = [
+      { codigo: 'DEV-1', titulo: 'a', responsaveis: ['ana'], origens: ['demandas'], horasEstimadas: 30, origemHoras: 'manual', prioridadeCard: 'Alta' },
+      { codigo: 'DEV-2', titulo: 'b', responsaveis: ['ana'], origens: ['demandas'], horasEstimadas: 16, prioridadeCard: 'Baixa' },
+      { codigo: 'DEV-3', titulo: 'c', responsaveis: ['bia'], origens: ['demandas'], horasEstimadas: 8, statusCard: 'Resolvido' },
+      { codigo: 'DEV-4', titulo: 'd', responsaveis: ['bia'], origens: ['demandas'], horasEstimadas: 12 },
+    ] as unknown as Parameters<typeof planilhaDeHoras>[0];
+    const p = planilhaDeHoras(cards, pessoas, 'Semana');
+    expect(p.grupos).toEqual(['Ana', 'Bia']);
+    expect(p.linhas.map((l) => l.item)).toEqual(['DEV-1', 'DEV-2', 'DEV-4']);
+    expect(p.linhas[0]).toMatchObject({ situacao: 'verificado', prioridade: 'essencial' });
+    expect(p.orcamento).toBe(60);
+    const o = ocupacao(p)!;
+    expect(o.porGrupo[0]).toMatchObject({ grupo: 'Ana', ref: 46, orcamentoDoGrupo: 40, pctDoGrupo: 115, estoura: true });
+    expect(o.porGrupo[1]).toMatchObject({ grupo: 'Bia', pctDoGrupo: 60, estoura: false });
     expect(sugestaoDeCortes(p).cabe).toBe(true);
   });
 });

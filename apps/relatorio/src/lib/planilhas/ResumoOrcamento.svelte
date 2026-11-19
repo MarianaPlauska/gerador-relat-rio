@@ -8,7 +8,8 @@
   const total = $derived(totalGeral(planilha));
   const uso = $derived(ocupacao(planilha));
   const cortes = $derived(sugestaoDeCortes(planilha));
-  const fmt = (n: number | undefined) => moeda(n, planilha.moeda);
+  const fmt = (n: number | undefined) => `${moeda(n, planilha.moeda)}${planilha.unidade && n !== undefined ? ` ${planilha.unidade}` : ''}`;
+  const doGrupo = (grupo: string) => uso?.porGrupo.find((g) => g.grupo === grupo);
   const cenarios = $derived(uso ? ([['Mínimo', uso.min], ['Referência', uso.ref], ['Máximo', uso.max]] as const) : []);
   const pctDoGrupo = (grupo: string) => uso?.porGrupo.find((g) => g.grupo === grupo)?.pctDoOrcamento;
 
@@ -34,7 +35,10 @@
           <td class="num">{fmt(g.ref)}</td>
           <td class="num">{fmt(g.max)}</td>
           <td class="num" class:aviso-cel={g.pctEstimado >= 50}>{g.pctEstimado}%</td>
-          {#if uso}<td class="num">{pctDoGrupo(g.grupo) ?? 0}%</td>{/if}
+          {#if uso}
+            {@const proprio = doGrupo(g.grupo)}
+            <td class="num" class:estoura-cel={proprio?.estoura}>{proprio?.pctDoGrupo !== undefined ? `${proprio.pctDoGrupo}% de ${fmt(proprio.orcamentoDoGrupo)}` : `${pctDoGrupo(g.grupo) ?? 0}%`}</td>
+          {/if}
         </tr>
       {/each}
       <tr class="total">
@@ -85,6 +89,11 @@
   {
     font-weight: 700;
     border-top: 2px solid var(--borda-forte);
+  }
+  .estoura-cel
+  {
+    color: var(--vermelho);
+    font-weight: 700;
   }
   .aviso-cel
   {

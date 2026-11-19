@@ -55,6 +55,10 @@ export interface Planilha
   // a aba Alternativas só existe quando a usuária pede
   comAlternativas: boolean;
   orcamento?: number | undefined;
+  // orçamento de cada grupo (ex.: capacidade semanal de cada pessoa, em horas)
+  orcamentoPorGrupo?: Record<string, number> | undefined;
+  // unidade dos valores quando não é dinheiro (ex.: "h")
+  unidade?: string | undefined;
   // ordem dos grupos
   grupos: string[];
   linhas: LinhaPlanilha[];

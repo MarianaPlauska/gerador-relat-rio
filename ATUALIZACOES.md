@@ -191,3 +191,12 @@ Registro de diretrizes visuais, regras de negocio e funcionalidades implementada
 5. **Convites e papéis, fase 1** (`acesso.ts`, `firestore.rules`, `AcessoEquipe.svelte`): papéis dono, supervisor e leitor; convite por e-mail; espaços compartilhados; faixa de somente leitura. Não foi testado contra o Firebase real (veja o README).
 6. **Refatoração do `painel/+page.svelte`** em componentes e módulos menores.
 7. **Futuro com servidor** (`docs/SERVIDOR.md` e Roadmap): coleta automática diária, avisos e relatório semanal automático, link interativo mais seguro, convites fase 2 e OCR no servidor, com desenho, segredos e ordem sugerida.
+
+## 12. Captura em 1 clique, leitura mais segura, fluxos e planilhas ligados ao painel
+
+- **Captura em 1 clique** (`lib/painel/CapturaUmClique.svelte`): um favorito do navegador ("Enviar ao OrbisOS") lê a página do painel aberta, inclusive o valor dos campos (nome da etapa, responsável), e entrega ao Diário do painel pelo mesmo caminho do Ctrl+C. Roda no navegador da supervisora, já logada; nenhuma senha passa para o OrbisOS.
+- **Cobertura da leitura** (`coberturaDaLeitura` em `leitor/complemento.ts`): cada captura mostra quanto % das linhas o leitor entendeu e avisa abaixo de 70% (o formato do painel pode ter mudado).
+- **Etapa feita com duração**: "feita · 10 d" e "09/11/26 → 19/11/26" viram `duracaoDias`, `inicio` e `fim` na etapa (`leitor/cards.ts`).
+- **Fluxos com tempo medido** (`etapas-tempo.ts`): p50 e p85 de cada etapa nas etapas feitas dos cards; o passo do fluxograma com o mesmo nome mostra o tempo e o gargalo fica em vermelho. Botão "Fluxo das etapas medidas" monta o fluxo na ordem em que as etapas costumam acontecer.
+- **Orçamento de horas** (`planilha/horas.ts`): planilha com uma pessoa por grupo, demandas abertas da última foto com as horas estimadas e a capacidade semanal como orçamento de cada pessoa.
+- Menu: Listas, Fluxos e Planilhas ficam no grupo **Ferramentas**.

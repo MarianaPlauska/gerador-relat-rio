@@ -5,7 +5,7 @@
     aprenderEstimativas, calcularMetricasAutomaticasDosCards, calcularPeriodoHistoricoPessoa, calcularRelacoesEImpactoSemana, chaveDaEtapa,
     compararComAnteriores, consolidarArvoreDeCards, correlacionarLote, definicoesPadrao, desvincularAjustado,
     detectarOrigem, ehCsvDeDemandas, enriquecerCard, fotoVazia, idCurto, lerCards, lerCsvDemandas, lerOndas, lerTotais,
-    linhasNaoReconhecidas, mesclarNaFoto, montarGanttSemana, nomesTotais, pessoasDoProjeto, removerCardAjustado, removerEtapaAjustada, removerRegraDescarte, segundaDaSemana, somarDias, sugerirDaCaptura, unirCapturas, vincularAjustado,
+    coberturaDaLeitura, linhasNaoReconhecidas, mesclarNaFoto, montarGanttSemana, nomesTotais, pessoasDoProjeto, removerCardAjustado, removerEtapaAjustada, removerRegraDescarte, segundaDaSemana, somarDias, sugerirDaCaptura, unirCapturas, vincularAjustado,
     type Ajustes, type AjusteEtapa, type Ausencia, type CapturaLida, type CardSnapshot, type EtapaCard, type Onda, type OrigemLeitura, type Pessoa, type RegistroPainel, type SaidaCapturaLote, type Snapshot, type TotaisPainel,
   } from '@supervisao/core';
   import { goto } from '$app/navigation';
@@ -15,6 +15,7 @@
   import { lerImagem, miniaturaDataUrl } from '#lib/ocr.ts';
   import ArvoreEnvio from '#lib/painel/ArvoreEnvio.svelte';
   import CapturaItem from '#lib/painel/CapturaItem.svelte';
+  import CapturaUmClique from '#lib/painel/CapturaUmClique.svelte';
   import type { AcoesCards } from '#lib/painel/acoes.ts';
   import InspetorTarefaCard from '#lib/painel/InspetorTarefaCard.svelte';
   import ModalCapturaAmpliada from '#lib/painel/ModalCapturaAmpliada.svelte';
@@ -285,6 +286,7 @@
       avisos,
       sugestoes,
       naoReconhecido: linhasNaoReconhecidas(conteudo, pastaAtual, dados.regrasDescarte),
+      coberturaPct: coberturaDaLeitura(conteudo, pastaAtual, dados.regrasDescarte).pct,
       repetidos: comp.repetidos,
       novos: comp.novos,
       porPessoa,
@@ -386,6 +388,7 @@
         avisos: a.avisos,
         sugestoes: a.sugestoes,
         naoReconhecido: a.naoReconhecido,
+        coberturaPct: a.coberturaPct,
         repetidos: a.repetidos,
         novos: a.novos,
         porPessoa: a.porPessoa,
@@ -753,6 +756,8 @@
   </div>
 
   {#if aviso}<p class="aviso">{aviso}</p>{/if}
+
+  <CapturaUmClique receber={(texto, url) => { aba = 'novo'; registrarCaptura(texto, 'Painel em 1 clique'); aviso = `Página do painel recebida (${url}). Confira a leitura e salve o registro.`; }} />
 
   {#if aba === 'novo'}
     {#if capturas.length === 0}

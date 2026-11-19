@@ -14,7 +14,7 @@ export interface PosicaoItens
 export function abaItens(wb: Workbook, p: Planilha): PosicaoItens
 {
   const ws = wb.addWorksheet('Itens', { views: [{ state: 'frozen', ySplit: 1 }] });
-  const valor = formatoValor(p.moeda);
+  const valor = formatoValor(p.moeda, p.unidade);
   cabecalho(ws, 1, COLUNAS_ITENS);
   larguras(ws, [16, 22, 40, 20, 6, 14, 14, 14, 14, 14, 14, 14, 13, 9, 12, 50]);
 

@@ -19,6 +19,19 @@ const RE_DATA = /\d{2}\/\d{2}\/\d{2,4}/;
 // linhas do texto lido que não viraram card nem total: o "restante" do print para a supervisora revisar
 export function linhasNaoReconhecidas(texto: string, prefixo: string, regrasDescarte?: string[]): string[]
 {
+  return todasNaoReconhecidas(texto, prefixo, regrasDescarte).slice(0, 15);
+}
+
+// quanto do texto o leitor entendeu: linhas com conteúdo que viraram card, total ou caíram numa regra de descarte
+export function coberturaDaLeitura(texto: string, prefixo: string, regrasDescarte?: string[]): { linhas: number; naoEntendidas: number; pct: number }
+{
+  const linhas = new Set(texto.split(/\r?\n/).map((l) => semAcento(l.replace(/\s+/g, ' ').trim())).filter((l) => l.length >= 8 && (l.match(/[a-z]/g)?.length ?? 0) >= 5)).size;
+  const naoEntendidas = todasNaoReconhecidas(texto, prefixo, regrasDescarte).length;
+  return { linhas, naoEntendidas, pct: linhas ? Math.round(((linhas - naoEntendidas) / linhas) * 100) : 100 };
+}
+
+function todasNaoReconhecidas(texto: string, prefixo: string, regrasDescarte?: string[]): string[]
+{
   const limpo = aplicarRegrasDescarte(texto, regrasDescarte);
   const re = new RegExp(`\\b${prefixo} ?-? ?[0-9A-Z]{2,4}\\b`, 'i');
   const vistas = new Set<string>();
@@ -34,7 +47,7 @@ export function linhasNaoReconhecidas(texto: string, prefixo: string, regrasDesc
     vistas.add(n);
     saida.push(linha);
   }
-  return saida.slice(0, 15);
+  return saida;
 }
 
 const campos: [keyof CardSnapshot, string][] = [

@@ -1,13 +1,20 @@
 <script lang="ts">
-  import { detectarLacunas, nomesTipoNo, organizar, paraMermaid, tamanhoDoNo, type Fluxograma, type LigacaoFluxo, type NoFluxo, type TipoNo } from '@supervisao/core';
+  import { detectarLacunas, gargaloDasEtapas, nomesTipoNo, tempoDoPasso, type TempoEtapa, organizar, paraMermaid, tamanhoDoNo, type Fluxograma, type LigacaoFluxo, type NoFluxo, type TipoNo } from '@supervisao/core';
   import { Background, Controls, MarkerType, MiniMap, Panel, SvelteFlow, useSvelteFlow, type ColorMode, type Connection, type Edge, type Node, type OnConnectEnd } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
   import { untrack } from 'svelte';
   import { baixarPng, baixarSvg } from './fluxograma.ts';
   import NoDoFluxo from './NoDoFluxo.svelte';
 
-  type Dado = { texto: string; tipo: TipoNo; detalhes?: string; ativoNoPercurso?: boolean };
-  let { fluxo, onmudar }: { fluxo: Fluxograma; onmudar: (nos: NoFluxo[], ligacoes: LigacaoFluxo[]) => void } = $props();
+  type Dado = { texto: string; tipo: TipoNo; detalhes?: string; ativoNoPercurso?: boolean; tempo?: TempoEtapa; gargalo?: boolean };
+  let { fluxo, onmudar, tempos = [] }: { fluxo: Fluxograma; onmudar: (nos: NoFluxo[], ligacoes: LigacaoFluxo[]) => void; tempos?: TempoEtapa[] } = $props();
+  // o tempo medido entra no desenho, nunca no fluxograma salvo
+  const gargalo = untrack(() => gargaloDasEtapas(tempos));
+  const medido = (texto: string, tipo: TipoNo) =>
+  {
+    const t = tipo === 'passo' ? tempoDoPasso(untrack(() => tempos), texto) : undefined;
+    return t ? { tempo: t, gargalo: t.chave === gargalo?.chave } : {};
+  };
 
   const nodeTypes = { no: NoDoFluxo };
   const seta = { type: MarkerType.ArrowClosed, width: 16, height: 16 };
@@ -18,7 +25,7 @@
     id: n.id,
     type: 'no',
     position: { x: n.x, y: n.y },
-    data: { texto: n.texto, tipo: n.tipo, ...(n.detalhes ? { detalhes: n.detalhes } : {}) }
+    data: { texto: n.texto, tipo: n.tipo, ...(n.detalhes ? { detalhes: n.detalhes } : {}), ...medido(n.texto, n.tipo) }
   });
 
   const paraAresta = (l: LigacaoFluxo, ys: Map<string, number>): Edge =>

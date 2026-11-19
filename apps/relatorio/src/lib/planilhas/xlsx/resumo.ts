@@ -27,7 +27,7 @@ function notas(ws: Worksheet, linha: number, titulo: string, frases: string[]): 
 export function abaResumo(wb: Workbook, p: Planilha, pos: PosicaoItens): void
 {
   const ws = wb.addWorksheet('Resumo');
-  const valor = formatoValor(p.moeda);
+  const valor = formatoValor(p.moeda, p.unidade);
   tituloDaAba(ws, p.nome, p.objetivo || 'Resumo por grupo. Os valores somam só os itens com Incluir? = Sim.', 7);
   larguras(ws, [30, 14, 18, 18, 18, 20, 12]);
   cabecalho(ws, 4, COLUNAS);

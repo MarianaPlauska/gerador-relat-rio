@@ -32,7 +32,8 @@ export interface Ocupacao
   min: UsoDoOrcamento;
   ref: UsoDoOrcamento;
   max: UsoDoOrcamento;
-  porGrupo: { grupo: string; ref: number; pctDoOrcamento: number }[];
+  // pctDoGrupo: quanto do orçamento do próprio grupo está usado, quando o grupo tem orçamento
+  porGrupo: { grupo: string; ref: number; pctDoOrcamento: number; orcamentoDoGrupo?: number | undefined; pctDoGrupo?: number | undefined; estoura?: boolean | undefined }[];
 }
 
 export interface SugestaoDeCortes
@@ -113,7 +114,11 @@ export function ocupacao(p: Planilha): Ocupacao | undefined
     min: uso(total.min, p.orcamento),
     ref: uso(total.ref, p.orcamento),
     max: uso(total.max, p.orcamento),
-    porGrupo: totaisPorGrupo(p).map((g) => ({ grupo: g.grupo, ref: g.ref, pctDoOrcamento: pct(g.ref, p.orcamento!) })),
+    porGrupo: totaisPorGrupo(p).map((g) =>
+    {
+      const proprio = p.orcamentoPorGrupo?.[g.grupo];
+      return { grupo: g.grupo, ref: g.ref, pctDoOrcamento: pct(g.ref, p.orcamento!), ...(proprio ? { orcamentoDoGrupo: proprio, pctDoGrupo: pct(g.ref, proprio), estoura: g.ref > proprio } : {}) };
+    }),
   };
 }
 

@@ -54,7 +54,7 @@
     },
     {
       id: 'processos',
-      nome: 'Listas, Fluxos e Planilhas',
+      nome: 'Ferramentas',
       itens: [
         { href: '/listas', nome: 'Listas', dica: 'Checklists de implantação por fase e empresa' },
         { href: '/fluxos', nome: 'Fluxos', dica: 'Editor visual de fluxogramas de processo' },

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import type { Planilha } from '@supervisao/core';
+  import { aprenderEstimativas, planilhaDeHoras, type Planilha } from '@supervisao/core';
   import { carregar, salvar, type Dados } from '#lib/armazenamento.ts';
   import AbaAlternativas from '#lib/planilhas/AbaAlternativas.svelte';
   import AbaNotas from '#lib/planilhas/AbaNotas.svelte';
@@ -35,6 +35,16 @@
     avisos = avisosDaImportacao;
     aba = 'resumo';
     goto(`/planilhas?id=${p.id}`);
+  }
+
+  // orçamento de horas: demandas abertas da foto mais recente contra a capacidade de cada pessoa
+  const ultimaFoto = $derived([...dados.fotos].sort((a, b) => a.data.localeCompare(b.data)).at(-1));
+
+  function criarOrcamentoDeHoras()
+  {
+    if (!ultimaFoto) return;
+    const p = planilhaDeHoras(ultimaFoto.cards, dados.pessoas, `Orçamento de horas - foto de ${ultimaFoto.data.split('-').reverse().join('/')}`, aprenderEstimativas(dados.fotos));
+    criada(p, p.linhas.length ? [] : ['Nenhuma demanda aberta na foto mais recente.']);
   }
 
   function excluir(p: Planilha)
@@ -97,6 +107,12 @@
     <span class="prompt">&gt; planilhas</span>
     <h1>Planilhas<span class="cursor">_</span></h1>
     <p class="dica">Cole um material solto (prompt, ideias, links) e uma IA gratuita organiza em grupos, com o link ao lado, valores, totais e orçamento. Você edita aqui e baixa o .xlsx.</p>
+    <section class="cartao horas">
+      <h2>Orçamento de horas do time</h2>
+      <p class="dica">Cada pessoa vira um grupo: as demandas abertas da última foto do painel entram com as horas estimadas e o orçamento é a capacidade semanal. Mostra quem passa da capacidade e o que tirar da semana para caber.</p>
+      <button class="principal" disabled={!ultimaFoto} onclick={criarOrcamentoDeHoras}>Criar com a última foto do painel</button>
+      {#if !ultimaFoto}<span class="dica">Registre o painel no Diário primeiro.</span>{/if}
+    </section>
     <CriarComIa {criada} />
     <ListaPlanilhas planilhas={dados.planilhas} />
   {/if}

@@ -8,6 +8,8 @@
     idCurto,
     lerFluxo,
     novoFluxograma,
+    passosDasEtapas,
+    temposPorEtapa,
     pedidoDeFluxo,
     prepararTextoLivre,
     type CardSnapshot,
@@ -131,6 +133,20 @@
     guardar(f);
   }
 
+  // quanto cada etapa costuma levar, medido nas etapas feitas dos cards lidos do painel
+  const tempos = $derived(temposPorEtapa(dados.fotos));
+
+  function gerarDasEtapas()
+  {
+    if (!tempos.length)
+    {
+      aviso = 'Ainda não há etapas feitas com duração nos cards lidos. Registre cards abertos (tela de etapas) no Diário do painel.';
+      return;
+    }
+    const r = lerFluxo(passosDasEtapas(tempos));
+    guardar({ ...novoFluxograma('Etapas dos cards (tempo medido)', 'Etapas na ordem em que costumam acontecer, com o tempo mediano (p50) e o p85 medidos no painel.'), nos: r.nos, ligacoes: r.ligacoes });
+  }
+
   function gerarDoRegistro(id: string)
   {
     const r = dados.registros.find((x) => x.id === id);
@@ -184,7 +200,7 @@
     </div>
     {#key f.id}
       <SvelteFlowProvider>
-        <EditorFluxo fluxo={f} onmudar={(nos, ligacoes) => aoMudarDesenho(f.id, nos, ligacoes)} />
+        <EditorFluxo fluxo={f} {tempos} onmudar={(nos, ligacoes) => aoMudarDesenho(f.id, nos, ligacoes)} />
       </SvelteFlowProvider>
     {/key}
   {:else}
@@ -240,6 +256,7 @@
             <button class="principal grande" onclick={montarTexto}>Montar fluxo a partir do texto</button>
             <button onclick={copiarPedido}>{pedidoCopiado ? 'Pedido copiado!' : 'Copiar pedido para IA'}</button>
             <button class="neutro" onclick={() => guardar(novoFluxograma(nome || 'Fluxo em branco'))}>Fluxo em branco</button>
+            <button class="neutro" onclick={gerarDasEtapas} title="Monta o fluxo com as etapas dos cards e mostra o tempo medido em cada uma">Fluxo das etapas medidas ({tempos.length})</button>
           </div>
         </div>
 

@@ -32,3 +32,4 @@ export * from './interativo';
 export * from './vivo';
 export * from './acesso';
 export * from './planilha';
+export * from './etapas-tempo';

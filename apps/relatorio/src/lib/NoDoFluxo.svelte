@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { tamanhoDoNo, type TipoNo } from '@supervisao/core';
+  import { tamanhoDoNo, type TempoEtapa, type TipoNo } from '@supervisao/core';
   import { Handle, Position, useSvelteFlow, type NodeProps } from '@xyflow/svelte';
   import { tick } from 'svelte';
 
-  let { id, data, selected }: NodeProps & { data: { texto: string; tipo: TipoNo; detalhes?: string; ativoNoPercurso?: boolean } } = $props();
+  let { id, data, selected }: NodeProps & { data: { texto: string; tipo: TipoNo; detalhes?: string; ativoNoPercurso?: boolean; tempo?: TempoEtapa; gargalo?: boolean } } = $props();
+  const dias = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
   const { updateNodeData } = useSvelteFlow();
   const t = $derived(tamanhoDoNo(data.tipo));
   let editando = $state(false);
@@ -29,6 +30,7 @@
   class="no {data.tipo}"
   class:selecionado={selected}
   class:percorrendo={data.ativoNoPercurso}
+  class:gargalo={data.gargalo}
   style:width="{t.largura}px"
   style:height="{t.altura}px"
   ondblclick={editar}
@@ -55,6 +57,9 @@
     ></textarea>
   {:else}
     <span class="texto">{data.texto}</span>
+    {#if data.tempo}
+      <span class="tempo" title="Medido em {data.tempo.n} etapas feitas nos cards do painel: metade levou até {dias(data.tempo.p50)} d e 85% até {dias(data.tempo.p85)} d.{data.tempo.rodandoAgora ? ` ${data.tempo.rodandoAgora} rodando agora.` : ''}{data.gargalo ? ' É a etapa mais demorada (gargalo).' : ''}">p50 {dias(data.tempo.p50)} d · p85 {dias(data.tempo.p85)} d{data.tempo.rodandoAgora ? ` · ${data.tempo.rodandoAgora} agora` : ''}</span>
+    {/if}
     {#if data.detalhes}
       <span class="tem-detalhes" title="Contém anotações / detalhes">✦</span>
     {/if}
@@ -95,6 +100,31 @@
     -webkit-box-orient: vertical;
     overflow-wrap: anywhere;
     font-weight: 500;
+  }
+  .tempo
+  {
+    position: absolute;
+    left: 50%;
+    bottom: -11px;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-family: var(--fonte-maquina);
+    font-size: 0.66rem;
+    padding: 1px 7px;
+    border: 1px solid var(--borda-forte);
+    background: var(--superficie-2);
+    color: var(--suave);
+    border-radius: 3px;
+  }
+  .gargalo
+  {
+    border-color: var(--vermelho);
+    box-shadow: 0 0 0 3px var(--vermelho-fundo);
+  }
+  .gargalo .tempo
+  {
+    border-color: var(--vermelho);
+    color: var(--vermelho);
   }
   .tem-detalhes
   {

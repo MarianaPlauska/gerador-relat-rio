@@ -283,15 +283,50 @@ function desdeDe(texto: string): string | undefined
   return data ? (m?.[2] ? `${data}T${m[2]}` : data) : undefined;
 }
 
+// etapa feita: "feita · 10 d" -> 10 (dias); h e min viram fração de dia útil de 8 h
+export function duracaoDaEtapaFeita(texto: string): number | undefined
+{
+  const m = texto.match(/\b(?:feita|conclu[ií]da)\s*[·•.:-]?\s*([\d,.]+)\s*(d|h|min)\b/i);
+  if (!m) return undefined;
+  const v = numeroBr(m[1]!);
+  if (!Number.isFinite(v)) return undefined;
+  const u = m[2]!.toLowerCase();
+  return Math.round((u === 'min' ? v / 480 : u === 'h' ? v / 8 : v) * 10) / 10;
+}
+
+// "09/11/26 → 19/11/26" -> início e fim da etapa
+export function periodoDaEtapa(texto: string): { inicio: string; fim: string } | undefined
+{
+  const m = texto.match(/(\d{2}\/\d{2}\/\d{2,4})\s*(?:→|->|>|até|a)\s*(\d{2}\/\d{2}\/\d{2,4})/);
+  if (!m) return undefined;
+  const inicio = lerDatas(m[1]!).datas[0];
+  const fim = lerDatas(m[2]!).datas[0];
+  return inicio && fim ? { inicio, fim } : undefined;
+}
+
+// completa a etapa feita com duração e período, quando o texto traz
+function completarFeita(etapa: EtapaCard, texto: string): void
+{
+  const duracao = duracaoDaEtapaFeita(texto);
+  if (duracao !== undefined) etapa.duracaoDias = duracao;
+  const periodo = periodoDaEtapa(texto);
+  if (periodo)
+  {
+    etapa.inicio = periodo.inicio;
+    etapa.fim = periodo.fim;
+  }
+}
+
 // extrai etapas no formato moderno do painel ("1 Validação dos requisitos Rodrigo Cinelli • rodando há 15,8 h desde 16/11/2026 16:25")
 function lerEtapasModernas(texto: string, pessoas: Pessoa[]): EtapaCard[]
 {
   const inicioEtapas = texto.search(/\bEtapas\b|\d+\s+de\s+\d+\s+conclu[ií]das|#\s+ETAPA/i);
   const escopo = inicioEtapas >= 0 ? texto.slice(inicioEtapas) : texto;
+  // "+ o que vai fazer" e "+ pessoa" são botões: saem do começo da linha, mas o resto dela (responsável, tempo) fica
   const linhas = escopo
     .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l && !/^(Etapas\b|#\s*ETAPA|\+\s*o que vai fazer|\+\s*pessoa|Concluir card$)/i.test(l));
+    .map((l) => l.trim().replace(/^(?:\+\s*o que vai fazer|\+\s*pessoa)\s*/i, '').trim())
+    .filter((l) => l && !/^(Etapas\b|#\s*ETAPA|Concluir card$|\d+\s+de\s+\d+\s+conclu)/i.test(l));
 
   // agrupa pelos índices numéricos de etapa (1, 2, 3...)
   const blocos: { ordem: number; texto: string }[] = [];
@@ -323,20 +358,21 @@ function lerEtapasModernas(texto: string, pessoas: Pessoa[]): EtapaCard[]
       if (mNome) nomePessoaTexto = mNome[1];
     }
 
-    let nomeEtapa = bruto;
+    // sem responsável reconhecido, o nome vai até o primeiro sinal de tempo ou de data
+    let nomeEtapa = bruto.split(/\s(?:feita|conclu[ií]da|rodando h|n[aã]o iniciada|desde|\d{2}\/\d{2}\/\d{2})/i)[0]!.trim();
     if (nomePessoaTexto)
     {
       const idx = semAcento(bruto).toLowerCase().indexOf(semAcento(nomePessoaTexto).toLowerCase());
-      if (idx > 0) nomeEtapa = bruto.slice(0, idx).trim();
+      if (idx > 0 && idx < bruto.length) nomeEtapa = bruto.slice(0, Math.min(idx, bruto.length)).trim().split(/\s(?:feita|conclu[ií]da|rodando h|n[aã]o iniciada|desde|\d{2}\/\d{2}\/\d{2})/i)[0]!.trim();
     }
-    nomeEtapa = nomeEtapa.replace(/\s+[v•·-]\s*$/i, '').replace(/\s*(?:rodando h[aá].*|n[aã]o iniciada.*)$/i, '').trim();
+    nomeEtapa = nomeEtapa.replace(/\s+[v•·-]\s*$/i, '').replace(/\s*(?:rodando h[aá].*|n[aã]o iniciada.*|feita\s*[·•].*)$/i, '').trim();
     if (!nomeEtapa) continue;
 
     const sit = situacaoEtapa(bruto) ?? 'outra';
     const tempoRodandoHoras = tempoRodandoEmHoras(bruto);
     const desde = desdeDe(bruto);
 
-    resultado.push({
+    const etapa: EtapaCard = {
       ordem: b.ordem,
       nome: nomeEtapa,
       pessoa: pessoaCad?.id ?? nomePessoaTexto,
@@ -344,7 +380,9 @@ function lerEtapasModernas(texto: string, pessoas: Pessoa[]): EtapaCard[]
       origemEtapa: 'print',
       ...(tempoRodandoHoras !== undefined ? { tempoRodandoHoras } : {}),
       ...(desde ? { desde } : {}),
-    });
+    };
+    if (sit === 'concluida') completarFeita(etapa, bruto);
+    resultado.push(etapa);
   }
   return resultado;
 }
@@ -438,7 +476,9 @@ function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
     if (celulas.length >= 3 && /^\d+$/.test(celulas[0]!))
     {
       const pessoa = opcoes.pessoas.find((p) => semAcento(celulas[2]!).includes(semAcento(p.nome)));
-      etapas.push({ ordem: etapas.length + 1, nome: celulas[1]!, pessoa: pessoa?.id, situacao: situacaoEtapa(celulas.slice(2).join(' ')) ?? 'outra' });
+      const etapa: EtapaCard = { ordem: etapas.length + 1, nome: celulas[1]!, pessoa: pessoa?.id, situacao: situacaoEtapa(celulas.slice(2).join(' ')) ?? 'outra' };
+      if (etapa.situacao === 'concluida') completarFeita(etapa, celulas.slice(2).join(' '));
+      etapas.push(etapa);
       continue;
     }
     const m = linha.match(/^\s*(.+?)\s+(?:[—–-]+\s*ningu[eé]m\s*[—–-]+|(\p{Lu}\p{Ll}+(?: \p{Lu}\p{Ll}+)+))\s+v\b/u);
@@ -463,6 +503,17 @@ function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
     const desde = desdeDe(`${resto} ${depois}`);
     if (horas !== undefined) etapa.tempoRodandoHoras = horas;
     if (desde) etapa.desde = desde;
+    if (etapa.situacao === 'concluida')
+    {
+      const duracao = duracaoDaEtapaFeita(`${antes} ${resto}`);
+      if (duracao !== undefined) etapa.duracaoDias = duracao;
+      const periodo = periodoDaEtapa(`${resto} ${depois}`);
+      if (periodo)
+      {
+        etapa.inicio = periodo.inicio;
+        etapa.fim = periodo.fim;
+      }
+    }
   }
 
   if (etapas.length === 0)

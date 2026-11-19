@@ -14,7 +14,7 @@ export const cor = {
 
 export const formatoMoeda = '"R$" #,##0.00';
 export const formatoNumero = '#,##0.##';
-export const formatoValor = (moeda: boolean) => (moeda ? formatoMoeda : formatoNumero);
+export const formatoValor = (moeda: boolean, unidade?: string) => (moeda ? formatoMoeda : unidade ? `#,##0.0 "${unidade}"` : formatoNumero);
 
 export function preencher(cell: Cell, argb: string): void
 {
