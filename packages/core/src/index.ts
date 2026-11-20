@@ -33,3 +33,5 @@ export * from './vivo';
 export * from './acesso';
 export * from './planilha';
 export * from './etapas-tempo';
+export * from './ata';
+export * from './priorizacao';

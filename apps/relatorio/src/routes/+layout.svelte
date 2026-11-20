@@ -50,6 +50,7 @@
         { href: '/semana', nome: 'Semana', dica: 'Plano semanal, entregas, alertas e compromissos' },
         { href: '/mes', nome: 'Mês', dica: 'Visão consolidada do período e evolução' },
         { href: '/vivos', nome: 'Checklist diário', dica: 'Tarefas do período para marcar e registrar o dia' },
+        { href: '/atas', nome: 'Atas e Combinados', dica: 'Atas de diretoria, resumos executivos e radar de prazos' },
       ],
     },
     {
@@ -59,6 +60,7 @@
         { href: '/listas', nome: 'Listas', dica: 'Checklists de implantação por fase e empresa' },
         { href: '/fluxos', nome: 'Fluxos', dica: 'Editor visual de fluxogramas de processo' },
         { href: '/planilhas', nome: 'Planilhas', dica: 'Organize material solto em planilha, com orçamento e .xlsx' },
+        { href: '/priorizacao', nome: 'Priorização', dica: 'Matriz Impacto × Esforço e RICE com quadrante visual' },
       ],
     },
     {
@@ -238,7 +240,9 @@
             <a href="/painel">Diário</a>
             <a href="/cards">Cards</a>
             <a href="/semana">Semana</a>
+            <a href="/atas">Atas</a>
             <a href="/fluxos">Fluxos</a>
+            <a href="/priorizacao">Priorização</a>
             <a href="/relatorio">Relatório</a>
             <a href="/modelos">Modelos</a>
             <a href="/roadmap">Roadmap</a>

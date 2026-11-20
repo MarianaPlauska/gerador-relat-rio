@@ -26,12 +26,14 @@
   {
     const dados = carregar();
     const paginas: [string, string, string?][] = [
-      ['Início', '/'], ['Diário do painel', '/painel'], ['Cards', '/cards'], ['Semana', '/semana'], ['Listas', '/listas'], ['Fluxos', '/fluxos'], ['Planilhas', '/planilhas'],
+      ['Início', '/'], ['Diário do painel', '/painel'], ['Cards', '/cards'], ['Semana', '/semana'], ['Atas e Combinados', '/atas'], ['Listas', '/listas'], ['Fluxos', '/fluxos'], ['Planilhas', '/planilhas'], ['Priorização', '/priorizacao'],
       ['Checklist diário', '/vivos'], ['Relatório (PDF)', '/relatorio'], ['Visão do mês', '/mes'], ['Modelos de relatório', '/modelos'],
       ['Retornos dos links', '/retornos'], ['Meu perfil', '/perfil'], ['Roadmap', '/roadmap'],
     ];
     const lista: Comando[] = paginas.map(([nome, rota]) => criar('Ir para', nome, ir(rota!)));
     lista.push(
+      criar('Ação', 'Nova ata de reunião', ir('/atas'), 'resumo executivo e radar de combinados'),
+      criar('Ação', 'Nova matriz de priorização', ir('/priorizacao'), 'Impacto x Esforço e RICE'),
       criar('Ação', 'Novo checklist diário', ir('/vivos'), 'registrar todo dia'),
       criar('Ação', 'Novo fluxograma', ir('/fluxos'), 'mapear um processo'),
       criar('Ação', 'Nova lista de checagem', ir('/listas')),
@@ -42,6 +44,8 @@
       criar('Ação', 'Baixar backup', baixarBackup),
       criar('Ação', 'Sair', sair),
     );
+    for (const a of dados.atas) lista.push(criar('Ata', a.titulo, ir(`/atas?id=${a.id}`), a.data));
+    for (const m of dados.matrizes) lista.push(criar('Priorização', m.nome, ir(`/priorizacao?id=${m.id}`), `${m.itens.length} itens`));
     for (const l of dados.listas) lista.push(criar('Lista', l.nome, ir(`/listas?id=${l.id}`)));
     for (const f of dados.fluxos) lista.push(criar('Fluxo', f.nome, ir(`/fluxos?id=${f.id}`)));
     for (const p of dados.planilhas) lista.push(criar('Planilha', p.nome, ir(`/planilhas?id=${p.id}`)));
