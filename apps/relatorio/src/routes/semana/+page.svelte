@@ -4,13 +4,35 @@
     agoraLocal, alertasDoPlano, confirmarPlano, horasPlanejadas, kpisDosItens, pendenciasDaSemana, segundaDaSemana, somarDias, sugerirItens,
     type Alerta, type CardSnapshot, type ItemPlano, type PlanoPessoa, type PlanoSemana, type Ritmo, type Risco,
   } from '@supervisao/core';
-  import { carregar, salvar, type Dados } from '#lib/armazenamento.ts';
+  import { carregar, salvar, salvarAgora, type Dados, type GovernancaSemana } from '#lib/armazenamento.ts';
+  import { nuvem } from '#lib/nuvem.svelte.ts';
+  import { copiar } from '#lib/saidas.ts';
 
   let dados = $state<Dados>(carregar());
   const hoje = agoraLocal().slice(0, 10);
   let semana = $state(segundaDaSemana(hoje));
+  let copiadoExtrato = $state(false);
+  let novaEtapaPorItem = $state<Record<string, string>>({});
 
   $effect(() => salvar($state.snapshot(dados)));
+
+  function garantirGov(sem = semana): GovernancaSemana
+  {
+    dados.governancaSemanal ??= {};
+    dados.governancaSemanal[sem] ??= {};
+    return dados.governancaSemanal[sem]!;
+  }
+
+  const gov = $derived<GovernancaSemana>(dados.governancaSemanal?.[semana] ?? {});
+
+  // meta progressiva de entregas no prazo: >=75% nov, >=80% dez, >=85% jan+
+  const metaPrazoMes = $derived.by(() =>
+  {
+    const mes = Number(semana.slice(5, 7));
+    if (mes === 11) return 75;
+    if (mes === 12) return 80;
+    return 85;
+  });
 
   const sexta = $derived(somarDias(semana, 4));
   const foto = $derived(dados.fotos.filter((f) => f.data <= sexta).at(-1) ?? dados.fotos.at(-1));
@@ -26,6 +48,204 @@
   const riscosAbertos = $derived(dados.riscos.filter((r) => r.status === 'aberto' || r.sinalizadoEm >= semana));
   const promessasDaSemana = $derived(dados.promessas.filter((p) => p.semana === semana));
   const promessasAnteriores = $derived(dados.promessas.filter((p) => p.semana === somarDias(semana, -7)));
+
+  // indicadores de governança (sincronizados no Firebase via dados.governancaSemanal)
+  const prazoAtualPct = $derived(foto?.totais.dentroDoPrazoPct ?? kpis?.pctDentroDoCronograma);
+  const qualidadeAtualPct = $derived(foto?.totais.qualidadePct ?? foto?.totais.eficienciaQualidade ?? gov.qualidadeManualPct);
+
+  const semanasOrdenadasPlanos = $derived([...new Set(dados.planos.map((p) => p.inicio))].sort());
+  const numeroSemanaPlano = $derived(Math.max(1, semanasOrdenadasPlanos.indexOf(semana) + 1));
+  const exigeRevisaoSexta = $derived(numeroSemanaPlano <= 2);
+
+  const resumoSegundas = $derived.by(() =>
+  {
+    const todas = semanasOrdenadasPlanos;
+    if (!todas.length) return { feitas: 0, total: 0, pct: 0 };
+    const feitas = todas.filter((s) => dados.governancaSemanal?.[s]?.extratoSegundaApresentado).length;
+    return { feitas, total: todas.length, pct: Math.round((feitas / todas.length) * 100) };
+  });
+
+  const backlogDaSemana = (sem: string): number | undefined =>
+  {
+    const manual = dados.governancaSemanal?.[sem]?.backlogFimSemana;
+    if (manual !== undefined) return manual;
+    const f = dados.fotos.filter((x) => x.data <= somarDias(sem, 4)).at(-1);
+    return f?.totais.emAbertoAgora ?? f?.totais.demandasEmAndamento;
+  };
+
+  const statusBacklog = $derived.by(() =>
+  {
+    const b0 = backlogDaSemana(semana);
+    const b1 = backlogDaSemana(somarDias(semana, -7));
+    const b2 = backlogDaSemana(somarDias(semana, -14));
+    const cresceu2Seguidas = b0 !== undefined && b1 !== undefined && b2 !== undefined && b0 > b1 && b1 > b2;
+    return { atual: b0, anterior: b1, cresceu2Seguidas };
+  });
+
+  const resumoSaidasEntradas = $derived.by(() =>
+  {
+    const todas = [...new Set([...semanasOrdenadasPlanos, ...Object.keys(dados.governancaSemanal ?? {})])].sort();
+    let total = 0;
+    let ok = 0;
+    for (const s of todas)
+    {
+      const g = dados.governancaSemanal?.[s];
+      if (g?.entradasSemana !== undefined && g?.saidasSemana !== undefined)
+      {
+        total++;
+        if (g.saidasSemana >= g.entradasSemana) ok++;
+      }
+    }
+    return { ok, total, maioriaOk: total > 0 && ok >= Math.ceil(total / 2) };
+  });
+
+  // radar 48h: itens não concluídos vencendo em até 2 dias (48h) ou já em risco/atrasados
+  const limite48h = $derived(somarDias(hoje, 2));
+  const radar48h = $derived.by(() =>
+  {
+    if (!plano) return [];
+    const lista: { pessoaId: string; item: ItemPlano; prazo?: string; motivo: string }[] = [];
+    for (const pp of plano.pessoas)
+    {
+      for (const item of pp.itens)
+      {
+        if (item.status === 'feito') continue;
+        const card = item.cardCodigo ? porCodigo.get(item.cardCodigo) : undefined;
+        const prazo = item.ate || card?.previsao || card?.vencimento;
+        const em48h = !!prazo && prazo <= limite48h;
+        const riscoCard = card?.ritmoPainel === 'atrasado' || card?.ritmoPainel === 'em_risco';
+        if (em48h || riscoCard || item.status === 'bloqueado')
+        {
+          const motivo = item.status === 'bloqueado'
+            ? 'Item bloqueado'
+            : prazo && prazo < hoje
+              ? `Prazo vencido (${dataCurta(prazo)})`
+              : em48h
+                ? `Entrega em até 48h (${dataCurta(prazo)})`
+                : `Card ${card?.ritmoPainel === 'atrasado' ? 'atrasado' : 'em risco'} no painel`;
+          lista.push({ pessoaId: pp.pessoaId, item, prazo, motivo });
+        }
+      }
+    }
+    return lista;
+  });
+
+  // estimado x realizado da semana
+  const estimadoRealizado = $derived.by(() =>
+  {
+    if (!plano) return { est: 0, real: 0, feitosEst: 0 };
+    let est = 0;
+    let real = 0;
+    let feitosEst = 0;
+    for (const pp of plano.pessoas)
+    {
+      for (const item of pp.itens)
+      {
+        const h = item.horasEstimadas ?? 0;
+        est += h;
+        const hr = gov.horasReaisPorItem?.[item.id];
+        if (hr !== undefined) real += hr;
+        else if (item.status === 'feito') real += h;
+        if (item.status === 'feito') feitosEst += h;
+      }
+    }
+    return { est, real, feitosEst };
+  });
+
+  function atualizarGov(parcial: Partial<GovernancaSemana>)
+  {
+    const g = garantirGov();
+    Object.assign(g, parcial);
+    dados.governancaSemanal = { ...dados.governancaSemanal };
+    salvarAgora($state.snapshot(dados));
+  }
+
+  function adicionarEtapaItem(itemId: string)
+  {
+    const texto = (novaEtapaPorItem[itemId] ?? '').trim();
+    if (!texto) return;
+    const g = garantirGov();
+    g.etapasPorItem ??= {};
+    g.etapasPorItem[itemId] = [...(g.etapasPorItem[itemId] ?? []), { texto, feita: false }];
+    dados.governancaSemanal = { ...dados.governancaSemanal };
+    novaEtapaPorItem[itemId] = '';
+    salvarAgora($state.snapshot(dados));
+  }
+
+  function alternarEtapaItem(itemId: string, idx: number)
+  {
+    const g = garantirGov();
+    const lista = g.etapasPorItem?.[itemId];
+    if (!lista?.[idx]) return;
+    lista[idx]!.feita = !lista[idx]!.feita;
+    dados.governancaSemanal = { ...dados.governancaSemanal };
+    salvarAgora($state.snapshot(dados));
+  }
+
+  function removerEtapaItem(itemId: string, idx: number)
+  {
+    const g = garantirGov();
+    if (!g.etapasPorItem?.[itemId]) return;
+    g.etapasPorItem[itemId] = g.etapasPorItem[itemId]!.filter((_, i) => i !== idx);
+    dados.governancaSemanal = { ...dados.governancaSemanal };
+    salvarAgora($state.snapshot(dados));
+  }
+
+  function definirHorasReais(itemId: string, val: string)
+  {
+    const g = garantirGov();
+    g.horasReaisPorItem ??= {};
+    if (val === '') delete g.horasReaisPorItem[itemId];
+    else g.horasReaisPorItem[itemId] = Number(val);
+    dados.governancaSemanal = { ...dados.governancaSemanal };
+    salvar($state.snapshot(dados));
+  }
+
+  function sinalizarRisco48h(pessoaId: string, item: ItemPlano, motivo: string)
+  {
+    const g = garantirGov();
+    g.sinalizado48hPorItem ??= {};
+    g.sinalizado48hPorItem[item.id] = agoraLocal();
+    dados.governancaSemanal = { ...dados.governancaSemanal };
+    const desc = `[Alerta 48h] ${item.cardCodigo ? `${item.cardCodigo} - ` : ''}${item.descricao || 'Entrega em risco'} (${motivo})`;
+    if (!dados.riscos.some((r) => r.descricao === desc))
+    {
+      novoRisco({ descricao: desc, cardCodigo: item.cardCodigo, pessoaId, origem: 'automatico', probabilidade: 'alta', impacto: 'alto' });
+    }
+    salvarAgora($state.snapshot(dados));
+  }
+
+  async function copiarExtratoSegunda()
+  {
+    if (!plano) return;
+    const linhas: string[] = [
+      `EXTRATO DA SEMANA (${dataCurta(semana)} a ${dataCurta(sexta)})`,
+      `Meta de prazo: >=${metaPrazoMes}% (atual: ${prazoAtualPct !== undefined ? `${prazoAtualPct}%` : 'sem leitura'}) | Qualidade: >=95% (atual: ${qualidadeAtualPct !== undefined ? `${qualidadeAtualPct}%` : '-'})`,
+      '',
+      'QUEM FICA COM O QUÊ E PRIORIDADES:',
+    ];
+    for (const pessoa of dados.pessoas)
+    {
+      const pp = plano.pessoas.find((x) => x.pessoaId === pessoa.id);
+      if (!pp?.itens.length) continue;
+      linhas.push(`- ${pessoa.nome} (${horasPlanejadas(pp)}h / ${pessoa.capacidadeHorasSemana}h):`);
+      for (const item of pp.itens)
+      {
+        const etapas = gov.etapasPorItem?.[item.id] ?? [];
+        const etTxt = etapas.length ? ` [etapas: ${etapas.map((e) => `${e.feita ? '✓' : '○'} ${e.texto}`).join('; ')}]` : '';
+        linhas.push(`  • ${item.cardCodigo ? `[${item.cardCodigo}] ` : ''}${item.descricao || 'Sem descrição'}${item.ate ? ` (até ${dataCurta(item.ate)})` : ''}${item.horasEstimadas ? ` ~${item.horasEstimadas}h` : ''}${etTxt}`);
+      }
+    }
+    if (radar48h.length || riscosAbertos.length)
+    {
+      linhas.push('', 'RISCOS DE PRAZO (AVISO >=48h):');
+      for (const r of radar48h) linhas.push(`- ${nomePessoa(r.pessoaId)}: ${r.item.cardCodigo ?? ''} ${r.item.descricao} — ${r.motivo}`);
+      for (const r of riscosAbertos) if (r.descricao) linhas.push(`- ${r.descricao}${r.planoB ? ` | Plano B: ${r.planoB}` : ''}`);
+    }
+    await copiar(linhas.join('\n'));
+    copiadoExtrato = true;
+    setTimeout(() => (copiadoExtrato = false), 2500);
+  }
 
   const nomesRitmo: Record<Ritmo, string> = { no_ritmo: 'no ritmo', em_risco: 'em risco', atrasado: 'atrasado' };
   const nomesStatus: Record<ItemPlano['status'], string> = { a_fazer: 'A fazer', fazendo: 'Fazendo', feito: 'Feito', bloqueado: 'Bloqueado', adiado: 'Adiado' };
@@ -91,6 +311,7 @@
   {
     const i = dados.planos.findIndex((p) => p.inicio === semana);
     dados.planos[i] = confirmarPlano($state.snapshot(dados.planos[i]!), hoje);
+    salvarAgora($state.snapshot(dados));
   }
 
   function marcarStatus(item: ItemPlano)
@@ -131,7 +352,92 @@
       </select>
     </label>
     <span class="dica">{foto ? `Comparando com a foto do painel de ${dataCurta(foto.data)}` : 'Sem foto do painel: cole o painel antes para ter os alertas.'}</span>
+    <span class="pilula" class:verde={nuvem.estado === 'ok'} class:amarelo={nuvem.estado === 'sincronizando' || nuvem.estado === 'sem_login'} class:atencao={nuvem.estado === 'erro'}>
+      {#if nuvem.estado === 'ok'}
+        Firebase conectado
+      {:else if nuvem.estado === 'sincronizando'}
+        Salvando no Firebase...
+      {:else if nuvem.verificando}
+        Verificando Firebase...
+      {:else}
+        Modo local (<a href="/entrar?modo=conta">conectar Firebase</a>)
+      {/if}
+    </span>
   </header>
+
+  <!-- PAINEL DE METAS, RITO DE SEGUNDA E GOVERNANÇA (SINCRONIZADO NO FIREBASE) -->
+  <section class="cartao gov-painel">
+    <div class="topo">
+      <h2>Metas e governança da semana</h2>
+      <span class="espaco"></span>
+      {#if plano}
+        <button onclick={copiarExtratoSegunda}>{copiadoExtrato ? 'Extrato copiado!' : 'Copiar extrato da reunião de segunda'}</button>
+        <a class="botao principal" href="/relatorio?semana={semana}">Gerar PDF da semana</a>
+      {/if}
+    </div>
+
+    <div class="gov-kpis">
+      <div class="gov-card">
+        <span class="etiqueta">Entregas no prazo (meta ≥{metaPrazoMes}%)</span>
+        <strong class="maquina">{prazoAtualPct !== undefined ? `${prazoAtualPct}%` : '-'}</strong>
+        <span class="pilula" class:verde={prazoAtualPct !== undefined && prazoAtualPct >= metaPrazoMes} class:atrasado={prazoAtualPct !== undefined && prazoAtualPct < metaPrazoMes}>
+          {prazoAtualPct === undefined ? 'Sem leitura' : prazoAtualPct >= metaPrazoMes ? 'Dentro da meta' : `Abaixo da meta (${metaPrazoMes}%)`}
+        </span>
+      </div>
+
+      <div class="gov-card">
+        <span class="etiqueta">Qualidade (meta ≥95%)</span>
+        <strong class="maquina">{qualidadeAtualPct !== undefined ? `${qualidadeAtualPct}%` : '-'}</strong>
+        {#if foto?.totais.qualidadePct === undefined && foto?.totais.eficienciaQualidade === undefined}
+          <input type="number" min="0" max="100" class="mini" placeholder="%" value={gov.qualidadeManualPct ?? ''} onchange={(e) => atualizarGov({ qualidadeManualPct: e.currentTarget.value === '' ? undefined : Number(e.currentTarget.value) })} aria-label="Qualidade manual (%)" />
+        {/if}
+        <span class="pilula" class:verde={qualidadeAtualPct !== undefined && qualidadeAtualPct >= 95} class:atrasado={qualidadeAtualPct !== undefined && qualidadeAtualPct < 95}>
+          {qualidadeAtualPct === undefined ? 'Informar ou ler print' : qualidadeAtualPct >= 95 ? 'Meta mantida' : 'Abaixo de 95%'}
+        </span>
+      </div>
+
+      <div class="gov-card">
+        <span class="etiqueta">Extrato nas segundas (meta 100%)</span>
+        <strong class="maquina">{resumoSegundas.total ? `${resumoSegundas.pct}%` : '-'}</strong>
+        <small class="dica">{resumoSegundas.feitas}/{resumoSegundas.total} segundas apresentadas</small>
+      </div>
+
+      <div class="gov-card">
+        <span class="etiqueta">Backlog (sem crescer 2 sem.)</span>
+        <strong class="maquina">{statusBacklog.atual ?? '-'}</strong>
+        <span class="pilula" class:verde={!statusBacklog.cresceu2Seguidas && statusBacklog.atual !== undefined} class:atrasado={statusBacklog.cresceu2Seguidas}>
+          {statusBacklog.cresceu2Seguidas ? 'Cresceu 2 sem. seguidas!' : statusBacklog.atual !== undefined ? 'Sob controle' : 'Sem leitura'}
+        </span>
+      </div>
+
+      <div class="gov-card">
+        <span class="etiqueta">Saídas ≥ Entradas (maioria)</span>
+        <strong class="maquina">{resumoSaidasEntradas.total ? `${resumoSaidasEntradas.ok}/${resumoSaidasEntradas.total}` : '-'}</strong>
+        <span class="pilula" class:verde={resumoSaidasEntradas.maioriaOk} class:amarelo={resumoSaidasEntradas.total > 0 && !resumoSaidasEntradas.maioriaOk}>
+          {resumoSaidasEntradas.total === 0 ? 'Preencha abaixo' : resumoSaidasEntradas.maioriaOk ? 'Maioria positiva' : 'Entradas > Saídas'}
+        </span>
+      </div>
+    </div>
+
+    <div class="gov-controles">
+      <label class="check-inline">
+        <input type="checkbox" checked={!!gov.extratoSegundaApresentado} onchange={(e) => atualizarGov({ extratoSegundaApresentado: e.currentTarget.checked, extratoApresentadoEm: e.currentTarget.checked ? hoje : undefined })} />
+        <span>Extrato apresentado na reunião de segunda</span>
+      </label>
+      <label class="check-inline">
+        <input type="checkbox" checked={!!gov.revisaoSextaFeita} onchange={(e) => atualizarGov({ revisaoSextaFeita: e.currentTarget.checked })} />
+        <span>Revisão prévia feita na sexta anterior</span>
+        <span class="pilula" class:amarelo={exigeRevisaoSexta && !gov.revisaoSextaFeita} class:verde={!exigeRevisaoSexta || gov.revisaoSextaFeita}>
+          {exigeRevisaoSexta ? `Semana ${numeroSemanaPlano}/2: revisar na sexta` : '3ª semana+: autonomia'}
+        </span>
+      </label>
+      <div class="gov-fluxo-inputs">
+        <label>Entradas <input type="number" min="0" class="mini" value={gov.entradasSemana ?? ''} onchange={(e) => atualizarGov({ entradasSemana: e.currentTarget.value === '' ? undefined : Number(e.currentTarget.value) })} /></label>
+        <label>Saídas <input type="number" min="0" class="mini" value={gov.saidasSemana ?? foto?.totais.concluidasNoPeriodo ?? ''} onchange={(e) => atualizarGov({ saidasSemana: e.currentTarget.value === '' ? undefined : Number(e.currentTarget.value) })} /></label>
+        <label>Backlog fim <input type="number" min="0" class="mini" value={gov.backlogFimSemana ?? statusBacklog.atual ?? ''} onchange={(e) => atualizarGov({ backlogFimSemana: e.currentTarget.value === '' ? undefined : Number(e.currentTarget.value) })} /></label>
+      </div>
+    </div>
+  </section>
 
   {#if !plano}
     <section class="cartao vazio">
@@ -146,6 +452,7 @@
         <div><b>{kpis?.alterados ?? 0}</b><span>itens alterados</span></div>
         <div><b>{kpis?.pctDentroDoCronograma !== undefined ? `${kpis.pctDentroDoCronograma}%` : '-'}</b><span>feitos dentro do cronograma</span></div>
         <div><b>{kpis?.naoPlanejadosFeitos ?? 0}</b><span>não planejados feitos</span></div>
+        <div><b>{estimadoRealizado.real}h / {estimadoRealizado.est}h</b><span>realizado × estimado</span></div>
         <div class:ruim={alertas.length > 0}><b>{alertas.length}</b><span>alertas</span></div>
       </div>
       <div class="acoes">
@@ -162,6 +469,26 @@
         {/if}
       </div>
     </section>
+
+    {#if radar48h.length}
+      <section class="cartao">
+        <h2>Radar 48h — entregas em risco para sinalizar com antecedência</h2>
+        <ul class="alertas">
+          {#each radar48h as r (`${r.pessoaId}-${r.item.id}`)}
+            {@const jaSinalizado = gov.sinalizado48hPorItem?.[r.item.id]}
+            <li class={jaSinalizado ? 'medio' : 'alto'}>
+              <span><b>{r.item.cardCodigo ?? 'Sem card'}</b> {r.item.descricao || '(sem descrição)'} — {r.motivo}</span>
+              <span class="dica">{nomePessoa(r.pessoaId)}</span>
+              {#if jaSinalizado}
+                <span class="pilula verde">Sinalizado em {dataCurta(jaSinalizado)}</span>
+              {:else}
+                <button class="link" onclick={() => sinalizarRisco48h(r.pessoaId, r.item, r.motivo)}>Sinalizar 48h e virar risco</button>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
 
     {#if alertas.length}
       <section class="cartao">
@@ -199,6 +526,7 @@
         {#each pp.itens as item (item.id)}
           {@const card = item.cardCodigo ? porCodigo.get(item.cardCodigo) : undefined}
           {@const meus = alertasDoItem(item.id)}
+          {@const etapasItem = gov.etapasPorItem?.[item.id] ?? []}
           <div class="item" class:feito={item.status === 'feito'} class:com-alerta={meus.length}>
             <div class="linha1">
               <select bind:value={item.cardCodigo} class="card">
@@ -208,7 +536,8 @@
               </select>
               <input bind:value={item.descricao} placeholder="O que vai ser feito" class="largo" />
               <label>Até <input type="date" bind:value={item.ate} onchange={() => mudarData(item)} /></label>
-              <label>Horas <input type="number" min="0" class="mini" bind:value={item.horasEstimadas} /></label>
+              <label>Est. (h) <input type="number" min="0" class="mini" bind:value={item.horasEstimadas} /></label>
+              <label>Real (h) <input type="number" min="0" class="mini" value={gov.horasReaisPorItem?.[item.id] ?? ''} onchange={(e) => definirHorasReais(item.id, e.currentTarget.value)} /></label>
               {#if item.tipo === 'nao_planejado'}<span class="pilula amarelo">não planejado</span>{/if}
               <button class="link" onclick={() => remover(planoDe(pessoa.id), item.id)}>remover</button>
             </div>
@@ -216,6 +545,31 @@
               <input bind:value={item.objetivo} placeholder="Para quê (objetivo)" class="largo" />
               <input bind:value={item.frente} list="frentes" placeholder="Frente" />
               <input bind:value={item.dor} list="dores" placeholder="Dor que resolve" />
+            </div>
+            <!-- quebra da demanda em etapas (sincronizada no Firebase) -->
+            <div class="etapas-quebra">
+              {#if etapasItem.length}
+                <div class="etapas-chips">
+                  {#each etapasItem as et, idx (idx)}
+                    <label class="etapa-chip" class:concluida={et.feita}>
+                      <input type="checkbox" checked={et.feita} onchange={() => alternarEtapaItem(item.id, idx)} />
+                      <span>{et.texto}</span>
+                      <button type="button" class="link" onclick={() => removerEtapaItem(item.id, idx)} aria-label="Remover etapa">&times;</button>
+                    </label>
+                  {/each}
+                </div>
+              {/if}
+              <div class="etapa-nova">
+                <input
+                  value={novaEtapaPorItem[item.id] ?? ''}
+                  oninput={(e) => (novaEtapaPorItem[item.id] = e.currentTarget.value)}
+                  onkeydown={(e) => e.key === 'Enter' && adicionarEtapaItem(item.id)}
+                  placeholder="+ Quebrar demanda em etapa (Enter para adicionar)..."
+                />
+                {#if (novaEtapaPorItem[item.id] ?? '').trim()}
+                  <button type="button" onclick={() => adicionarEtapaItem(item.id)}>+ Etapa</button>
+                {/if}
+              </div>
             </div>
             {#if card}
               <p class="info-card">
@@ -323,6 +677,98 @@
 </main>
 
 <style>
+  .gov-painel
+  {
+    display: grid;
+    gap: 14px;
+  }
+  .gov-kpis
+  {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+  }
+  .gov-card
+  {
+    padding: 10px 12px;
+    background: var(--superficie-2);
+    border: 1px solid var(--borda);
+    border-radius: var(--raio-pequeno);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    align-items: flex-start;
+  }
+  .gov-card strong
+  {
+    font-size: 1.35rem;
+    color: var(--texto);
+  }
+  .gov-controles
+  {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 20px;
+    padding-top: 8px;
+    border-top: 1px solid var(--borda);
+  }
+  .check-inline
+  {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--texto);
+  }
+  .gov-fluxo-inputs
+  {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-left: auto;
+  }
+  .etapas-quebra
+  {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 4px;
+  }
+  .etapas-chips
+  {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .etapa-chip
+  {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    background: var(--superficie-2);
+    border: 1px solid var(--borda);
+    border-radius: var(--raio-pequeno);
+    font-size: 0.8rem;
+    color: var(--texto);
+  }
+  .etapa-chip.concluida span
+  {
+    text-decoration: line-through;
+    color: var(--suave);
+  }
+  .etapa-nova
+  {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .etapa-nova input
+  {
+    flex: 1;
+    font-size: 0.82rem;
+    padding: 4px 8px;
+  }
   header, .topo, .linha1, .linha2, .linha3, .acoes, .promessa
   {
     display: flex;

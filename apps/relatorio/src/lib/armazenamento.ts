@@ -32,6 +32,21 @@ export interface Identificacao
   destinatario: string;
 }
 
+// governança da semana: rito de segunda, revisão de sexta, entradas/saídas/backlog, etapas e horas reais (sincronizado no Firebase)
+export interface GovernancaSemana
+{
+  extratoSegundaApresentado?: boolean | undefined;
+  extratoApresentadoEm?: string | undefined;
+  revisaoSextaFeita?: boolean | undefined;
+  entradasSemana?: number | undefined;
+  saidasSemana?: number | undefined;
+  backlogFimSemana?: number | undefined;
+  qualidadeManualPct?: number | undefined;
+  etapasPorItem?: Record<string, { texto: string; feita: boolean }[]> | undefined;
+  horasReaisPorItem?: Record<string, number> | undefined;
+  sinalizado48hPorItem?: Record<string, string> | undefined;
+}
+
 // cada espaço compartilhado tem a própria cópia local; o espaço próprio mantém a chave de sempre
 const chave = (): string => chaveDoEspaco('relatorio-semanal-v1');
 
@@ -73,11 +88,13 @@ export interface Dados
   filaManual?: Record<string, string[]>;
   // palavras ou frases que devem ser descartadas ao transcrever e interpretar prints
   regrasDescarte?: string[];
+  // governança semanal (metas de prazo/qualidade, extrato de segunda, backlog, etapas e horas reais) por segunda-feira ISO
+  governancaSemanal?: Record<string, GovernancaSemana>;
 }
 
 function padrao(): Dados
 {
-  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [], vivos: [], planilhas: [], atas: [], matrizes: [], registros: [], origensPersonalizadas: [], projetos: ['DEV'], regrasDescarte: [] };
+  return { pessoas: pessoasExemplo, prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [], vivos: [], planilhas: [], atas: [], matrizes: [], registros: [], origensPersonalizadas: [], projetos: ['DEV'], regrasDescarte: [], governancaSemanal: {} };
 }
 
 // campos que faltam ganham o padrão; listas antigas ganham fases e diário

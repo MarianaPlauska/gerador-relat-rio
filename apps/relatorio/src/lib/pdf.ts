@@ -73,8 +73,8 @@ const layoutOficial: CustomTableLayout = {
   vLineWidth: () => 0,
   hLineColor: (i, node) => (i === 0 || i === node.table.body.length ? cores.tinta : cores.grade),
   fillColor: (i) => (i === 0 ? cores.tinta : i % 2 === 0 ? '#f4f6f5' : null),
-  paddingLeft: () => 5,
-  paddingRight: () => 5,
+  paddingLeft: () => 4,
+  paddingRight: () => 4,
   paddingTop: () => 4,
   paddingBottom: () => 4,
 };
@@ -176,16 +176,22 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
       margin: [0, 18, 0, 8],
     };
   };
+  const ultimoTemQuebra = (): boolean =>
+  {
+    const ult = conteudo.at(-1);
+    return !!ult && typeof ult === 'object' && 'pageBreak' in ult && (ult.pageBreak === 'after' || ult.pageBreak === 'before');
+  };
   const anexo = (texto: string): Content =>
   {
     const letra = String.fromCharCode(65 + nAnexo++);
+    const precisaQuebra = conteudo.length > 0 && !ultimoTemQuebra();
     return {
       stack: [
         { text: `ANEXO ${letra} - ${texto.toUpperCase()}`, style: 'h1', tocItem: true, tocStyle: { bold: true, fontSize: 9, lineHeight: 1.1 }, tocNumberStyle: { bold: true, fontSize: 9, lineHeight: 1.1 }, tocMargin: [0, 3, 0, 0] },
         { canvas: [{ type: 'line', x1: 0, y1: 3, x2: LARGURA, y2: 3, lineWidth: 1.2, lineColor: cores.marca }] },
       ],
       margin: [0, 0, 0, 8],
-      pageBreak: 'before',
+      ...(precisaQuebra ? { pageBreak: 'before' as const } : {}),
     };
   };
   const h2 = (texto: string): Content =>
@@ -201,7 +207,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
   function tabela(legenda: string, cabecalho: string[], linhas: TableCell[][], larguras: (number | string)[], origem?: string): Content
   {
     return {
-      unbreakable: linhas.length <= 12,
+      unbreakable: linhas.length <= 4,
       stack: [
         legendaTabela(legenda),
         {
@@ -210,7 +216,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
             keepWithHeaderRows: 1,
             dontBreakRows: true,
             widths: larguras,
-            body: [cabecalho.map((h, i) => ({ text: h, style: 'th', alignment: i === 0 ? 'left' : 'center' })), ...linhas.map((l) => l.map(semVazios))],
+            body: [cabecalho.map((h, i) => ({ text: h, style: 'th', alignment: i === 0 ? 'left' : 'center', noWrap: typeof larguras[i] === 'number' })), ...linhas.map((l) => l.map(semVazios))],
           },
           layout: layoutOficial,
           margin: [0, 0, 0, 6],
@@ -474,7 +480,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
       direita(num(o.pct, '%'), { bold: true }),
       { text: dataMedia(o.proximoVencimento), font: 'Maquina' },
       marcador(o.situacao ?? '-', o.situacao === 'Em curso' ? cores.verde : cores.suave),
-    ]), ['*', 52, 52, 36, 36, 46, 56, 70], 'painel do gestor'));
+    ]), ['*', 50, 50, 38, 42, 48, 56, 68], 'painel do gestor'));
   },
 
   fluxo: () =>
@@ -559,7 +565,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
       };
       const linhas = resumos.map((x) => linhaEst(nomesTotais[x.chave], x.r, x.sobe, x.chave.endsWith('Pct') ? '%' : ''));
       if (rPlano) linhas.push(linhaEst('Plano: % de itens feitos', rPlano, true, '%'));
-      conteudo.push(tabela('Estatísticas descritivas por indicador', ['Indicador', 'n', 'Média', 'Mediana', 'DP', 'Mín / Máx', 'Tend./sem', 'Atual'], linhas, ['*', 20, 46, 46, 34, 58, 48, 58], 'painel do gestor (uma foto por semana) e planos da supervisão'));
+      conteudo.push(tabela('Estatísticas descritivas por indicador', ['Indicador', 'n', 'Média', 'Mediana', 'DP', 'Mín / Máx', 'Tend./sem', 'Atual'], linhas, ['*', 24, 46, 50, 34, 58, 54, 62], 'painel do gestor (uma foto por semana) e planos da supervisão'));
       const leituras: string[] = [];
       for (const x of resumos)
       {
@@ -629,7 +635,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
           marcador(nomesStatus[item.status], corStatus(item.status)),
           item.causa ? nomesCausa[item.causa] ?? item.causa : '-',
           item.motivoNaoFeito ?? '-',
-        ]), [60, '*', 52, 80, 120], 'fechamento do plano'));
+        ]), [62, '*', 64, 82, 115], 'fechamento do plano'));
       }
     }
   },
@@ -658,7 +664,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
             direita(num(util, '%'), { color: (util ?? 0) > 100 ? cores.vermelho : cores.tinta, bold: (util ?? 0) > 100 }),
             direita(String(x.alertas), { color: x.alertas ? cores.vermelho : cores.suave }),
           ];
-        }), ['*', 40, 42, 44, 46, 70, 40, 38], 'plano da supervisão'));
+        }), ['*', 44, 44, 50, 54, 68, 44, 44], 'plano da supervisão'));
         const comPlano = comCarga.filter((x) => x.atual.planejados > 0);
         if (comPlano.length)
         {
@@ -754,7 +760,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
           direita(`${c.etapasConcluidas ?? '?'}/${c.etapasTotal ?? '?'}`),
           direita(dataMedia(c.previsao), { color: (c.previsao ?? '9999') < atual.inicio ? cores.vermelho : cores.tinta }),
           c.ritmoPainel ? marcador(nomesRitmo[c.ritmoPainel], corRitmo[c.ritmoPainel]) : '',
-        ]), ['*', 120, 40, 52, 55]));
+        ]), ['*', 115, 44, 58, 60]));
       }
     }
   },
@@ -850,7 +856,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
             },
             marcador(nomesStatus[i.status], corStatus(i.status)),
           ];
-        }), [110, '*', 110, 50, 50], 'plano da supervisão'));
+        }), [95, '*', 105, 52, 62], 'plano da supervisão'));
       }
     }
   },
@@ -927,7 +933,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
           direita(num(x.pendentes.length)),
           direita(num(x.travados.length), x.travados.length ? { color: cores.vermelho, bold: true } : {}),
           pequeno(x.pendentes.slice(0, 8).map((i) => i.nome).join(', ') + (x.pendentes.length > 8 ? ` e mais ${x.pendentes.length - 8}` : '')),
-        ]), [90, 40, 46, '*'], 'listas de checagem da supervisão'));
+        ]), [95, 44, 54, '*'], 'listas de checagem da supervisão'));
       }
 
       const travados = l.itens.flatMap((i) => l.etapas.filter((e) => i.marcas[e.id]?.estado === 'travado').map((e) => ({ i, e, m: i.marcas[e.id]! })));
@@ -1055,7 +1061,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
           unbreakable: true,
           stack: [
             legendaFigura(`${cap.nome.split(' · ')[0]} (${cap.cards.length} cards, ${cap.totais.length} indicadores)`),
-            { image: cap.imagemDataUrl!, width: LARGURA, alignment: 'center', margin: [0, 2, 0, 4] },
+            { image: cap.imagemDataUrl!, fit: [LARGURA, 500], alignment: 'center', margin: [0, 2, 0, 4] },
             ...(cap.comentario?.trim() ? [pequeno(`Comentário: ${cap.comentario.trim()}`)] : []),
             fonte(`print do diário em ${dataMedia(r.data)} (${r.pasta})`),
           ],
@@ -1071,7 +1077,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
     else if (b.tipo === 'fluxograma') desenharFluxograma(b);
     else if (b.tipo === 'pessoa') desenharPessoa(b);
     else if (b.tipo === 'anotacao') desenharAnotacao(b);
-    else if (b.tipo === 'quebra') conteudo.push({ text: '', pageBreak: 'before' });
+    else if (b.tipo === 'quebra') { if (conteudo.length > 0 && !ultimoTemQuebra()) conteudo.push({ text: '', pageBreak: 'before' }); }
     else if (b.tipo === 'texto')
     {
       conteudo.push(h1(b.titulo || 'Observações'));
@@ -1116,7 +1122,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
       h1: { font: 'Maquina', bold: true, fontSize: 13, color: cores.tinta },
       h2: { font: 'Maquina', bold: true, fontSize: 10.5, color: cores.tinta, margin: [0, 10, 0, 5] },
       h3: { bold: true, fontSize: 9.5, margin: [0, 6, 0, 3] },
-      p: { fontSize: 9.5, lineHeight: 1.35, alignment: 'justify', margin: [0, 0, 0, 6] },
+      p: { fontSize: 9.5, lineHeight: 1.35, alignment: 'left', margin: [0, 0, 0, 6] },
       legenda: { font: 'Maquina', bold: true, fontSize: 8, color: cores.tinta, margin: [0, 4, 0, 3] },
     },
     background: (pagina) => (pagina !== 1 ? null : curta
@@ -1156,8 +1162,8 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
         { text: `Página ${pagina} de ${total}`, alignment: 'right', font: 'Maquina', fontSize: 8, color: cores.suave },
       ],
     }),
-    // título ou legenda no fim da página vai para a próxima junto com o conteúdo
-    pageBreakBefore: (no) => !!no.headlineLevel && no.startPosition.verticalRatio > (no.headlineLevel === 1 ? 0.7 : 0.82),
+    // título ou legenda no fim da página vai para a próxima junto com o conteúdo (sem gerar página em branco)
+    pageBreakBefore: (no) => !!no.headlineLevel && !no.pageBreak && no.startPosition.top > 120 && no.startPosition.verticalRatio > (no.headlineLevel === 1 ? 0.75 : 0.84),
     content: conteudo,
   };
 }
