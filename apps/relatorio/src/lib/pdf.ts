@@ -63,7 +63,12 @@ function prepararFontes(): Promise<void>
       Maquina: { normal: 'm4.woff', bold: 'm7.woff', italics: 'm4.woff', bolditalics: 'm7.woff' },
       Texto: { normal: 't4.woff', bold: 't6.woff', italics: 't4i.woff', bolditalics: 't6.woff' },
     });
-  })();
+  })().catch((e) =>
+  {
+    // se a fonte falhou (rede), a próxima tentativa carrega de novo em vez de ficar quebrada até recarregar
+    fontesProntas = undefined;
+    throw e;
+  });
   return fontesProntas;
 }
 
@@ -342,6 +347,64 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
   };
 
   const desenhar: Record<SecaoPadrao, () => void> = {
+  extrato: () =>
+  {
+    const gov = dados.governancaSemanal?.[atual.inicio] ?? {};
+    const mes = Number(ctx.fim.slice(5, 7));
+    const metaPrazo = mes === 11 ? 75 : mes === 12 ? 80 : 85;
+    const prazo = t.dentroDoPrazoPct;
+    const qualidade = t.qualidadePct ?? t.eficienciaQualidade ?? gov.qualidadeManualPct;
+    conteudo.push(h1(titulo('extrato')));
+    conteudo.push(p(`Para a reunião de segunda: o que entra na semana, quem fica com o quê, as prioridades e os riscos de prazo. Meta do mês: entregas no prazo de pelo menos ${metaPrazo}% (atual: ${prazo !== undefined ? `${prazo}%` : 'sem leitura'}) e qualidade de pelo menos 95% (atual: ${qualidade !== undefined ? `${qualidade}%` : 'sem leitura'}).`));
+    const itens = (atual.plano?.pessoas ?? []).flatMap((pp) => pp.itens.map((i) => ({ pp, i })));
+    if (itens.length)
+    {
+      let est = 0;
+      let real = 0;
+      conteudo.push(h2('Quem fica com o quê'));
+      conteudo.push(tabela('Plano da semana com estimado x realizado e etapas', ['Pessoa', 'Card e o que', 'Até', 'Est. / real', 'Etapas', 'Situação'], itens.map(({ pp, i }) =>
+      {
+        const etapas = gov.etapasPorItem?.[i.id] ?? [];
+        const horasReais = i.horasRealizadas ?? gov.horasReaisPorItem?.[i.id];
+        est += i.horasEstimadas ?? 0;
+        real += horasReais ?? 0;
+        return [
+          { text: primeiroNome(pp.pessoaId), bold: true },
+          { stack: [{ text: i.cardCodigo ?? 'sem card', bold: true, font: 'Maquina' }, i.descricao, i.objetivo ? pequeno(`para quê: ${i.objetivo}`) : ''] },
+          { text: dataCurta(i.ate), font: 'Maquina' },
+          direita(`${i.horasEstimadas ?? '-'} h / ${horasReais ?? '-'} h`),
+          { text: etapas.length ? `${etapas.filter((e) => e.feita).length}/${etapas.length}: ${etapas.map((e) => e.texto).join(', ')}` : '-', fontSize: 8 },
+          marcador(nomesStatus[i.status], corStatus(i.status)),
+        ];
+      }), [56, '*', 40, 56, 110, 50], 'plano da supervisão'));
+      if (est) conteudo.push(p(`Estimado x realizado: ${est} h estimadas e ${real} h realizadas (${Math.round((real / est) * 100)}% do estimado).`));
+    }
+    const avisos48 = Object.entries(gov.sinalizado48hPorItem ?? {});
+    if (ctx.alertas.length || avisos48.length)
+    {
+      conteudo.push(h2('Riscos de prazo'));
+      if (ctx.alertas.length) conteudo.push({ ul: ctx.alertas.map((a) => (a.texto.startsWith(nomePessoa(a.pessoaId)) ? a.texto : `${primeiroNome(a.pessoaId)}: ${a.texto}`)), style: 'p' });
+      if (avisos48.length)
+      {
+        const itemDe = (id: string) => itens.find((x) => x.i.id === id)?.i;
+        conteudo.push(p(`Avisos de risco dados com antecedência (meta: pelo menos 48 h antes do prazo): ${avisos48.map(([id, quando]) => `${itemDe(id)?.cardCodigo ?? 'item'} em ${dataCurta(quando.slice(0, 10))}`).join('; ')}.`));
+      }
+    }
+    if (gov.entradasSemana !== undefined || gov.saidasSemana !== undefined || gov.backlogFimSemana !== undefined)
+    {
+      conteudo.push(h2('Fila e backlog'));
+      conteudo.push(p(`Entradas: ${gov.entradasSemana ?? '-'}. Saídas: ${gov.saidasSemana ?? '-'}${gov.entradasSemana !== undefined && gov.saidasSemana !== undefined ? (gov.saidasSemana >= gov.entradasSemana ? ' (saídas maiores ou iguais às entradas)' : ' (entrou mais do que saiu)') : ''}. Backlog no fim da semana: ${gov.backlogFimSemana ?? '-'}.`));
+    }
+    const prints = dados.registros
+      .filter((r) => r.data >= atual.inicio && r.data <= ctx.fim)
+      .flatMap((r) => r.capturas.filter((c) => c.pessoaId && (c.oQueVaiFazer || c.porque)));
+    if (prints.length)
+    {
+      conteudo.push(h2('O que cada pessoa vai fazer e por quê'));
+      conteudo.push(tabela('Prints da semana por pessoa', ['Pessoa', 'O que vai fazer', 'Por quê'], prints.map((c) => [{ text: nomePessoa(c.pessoaId), bold: true }, c.oQueVaiFazer ?? '-', c.porque ?? '-']), [90, '*', '*'], 'diário do painel'));
+    }
+    conteudo.push(pequeno(`Extrato apresentado na segunda: ${gov.extratoSegundaApresentado ? 'sim' : 'ainda não'}${gov.revisaoSextaFeita ? '. Plano revisado na sexta anterior.' : '.'}`));
+  },
   resumo: () =>
   {
   conteudo.push(h1(nomesSecoes.resumo));
@@ -1055,7 +1118,8 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
       conteudo.push(h2(`${dataMedia(r.data)} · ${r.pasta}${r.motivo ? ` · ${r.motivo}` : ''}`));
       for (const paragrafo of r.texto.split('\n\n').filter(Boolean)) conteudo.push(p(paragrafo));
       if (b.comImagens === false) continue;
-      for (const cap of r.capturas.filter((c) => c.imagemDataUrl))
+      // o pdfmake só aceita JPEG e PNG: outro formato derrubaria o PDF inteiro
+      for (const cap of r.capturas.filter((c) => /^data:image\/(jpeg|jpg|png)/i.test(c.imagemDataUrl ?? '')))
       {
         conteudo.push({
           unbreakable: true,
@@ -1072,7 +1136,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
 
   for (const b of blocos)
   {
-    if (b.tipo === 'secao') desenhar[b.secao]();
+    if (b.tipo === 'secao') desenhar[b.secao]?.();
     else if (b.tipo === 'lista') desenharLista(b);
     else if (b.tipo === 'fluxograma') desenharFluxograma(b);
     else if (b.tipo === 'pessoa') desenharPessoa(b);

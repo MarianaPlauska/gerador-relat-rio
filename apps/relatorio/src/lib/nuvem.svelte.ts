@@ -18,10 +18,14 @@ import { idsDeImagemUsados, separarImagens } from './imagens.ts';
 // o espaço de outra pessoa (guardado em localStorage, 'orbisos-espaco'). Sem valor, vale o espaço próprio e as chaves
 // do navegador continuam as de sempre; num espaço compartilhado elas ganham o sufixo `--{dono}` para não misturar donos.
 
-export const nuvem = $state<{ estado: 'desligada' | 'sem_login' | 'sincronizando' | 'ok' | 'erro'; verificando: boolean; email?: string | undefined; nome?: string | undefined; ultimoEnvio?: string | undefined; erro?: string | undefined }>({
+export const nuvem = $state<{ estado: 'desligada' | 'sem_login' | 'sincronizando' | 'ok' | 'erro'; verificando: boolean; email?: string | undefined; nome?: string | undefined; ultimoEnvio?: string | undefined; erro?: string | undefined; aviso?: string | undefined; imagensPendentes: number }>({
   estado: firebaseConfig.apiKey ? 'sem_login' : 'desligada',
   verificando: !!firebaseConfig.apiKey,
+  imagensPendentes: 0,
 });
+
+// o que foi tentado por último: "Tentar de novo" reenvia isto depois de um erro
+let ultimaTentativa: Dados | undefined;
 
 const CHAVE_ESPACO = 'orbisos-espaco';
 
@@ -245,16 +249,28 @@ async function baixar(): Promise<{ dados: Dados; quando: string } | undefined>
   return { dados, quando: atualizadoEm };
 }
 
+// cada imagem sobe sozinha: uma que falha (grande demais, rede) fica pendente e não segura as outras nem os dados
 async function enviarImagens(imagens: Map<string, string>, usadas: Set<string>)
 {
   const { fs, banco } = await servico();
+  const falhas: string[] = [];
   for (const [id, dataUrl] of imagens)
   {
     if (imagensNaNuvem.has(id)) continue;
-    await fs.setDoc(fs.doc(banco, 'usuarios', raiz(), 'imagens', id), { dataUrl, em: new Date().toISOString() });
-    imagensNaNuvem.add(id);
-    imagensPendentes.delete(id);
+    try
+    {
+      await fs.setDoc(fs.doc(banco, 'usuarios', raiz(), 'imagens', id), { dataUrl, em: new Date().toISOString() });
+      imagensNaNuvem.add(id);
+      imagensPendentes.delete(id);
+    }
+    catch (e)
+    {
+      imagensPendentes.set(id, dataUrl);
+      falhas.push(String(e));
+    }
   }
+  nuvem.imagensPendentes = imagensPendentes.size;
+  nuvem.aviso = falhas.length ? `${falhas.length} ${falhas.length === 1 ? 'imagem não subiu' : 'imagens não subiram'} (os dados subiram). Vou tentar de novo no próximo salvamento. ${falhas[0]}` : undefined;
   // imagem que nenhum registro usa mais sai da nuvem
   for (const id of [...imagensNaNuvem])
   {
@@ -271,9 +287,12 @@ async function enviar(dadosCompletos: Dados)
   // as imagens embutidas saem dos dados e vão para documentos próprios
   const { leve, imagens } = separarImagens(dadosCompletos);
   for (const [id, url] of imagensPendentes) if (!imagens.has(id)) imagens.set(id, url);
-  await enviarImagens(imagens, idsDeImagemUsados(leve));
 
   const { fotos, registros, ...resto } = leve;
+  // o Firestore recusa documento acima de 1 MB: avisa antes de chegar lá
+  const tamanho = JSON.stringify(resto).length;
+  if (tamanho > 1_000_000) throw new Error(`Os dados gerais têm ${Math.round(tamanho / 1024)} KB e o Firebase aceita até 1 MB por documento. Exporte um backup e apague planilhas, listas ou relatórios antigos.`);
+  const avisoTamanho = tamanho > 900_000 ? `Os dados gerais estão com ${Math.round(tamanho / 1024)} KB, perto do limite de 1 MB do Firebase.` : undefined;
   const quando = quandoLocal() || new Date().toISOString();
   const operacoes: ((lote: ReturnType<typeof fs.writeBatch>) => void)[] = [
     (lote) => lote.set(fs.doc(banco, 'usuarios', raiz(), 'geral', 'dados'), { ...resto, atualizadoEm: quando }),
@@ -309,6 +328,19 @@ async function enviar(dadosCompletos: Dados)
   fotosNaNuvem = fotosAgora;
   registrosNaNuvem = registrosAgora;
   nuvem.ultimoEnvio = new Date().toISOString();
+  // as imagens vão depois dos dados: se uma falhar, o plano, a governança e os registros já estão salvos
+  await enviarImagens(imagens, idsDeImagemUsados(leve));
+  if (avisoTamanho) nuvem.aviso = [nuvem.aviso, avisoTamanho].filter(Boolean).join(' ');
+}
+
+// depois de um erro: reenvia o último conjunto de dados
+export async function tentarDeNovo(): Promise<void>
+{
+  const dados = ultimoDadosPendente ?? ultimaTentativa;
+  if (!uid || !pronto || somenteLeitura() || !dados) return;
+  clearTimeout(espera);
+  ultimoDadosPendente = undefined;
+  await executar(() => enviar(dados));
 }
 
 export function agendarEnvio(dados: Dados, imagens: Map<string, string> = new Map()): void
@@ -323,7 +355,11 @@ export function agendarEnvio(dados: Dados, imagens: Map<string, string> = new Ma
   {
     const enviarDados = ultimoDadosPendente;
     ultimoDadosPendente = undefined;
-    if (enviarDados) void executar(() => enviar(enviarDados));
+    if (enviarDados)
+    {
+      ultimaTentativa = enviarDados;
+      void executar(() => enviar(enviarDados));
+    }
   }, 800);
 }
 
@@ -333,6 +369,7 @@ export async function enviarPendenteAgora(): Promise<void>
   clearTimeout(espera);
   const enviarDados = ultimoDadosPendente;
   ultimoDadosPendente = undefined;
+  ultimaTentativa = enviarDados;
   await executar(() => enviar(enviarDados));
 }
 

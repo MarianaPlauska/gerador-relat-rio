@@ -16,6 +16,7 @@
   import ArvoreEnvio from '#lib/painel/ArvoreEnvio.svelte';
   import CapturaItem from '#lib/painel/CapturaItem.svelte';
   import CapturaUmClique from '#lib/painel/CapturaUmClique.svelte';
+  import EstadoNuvem from '#lib/EstadoNuvem.svelte';
   import type { AcoesCards } from '#lib/painel/acoes.ts';
   import InspetorTarefaCard from '#lib/painel/InspetorTarefaCard.svelte';
   import ModalCapturaAmpliada from '#lib/painel/ModalCapturaAmpliada.svelte';
@@ -74,7 +75,12 @@
   let pastaAtual = $state('DEV');
   let inicializouPasta = $state(false);
   let novaPasta = $state('');
-  let dataRegistro = $state(agoraLocal().slice(0, 10));
+  // vindo da Semana: "/painel?pessoa=...&semana=AAAA-MM-DD" marca os prints colados como daquela pessoa e daquela semana
+  const pedidoUrl = typeof location === 'undefined' ? new URLSearchParams() : new URLSearchParams(location.search);
+  const pessoaDaSemana = pedidoUrl.get('pessoa') ?? undefined;
+  const semanaPedida = pedidoUrl.get('semana') ?? undefined;
+  const hojeIso = agoraLocal().slice(0, 10);
+  let dataRegistro = $state(semanaPedida && (hojeIso < semanaPedida || hojeIso > somarDias(semanaPedida, 4)) ? semanaPedida : hojeIso);
   let aviso = $state('');
   let progresso = $state<number | null>(null);
 
@@ -252,12 +258,17 @@
   }
 
   // lê o texto de um print (CSV de demandas ou texto de imagem) sem correlacionar: a ligação entre prints é feita no lote todo
-  function lerConteudo(conteudo: string, origem: OrigemLeitura)
+  // códigos já vistos: corrigem leituras do OCR como DEV-8061 -> DEV-061
+  const codigosConhecidos = $derived([...new Set(dados.fotos.flatMap((f) => f.cards.map((c) => c.codigo)))]);
+
+  function lerConteudo(conteudo: string, origem: OrigemLeitura, pessoaId?: string)
   {
     const csv = ehCsvDeDemandas(conteudo) ? lerCsvDemandas(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas }) : undefined;
     return {
       totais: csv ? {} : lerTotais(conteudo),
-      cards: csv ? csv.cards : lerCards(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas, origem, hoje: dataRegistro, regrasDescarte: dados.regrasDescarte }),
+      cards: (csv ? csv.cards : lerCards(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas, origem, hoje: dataRegistro, regrasDescarte: dados.regrasDescarte, codigosConhecidos }))
+        // print de uma pessoa: tudo nele é dela
+        .map((c) => (pessoaId ? { ...c, responsaveis: [pessoaId], responsavelEtapaAtual: pessoaId } : c)),
     };
   }
 
@@ -285,8 +296,8 @@
       ondas,
       avisos,
       sugestoes,
-      naoReconhecido: linhasNaoReconhecidas(conteudo, pastaAtual, dados.regrasDescarte),
-      coberturaPct: coberturaDaLeitura(conteudo, pastaAtual, dados.regrasDescarte).pct,
+      naoReconhecido: linhasNaoReconhecidas(conteudo, pastaAtual, dados.regrasDescarte, cards, dados.pessoas),
+      coberturaPct: coberturaDaLeitura(conteudo, pastaAtual, dados.regrasDescarte, cards, dados.pessoas).pct,
       repetidos: comp.repetidos,
       novos: comp.novos,
       porPessoa,
@@ -346,7 +357,7 @@
     capturas = [
       ...capturas,
       {
-        id: idCurto(), nome: `${nome} · ${nomesOrigem[origem]}`, origem, texto: textoLimpo, ...(imagemDataUrl ? { imagemDataUrl } : {}),
+        id: idCurto(), nome: `${nome} · ${nomesOrigem[origem]}`, origem, texto: textoLimpo, ...(imagemDataUrl ? { imagemDataUrl } : {}), ...(pessoaDaSemana ? { pessoaId: pessoaDaSemana } : {}),
         totais: [], cards: [], ondas: 0, avisos: [], sugestoes: [], comentario: '',
       },
     ];
@@ -363,7 +374,7 @@
     let c: CardSnapshot[] = [];
     let o: Onda[] = [];
     const base = fotoBase?.cards ?? [];
-    const leituras = new Map(capturas.map((cap) => [cap.id, lerConteudo(cap.texto, cap.origem)]));
+    const leituras = new Map(capturas.map((cap) => [cap.id, lerConteudo(cap.texto, cap.origem, cap.pessoaId)]));
     const lote = correlacionarLote(
       capturas.map((cap) => ({ id: cap.id, origem: cap.origem, cards: leituras.get(cap.id)!.cards, cardPaiForcado: cap.cardPaiManual })),
       base,
@@ -531,8 +542,37 @@
     reordenarFila,
   };
 
+  // roda o OCR outra vez sobre a imagem guardada, sem precisar enviar de novo
+  async function relerImagem(id: string)
+  {
+    const cap = capturas.find((c) => c.id === id);
+    if (!cap?.imagemDataUrl) return;
+    aviso = 'Lendo a imagem de novo...';
+    progresso = 0;
+    try
+    {
+      const blob = await (await fetch(cap.imagemDataUrl)).blob();
+      const texto = await lerImagem(blob, (p) => (progresso = p), pastaAtual || dados.prefixo);
+      cap.texto = aplicarRegrasDescarte(texto, dados.regrasDescarte);
+      cap.origem = detectarOrigem(texto);
+      capturas = [...capturas];
+      recalcular();
+      aviso = 'Imagem lida de novo. Confira abaixo.';
+    }
+    catch (erro)
+    {
+      aviso = `Não consegui ler a imagem de novo: ${String(erro)}`;
+    }
+    finally
+    {
+      progresso = null;
+    }
+  }
+
   function removerCaptura(id: string)
   {
+    const saindo = capturas.find((c) => c.id === id);
+    if (saindo && cardSelecionadoCodigo && saindo.cards.includes(cardSelecionadoCodigo)) cardSelecionadoCodigo = null;
     capturas = capturas.filter((c) => c.id !== id);
     if (capturaModalId === id) capturaModalId = null;
     recalcular();
@@ -755,6 +795,10 @@
     <button role="tab" aria-selected={aba === 'diario'} class:ativa={aba === 'diario'} onclick={() => (aba = 'diario')}>Diário do projeto {pastaAtual} ({registrosDaPasta.length})</button>
   </div>
 
+  <div class="nuvem-painel"><EstadoNuvem /></div>
+  {#if pessoaDaSemana}
+    <p class="aviso">Os prints que você colar agora são de <b>{dados.pessoas.find((p) => p.id === pessoaDaSemana)?.nome ?? pessoaDaSemana}</b> e entram no registro de {dataRegistro.split('-').reverse().join('/')}{semanaPedida ? `, na semana de ${semanaPedida.split('-').reverse().join('/')}` : ''}. Escreva o que a pessoa vai fazer e por quê em cada print e salve o registro.</p>
+  {/if}
   {#if aviso}<p class="aviso">{aviso}</p>{/if}
 
   <CapturaUmClique receber={(texto, url) => { aba = 'novo'; registrarCaptura(texto, 'Painel em 1 clique'); aviso = `Página do painel recebida (${url}). Confira a leitura e salve o registro.`; }} />
@@ -776,7 +820,7 @@
           placeholder="Clique aqui e cole com Ctrl+V (Win+Shift+S tira o print) ou solte as imagens aqui"
         ></textarea>
         <div class="linha botoes-upload">
-          <label class="botao mini">Escolher imagens <input type="file" accept="image/*" multiple hidden onchange={(e) => lerImagens([...(e.currentTarget.files ?? [])])} /></label>
+          <label class="botao mini">Escolher imagens <input type="file" accept="image/*" multiple hidden onchange={(e) => { const arquivos = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; lerImagens(arquivos); }} /></label>
           <label class="botao mini">Escolher CSV <input type="file" accept=".csv,text/csv" hidden onchange={async (e) => { const f = e.currentTarget.files?.[0]; if (f) registrarCaptura(await f.text(), `CSV ${f.name}`); e.currentTarget.value = ''; }} /></label>
           <button class="mini" onclick={() => { registrarCaptura(caixa, `Texto ${capturas.length + 1}`); caixa = ''; }} disabled={!caixa.trim()}>Ler o texto digitado</button>
           {#if progresso !== null}<progress value={progresso}></progress>{/if}
@@ -800,7 +844,7 @@
               placeholder="＋ Cole mais prints (Ctrl+V) ou solte aqui..."
             ></textarea>
             <div class="botoes-upload-feita">
-              <label class="botao mini">＋ Imagens <input type="file" accept="image/*" multiple hidden onchange={(e) => lerImagens([...(e.currentTarget.files ?? [])])} /></label>
+              <label class="botao mini">＋ Imagens <input type="file" accept="image/*" multiple hidden onchange={(e) => { const arquivos = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; lerImagens(arquivos); }} /></label>
               <label class="botao mini">＋ CSV <input type="file" accept=".csv,text/csv" hidden onchange={async (e) => { const f = e.currentTarget.files?.[0]; if (f) registrarCaptura(await f.text(), `CSV ${f.name}`); e.currentTarget.value = ''; }} /></label>
               {#if caixa.trim()}
                 <button class="mini" onclick={() => { registrarCaptura(caixa, `Texto ${capturas.length + 1}`); caixa = ''; }}>Ler texto</button>
@@ -830,7 +874,7 @@
         {/if}
 
         {#each capturas as cap, idx (cap.id)}
-          <CapturaItem {cap} indice={idx} {cardsLidos} {nomesOrigemPadrao} origensPersonalizadas={dados.origensPersonalizadas} {obterNomeOrigem} aoAmpliar={() => (capturaModalId = cap.id)} aoRecalcular={recalcular} aoRemover={() => removerCaptura(cap.id)} aoCriarOpcao={(nome) => criarOpcaoOrigem(cap.id, nome)} aoDescartarTexto={(l) => adicionarRegras([l])} />
+          <CapturaItem {cap} indice={idx} {cardsLidos} {nomesOrigemPadrao} origensPersonalizadas={dados.origensPersonalizadas} {obterNomeOrigem} aoAmpliar={() => (capturaModalId = cap.id)} aoRecalcular={recalcular} aoRemover={() => removerCaptura(cap.id)} aoCriarOpcao={(nome) => criarOpcaoOrigem(cap.id, nome)} aoDescartarTexto={(l) => adicionarRegras([l])} pessoas={dados.pessoas} aoRelerImagem={() => relerImagem(cap.id)} />
         {/each}
 
         <details class="conferir painel-inteligencia-auto">

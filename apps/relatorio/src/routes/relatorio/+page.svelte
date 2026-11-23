@@ -364,7 +364,7 @@
       {/if}
     </div>
 
-    <button class="principal grande" onclick={() => baixarPdf(entrada())}>Baixar PDF</button>
+    <button class="principal grande" onclick={async () => { try { erro = ''; await baixarPdf(entrada()); } catch (x) { erro = `Não consegui baixar o PDF: ${String(x)}`; } }}>Baixar PDF</button>
     <div class="saidas">
       <button onclick={() => copiarSaida('teams', textoTeams(dados, ctx, notas))}>{copiado === 'teams' ? 'Copiado!' : 'Copiar mensagem do Teams'}</button>
       <button onclick={() => copiarSaida('pacote', textoPacote(dados, ctx, notas))}>{copiado === 'pacote' ? 'Copiado!' : 'Copiar pacote para IA'}</button>

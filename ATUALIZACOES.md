@@ -200,3 +200,14 @@ Registro de diretrizes visuais, regras de negocio e funcionalidades implementada
 - **Fluxos com tempo medido** (`etapas-tempo.ts`): p50 e p85 de cada etapa nas etapas feitas dos cards; o passo do fluxograma com o mesmo nome mostra o tempo e o gargalo fica em vermelho. Botão "Fluxo das etapas medidas" monta o fluxo na ordem em que as etapas costumam acontecer.
 - **Orçamento de horas** (`planilha/horas.ts`): planilha com uma pessoa por grupo, demandas abertas da última foto com as horas estimadas e a capacidade semanal como orçamento de cada pessoa.
 - Menu: Listas, Fluxos e Planilhas ficam no grupo **Ferramentas**.
+
+
+## 13. Leitura certa da lista da semana, prints por pessoa, nuvem confiável e extrato no PDF
+
+- **Lista de demandas**: `detectarOrigem` reconhece a lista mesmo com o cabeçalho sujo pelo OCR (antes caía em "cronograma"). `lerDemanda` lê o atraso ("· 3,3 d de atraso" vira `atrasoDias`) sem confundir com o tempo, e o status "Planejado".
+- **Códigos**: `corrigirCodigo` desfaz o 0 lido como 8, 9 ou 6 (DEV-8061 → DEV-061 sempre; DEV-845 → DEV-045 quando o código já é conhecido nas fotos). Tabela lida em colunas: os nomes vão para os cards na ordem, com aviso. O OCR prefere a leitura linha a linha.
+- **Cobertura justa**: a segunda linha da descrição, nomes, status e tempos contam como entendidos.
+- **Prints por pessoa** (`CapturaItem.svelte`): "Este print é de" marca a pessoa; os cards ficam com ela e o print ganha "O que vai fazer" e "Por quê". "Ler a imagem de novo" refaz o OCR; o mesmo arquivo pode ser enviado de novo sem refresh; "remover" sempre visível.
+- **Semana**: cada pessoa mostra os prints da semana (miniatura, o que vai fazer e por quê) e tem "+ Print para esta semana", que abre o Diário com a pessoa e a semana marcadas.
+- **Firebase** (`nuvem.svelte.ts`, `EstadoNuvem.svelte`): os dados sobem antes das imagens; imagem que falha não segura o resto; aviso perto de 1 MB; estado real com o erro escrito e "tentar de novo" na Semana e no Diário.
+- **PDF**: nova seção "Extrato da semana" no modelo semanal (metas do mês, quem fica com o quê com estimado x realizado e etapas, riscos de prazo e avisos de 48 h, entradas, saídas e backlog, o que cada pessoa vai fazer e por quê). "Baixar PDF" mostra o erro; fonte que falhou carrega de novo; seção desconhecida e imagem fora de JPEG/PNG não derrubam o PDF.

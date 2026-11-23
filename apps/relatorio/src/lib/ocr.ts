@@ -85,7 +85,10 @@ export function pontuar(texto: string, prefixo: string): number
   const datas = texto.match(/\d{2}\/\d{2}\/\d{2,4}/g)?.length ?? 0;
   const palavras = texto.match(/[A-Za-zÀ-ÿ]{4,}/g)?.length ?? 0;
   const lixo = texto.match(/[^\sA-Za-zÀ-ÿ0-9/:.,%()·\-—–★*+_|]/g)?.length ?? 0;
-  return codigos * 12 + datas * 4 + palavras - lixo * 2;
+  // tabela lida linha a linha: o código vem com descrição e nome na mesma linha; lida em colunas, o código fica sozinho
+  const reCodigo = new RegExp(`\\b${prefixo} ?- ?[0-9A-Z]{2,4}\\b`);
+  const linhasCompletas = texto.split(/\r?\n/).filter((l) => reCodigo.test(l) && (l.replace(reCodigo, '').match(/[A-Za-zÀ-ÿ]{4,}/g)?.length ?? 0) >= 3).length;
+  return codigos * 12 + datas * 4 + palavras - lixo * 2 + linhasCompletas * 10;
 }
 
 // leitura boa o bastante para não gastar mais passadas: muita coisa reconhecida e pouco símbolo solto

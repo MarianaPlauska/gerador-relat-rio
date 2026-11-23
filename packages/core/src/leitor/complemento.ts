@@ -1,4 +1,4 @@
-import type { CapturaLida, CardSnapshot, RegistroPainel } from '../tipos';
+import type { CapturaLida, CardSnapshot, Pessoa, RegistroPainel } from '../tipos';
 import { aplicarRegrasDescarte } from './descarte';
 import { nomesTotais } from './totais';
 import { semAcento } from './normalizar';
@@ -17,21 +17,35 @@ const rotulosTotais = Object.values(nomesTotais).map((n) => semAcento(n));
 const RE_DATA = /\d{2}\/\d{2}\/\d{2,4}/;
 
 // linhas do texto lido que não viraram card nem total: o "restante" do print para a supervisora revisar
-export function linhasNaoReconhecidas(texto: string, prefixo: string, regrasDescarte?: string[]): string[]
+export function linhasNaoReconhecidas(texto: string, prefixo: string, regrasDescarte?: string[], cards?: CardSnapshot[], pessoas?: Pessoa[]): string[]
 {
-  return todasNaoReconhecidas(texto, prefixo, regrasDescarte).slice(0, 15);
+  return todasNaoReconhecidas(texto, prefixo, regrasDescarte, cards, pessoas).slice(0, 15);
 }
 
 // quanto do texto o leitor entendeu: linhas com conteúdo que viraram card, total ou caíram numa regra de descarte
-export function coberturaDaLeitura(texto: string, prefixo: string, regrasDescarte?: string[]): { linhas: number; naoEntendidas: number; pct: number }
+export function coberturaDaLeitura(texto: string, prefixo: string, regrasDescarte?: string[], cards?: CardSnapshot[], pessoas?: Pessoa[]): { linhas: number; naoEntendidas: number; pct: number }
 {
   const linhas = new Set(texto.split(/\r?\n/).map((l) => semAcento(l.replace(/\s+/g, ' ').trim())).filter((l) => l.length >= 8 && (l.match(/[a-z]/g)?.length ?? 0) >= 5)).size;
-  const naoEntendidas = todasNaoReconhecidas(texto, prefixo, regrasDescarte).length;
+  const naoEntendidas = todasNaoReconhecidas(texto, prefixo, regrasDescarte, cards, pessoas).length;
   return { linhas, naoEntendidas, pct: linhas ? Math.round(((linhas - naoEntendidas) / linhas) * 100) : 100 };
 }
 
-function todasNaoReconhecidas(texto: string, prefixo: string, regrasDescarte?: string[]): string[]
+// metadados das telas do painel: cabeçalhos, status, tempos, atraso, tipo e prioridade
+const RE_METADADO = /\b(id|solicitante|tipo|descricao|responsavel|tempo|status|novo|planejado|em andamento|resolvido|cancelado|de atraso|kitu ?sistema|suporte kitu|alta|baixa|media|critica)\b|\d+(?:,\d+)?\s?(?:h|d|min)\b/;
+const palavras = (t: string) => semAcento(t).match(/[a-z0-9]{4,}/g) ?? [];
+
+function todasNaoReconhecidas(texto: string, prefixo: string, regrasDescarte?: string[], cards?: CardSnapshot[], pessoas?: Pessoa[]): string[]
 {
+  // texto dos cards lidos: a segunda linha de uma descrição está no card mesmo sem código na linha
+  const doCard = new Set((cards ?? []).flatMap((c) => palavras(`${c.titulo ?? ''} ${c.descricaoCompleta ?? ''} ${c.sistema ?? ''} ${c.statusCard ?? ''}`)));
+  const nomes = (pessoas ?? []).map((p) => semAcento(p.nome));
+  const entendida = (n: string) =>
+  {
+    if (nomes.some((nome) => n.includes(nome))) return true;
+    const p = palavras(n);
+    if (doCard.size && p.length && p.filter((w) => doCard.has(w)).length / p.length >= 0.5) return true;
+    return RE_METADADO.test(n) && p.filter((w) => !RE_METADADO.test(w)).length <= 1;
+  };
   const limpo = aplicarRegrasDescarte(texto, regrasDescarte);
   const re = new RegExp(`\\b${prefixo} ?-? ?[0-9A-Z]{2,4}\\b`, 'i');
   const vistas = new Set<string>();
@@ -42,6 +56,7 @@ function todasNaoReconhecidas(texto: string, prefixo: string, regrasDescarte?: s
     if (linha.length < 8 || re.test(linha) || RE_DATA.test(linha)) continue;
     const n = semAcento(linha);
     if (rotulosTotais.some((r) => n.includes(r))) continue;
+    if (entendida(n)) continue;
     if ((linha.match(/[A-Za-zÀ-ÿ]/g)?.length ?? 0) < 5) continue;
     if (vistas.has(n)) continue;
     vistas.add(n);

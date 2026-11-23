@@ -64,6 +64,8 @@ export interface CardSnapshot
   assunto?: string | undefined;
   aberturaHora?: string | undefined;
   tempoTotalMin?: number | undefined;
+  // "Novo · 3,3 d de atraso" na lista de demandas
+  atrasoDias?: number | undefined;
   ociosoEtapasMin?: number | undefined;
   horasEstimadas?: number | undefined;
   // de onde veio o tempo estipulado: digitado pela pessoa, regra fixa ou mediana das demandas parecidas já concluídas
@@ -174,6 +176,10 @@ export interface CapturaLida
   imagemDataUrl?: string | undefined;
   // quando a imagem fica na nuvem (Firestore) em vez de dentro do registro
   imagemId?: string | undefined;
+  // print de uma pessoa (clicando no responsável no painel): os cards ficam com ela, e o plano dela vem junto
+  pessoaId?: string | undefined;
+  oQueVaiFazer?: string | undefined;
+  porque?: string | undefined;
   totais: (keyof TotaisPainel)[];
   cards: string[];
   ondas: number;

@@ -2,7 +2,7 @@
   import type { CapturaLida, CardSnapshot } from '@supervisao/core';
 
   // um print enviado: miniatura, "Entendi como", card ao qual pertence, resumo do que foi lido, comentÃ¡rio e texto lido
-  let { cap, indice, cardsLidos, nomesOrigemPadrao, origensPersonalizadas, obterNomeOrigem, aoAmpliar, aoRecalcular, aoRemover, aoCriarOpcao, aoDescartarTexto }: {
+  let { cap, indice, cardsLidos, nomesOrigemPadrao, origensPersonalizadas, obterNomeOrigem, aoAmpliar, aoRecalcular, aoRemover, aoCriarOpcao, aoDescartarTexto, pessoas = [], aoRelerImagem }: {
     cap: CapturaLida;
     indice: number;
     cardsLidos: CardSnapshot[];
@@ -14,6 +14,8 @@
     aoRemover: () => void;
     aoCriarOpcao: (nome: string) => void;
     aoDescartarTexto?: (texto: string) => void;
+    pessoas?: { id: string; nome: string }[];
+    aoRelerImagem?: () => void;
   } = $props();
 
   let criando = $state(false);
@@ -104,8 +106,8 @@
             >
               +
             </button>
-            <button class="link perigo" onclick={() => aoRemover()}>remover</button>
           {/if}
+          <button class="link perigo" onclick={() => aoRemover()}>remover</button>
         </span>
       </div>
       <div class="chips">
@@ -115,6 +117,27 @@
         {#if cap.novos?.length}<span class="pilula novo">{cap.novos.length} novos</span>{/if}
         {#if cap.repetidos?.length}<span class="pilula repetido">{cap.repetidos.length} já vistos</span>{/if}
       </div>
+      <div class="linha-pessoa">
+        <label class="mini">Este print é de
+          <select value={cap.pessoaId ?? ''} onchange={(e) => { cap.pessoaId = e.currentTarget.value || undefined; aoRecalcular(); }}>
+            <option value="">várias pessoas (ler do print)</option>
+            {#each pessoas as p (p.id)}<option value={p.id}>{p.nome}</option>{/each}
+          </select>
+        </label>
+        {#if aoRelerImagem && cap.imagemDataUrl}
+          <button type="button" class="link" onclick={aoRelerImagem} title="Roda o OCR outra vez sobre esta imagem">ler a imagem de novo</button>
+        {/if}
+      </div>
+      {#if cap.pessoaId}
+        <div class="plano-pessoa">
+          <label>O que vai fazer na semana
+            <textarea rows="2" value={cap.oQueVaiFazer ?? ''} oninput={(e) => { cap.oQueVaiFazer = e.currentTarget.value || undefined; }} placeholder="As entregas e etapas desta pessoa na semana"></textarea>
+          </label>
+          <label>Por quê
+            <textarea rows="2" value={cap.porque ?? ''} oninput={(e) => { cap.porque = e.currentTarget.value || undefined; }} placeholder="O motivo: prioridade, prazo, pedido do cliente, risco..."></textarea>
+          </label>
+        </div>
+      {/if}
       {#if cap.cardPaiVinculado || cap.origem === 'card'}
         <div class="vinculo-arvore-barra">
           <span class="etiqueta">Pertence ao card:</span>
@@ -208,4 +231,29 @@
   .comentario { display: block; font-weight: 600; font-size: 0.86rem; }
   .complemento { margin: 4px 0 8px 18px; padding: 0; font-size: 0.82rem; color: var(--suave); }
   @media (max-width: 800px) { .captura { grid-template-columns: 1fr; } }
+  .linha-pessoa
+  {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--size-3);
+    margin: var(--size-2) 0;
+  }
+  .plano-pessoa
+  {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--size-2);
+    margin-bottom: var(--size-2);
+  }
+  .plano-pessoa label
+  {
+    display: grid;
+    gap: 4px;
+  }
+  .plano-pessoa textarea
+  {
+    width: 100%;
+    resize: vertical;
+  }
 </style>

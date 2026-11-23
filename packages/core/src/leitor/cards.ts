@@ -40,18 +40,23 @@ export interface OpcoesLeitura
   origem?: OrigemLeitura;
   hoje?: string;
   regrasDescarte?: string[] | undefined;
+  // códigos já vistos em fotos e registros: corrigem leituras como DEV-8061 -> DEV-061
+  codigosConhecidos?: string[] | undefined;
 }
 
 export function detectarOrigem(texto: string): OrigemLeitura
 {
   const t = semAcento(texto);
   if (/o que foi pedido|\+ o que vai fazer|adicionar etapa|concluir card|subtarefa|ocioso entre etapas|\d+\s+de\s+\d+\s+concluidas/.test(t)) return 'card';
-  if (/registros filtrados|solicitante\s+tipo/.test(t)) return 'demandas';
+  // a lista de demandas tem o cabeçalho ID SOLICITANTE TIPO DESCRIÇÃO RESPONSÁVEL TEMPO STATUS; o OCR costuma sujar entre as palavras
+  const cabecalhoDemandas = ['solicitante', 'descricao', 'responsavel', 'tempo', 'status'].filter((w) => t.includes(w)).length;
+  const jeitoDeDemanda = /de atraso|kitu ?sistema|\b(novo|planejado|em andamento)\b/.test(t) && /\d+(?:,\d+)?\s?(?:h|d|min)\b/.test(t);
+  if (/registros filtrados|solicitante\W{0,8}tipo/.test(t) || (cabecalhoDemandas >= 3 && /solicitante|descricao/.test(t) && !/etapa atual|no\s*ritmo/.test(t))) return 'demandas';
   // listas do cronograma têm a coluna de vencimento; os chips de filtro ("A iniciar") não mudam isso
   if (/\bvenc\b/.test(t) && /situacao/.test(t)) return 'cronograma';
   if (/fila|a iniciar|ordenadas pela abertura/.test(t) && !/ritmo/.test(t)) return 'fila';
   if (/no\s*ritmo|em\s*risco|etapa atual|rodando ha/.test(t)) return 'em_execucao';
-  return 'cronograma';
+  return jeitoDeDemanda ? 'demandas' : 'cronograma';
 }
 
 // separa o texto em pedaços que começam no código do card (ex.: DEV-218)
@@ -72,14 +77,34 @@ export function lerCards(textoLido: string, opcoes: OpcoesLeitura): CardSnapshot
   {
     const inicio = m.index + m[0].length;
     const fim = marcas[i + 1]?.index ?? texto.length;
-    const { codigo, corrigido } = corrigirCodigo(m[0], opcoes.prefixo);
+    const { codigo, corrigido } = corrigirCodigo(m[0], opcoes.prefixo, opcoes.codigosConhecidos);
     const trecho = texto.slice(inicio, fim);
     const card = origem === 'demandas' ? lerDemanda(codigo, trecho, opcoes.pessoas, opcoes.regrasDescarte) : lerTrecho(codigo, trecho, origem, opcoes.pessoas);
     card.avisosLeitura = [...(corrigido ? ['código corrigido, confira'] : []), ...(card.avisosLeitura ?? []), ...avisar(card, origem, opcoes.hoje)];
     const anterior = porCodigo.get(card.codigo);
     porCodigo.set(card.codigo, anterior ? juntarCard(anterior, card) : card);
   });
-  return marcarCodigosEstranhos([...porCodigo.values()]);
+  const lidos = marcarCodigosEstranhos([...porCodigo.values()]);
+  return origem === 'demandas' ? responsaveisEmColuna(lidos, texto, marcas.at(-1)?.index ?? 0, opcoes.pessoas) : lidos;
+}
+
+// o OCR às vezes lê a tabela coluna a coluna: todos os códigos, depois todos os nomes. Os nomes caem no último card;
+// se a quantidade de nomes depois do último código bate com a de cards, cada um vai para o seu card, na ordem
+function responsaveisEmColuna(cards: CardSnapshot[], texto: string, inicioUltimo: number, pessoas: Pessoa[]): CardSnapshot[]
+{
+  if (cards.length < 3 || cards.filter((c) => !c.responsaveis.length).length < cards.length - 1) return cards;
+  const cauda = semAcento(texto.slice(inicioUltimo));
+  const nomes = pessoas
+    .flatMap((p) => [...cauda.matchAll(new RegExp(`\\b${semAcento(p.nome)}\\b`, 'g'))].map((m) => ({ id: p.id, pos: m.index })))
+    .sort((a, b) => a.pos - b.pos);
+  if (nomes.length !== cards.length) return cards;
+  cards.forEach((c, i) =>
+  {
+    c.responsaveis = [nomes[i]!.id];
+    c.responsavelEtapaAtual = nomes[i]!.id;
+    c.avisosLeitura = [...(c.avisosLeitura ?? []), 'tabela lida em colunas, confira o responsável e a descrição'];
+  });
+  return cards;
 }
 
 // a imagem às vezes cola as palavras ("KituSistema", "SuporteKitu", "Emandamento")
@@ -131,8 +156,16 @@ function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[], regrasDes
     card.criticidade = (pTxt === 'critica' || pTxt === 'critico' || pTxt === 'urgente') ? 3 : pTxt === 'alta' ? 2 : 1;
   }
 
+  // "Novo · 3,3 d de atraso": o atraso não é o tempo da demanda
+  const atraso = trecho.match(/([\d,]+)\s*(d|h)\s+de\s+atraso/i);
+  if (atraso)
+  {
+    const v = numeroBr(atraso[1]!);
+    if (Number.isFinite(v)) card.atrasoDias = Math.round((atraso[2]!.toLowerCase() === 'h' ? v / 8 : v) * 10) / 10;
+  }
+  const semAtraso = trecho.replace(/[·•.]?\s*[\d,]+\s*(?:d|h|min)\s+de\s+atraso/gi, ' ');
   // o status vem depois do tempo; antes dele "novo" pode ser parte da descrição
-  const tempo = trecho.match(RE_TEMPO);
+  const tempo = semAtraso.match(RE_TEMPO);
   if (tempo)
   {
     const mTempo = tempo[0].replace(/^[Oo]/, '0').match(/([\d,]+)\s*(min|h|d)/i);
@@ -143,7 +176,7 @@ function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[], regrasDes
       card.tempoTotalMin = Math.round(un === 'h' ? val * 60 : un === 'd' ? val * 480 : val);
     }
   }
-  const aposTempo = tempo ? trecho.slice(tempo.index! + tempo[0].length) : trecho;
+  const aposTempo = tempo ? semAtraso.slice(tempo.index! + tempo[0].length) : semAtraso;
   const status = aposTempo.match(RE_STATUS_CARD)?.[0];
   if (status)
   {
@@ -181,7 +214,8 @@ function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[], regrasDes
     if (/^[•·-]?\s*(cr[ií]tic[ao]|urgente|alta|m[eé]dia|baixa)\s*$/i.test(l)) return true;
     if (/^(Kitu Sistema|Suporte Kitu|Outras Aplica[cç][oõ]es ou de Terceiros|Direcionamento)\s*$/i.test(l)) return true;
     if (/^[O0o\d][\d,.]*\s*(?:min|h|d)$/i.test(l)) return true;
-    if (/^[•·-]?\s*(em andamento|novo|resolvido|planejado|cancelado)\s*$/i.test(l)) return true;
+    if (/^[•·-]?\s*(em andamento|novo|resolvido|planejado|cancelado)\s*([·•.]?\s*[\d,]+\s*(d|h|min)\s+de\s+atraso)?\s*$/i.test(l)) return true;
+    if (/^[·•.]?\s*[\d,]+\s*(d|h|min)\s+de\s+atraso\s*$/i.test(l)) return true;
     if (/^(id|solicitante|tipo|descri[cç][aã]o|respons[aá]vel|tempo|status|sat\.?)$/i.test(semAcento(l))) return true;
     if (achadas.some((p) => semAcento(l).toLowerCase() === semAcento(p.nome).toLowerCase())) return true;
     return false;
@@ -549,10 +583,17 @@ function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
 }
 
 // a imagem lê 0 como O: DEV-O080 -> DEV-080
-function corrigirCodigo(lido: string, prefixo: string): { codigo: string; corrigido: boolean }
+function corrigirCodigo(lido: string, prefixo: string, conhecidos?: string[]): { codigo: string; corrigido: boolean }
 {
   let numero = lido.slice(prefixo.length + 1).replace(/O/g, '0');
   if (/^0\d{3}$/.test(numero)) numero = numero.slice(1);
+  // 0 lido como 8, 9 ou 6 (DEV-061 -> DEV-8061, DEV-045 -> DEV-845): com 4 dígitos sempre; com 3, só se o corrigido já é conhecido
+  const conhece = (n: string) => conhecidos?.includes(`${prefixo}-${n}`) ?? false;
+  if (!conhece(numero))
+  {
+    if (/^[869]\d{3}$/.test(numero)) numero = numero.slice(1);
+    else if (/^[869]\d{2}$/.test(numero) && conhece(`0${numero.slice(1)}`)) numero = `0${numero.slice(1)}`;
+  }
   const codigo = `${prefixo}-${numero}`;
   return { codigo, corrigido: codigo !== lido };
 }

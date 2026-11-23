@@ -1,14 +1,20 @@
 <script lang="ts">
+  import EstadoNuvem from '#lib/EstadoNuvem.svelte';
   import
   {
     agoraLocal, alertasDoPlano, confirmarPlano, horasPlanejadas, kpisDosItens, pendenciasDaSemana, segundaDaSemana, somarDias, sugerirItens,
     type Alerta, type CardSnapshot, type ItemPlano, type PlanoPessoa, type PlanoSemana, type Ritmo, type Risco,
   } from '@supervisao/core';
-  import { carregar, salvar, salvarAgora, type Dados, type GovernancaSemana } from '#lib/armazenamento.ts';
+  import { carregar, hidratarImagens, salvar, salvarAgora, type Dados, type GovernancaSemana } from '#lib/armazenamento.ts';
   import { nuvem } from '#lib/nuvem.svelte.ts';
   import { copiar } from '#lib/saidas.ts';
 
   let dados = $state<Dados>(carregar());
+  // as imagens dos prints ficam na nuvem: busca as que faltam para mostrar as miniaturas
+  $effect(() =>
+  {
+    void hidratarImagens(dados);
+  });
   const hoje = agoraLocal().slice(0, 10);
   let semana = $state(segundaDaSemana(hoje));
   let copiadoExtrato = $state(false);
@@ -272,6 +278,10 @@
     dados.planos = [...dados.planos, novo].sort((a, b) => a.inicio.localeCompare(b.inicio));
   }
 
+  // prints do Diário desta semana marcados para a pessoa (ou em que ela aparece como responsável)
+  const printsDaSemana = $derived(dados.registros.filter((r) => r.data >= semana && r.data <= somarDias(semana, 6)).flatMap((r) => r.capturas.map((cap) => ({ registro: r, cap }))));
+  const printsDaPessoa = (id: string, nome: string) => printsDaSemana.filter(({ cap }) => cap.pessoaId === id || (!cap.pessoaId && cap.porPessoa?.some((g) => g.pessoa === nome)));
+
   function planoDe(pessoaId: string): PlanoPessoa
   {
     const p = plano!;
@@ -352,17 +362,7 @@
       </select>
     </label>
     <span class="dica">{foto ? `Comparando com a foto do painel de ${dataCurta(foto.data)}` : 'Sem foto do painel: cole o painel antes para ter os alertas.'}</span>
-    <span class="pilula" class:verde={nuvem.estado === 'ok'} class:amarelo={nuvem.estado === 'sincronizando' || nuvem.estado === 'sem_login'} class:atencao={nuvem.estado === 'erro'}>
-      {#if nuvem.estado === 'ok'}
-        Firebase conectado
-      {:else if nuvem.estado === 'sincronizando'}
-        Salvando no Firebase...
-      {:else if nuvem.verificando}
-        Verificando Firebase...
-      {:else}
-        Modo local (<a href="/entrar?modo=conta">conectar Firebase</a>)
-      {/if}
-    </span>
+    <EstadoNuvem />
   </header>
 
   <!-- PAINEL DE METAS, RITO DE SEGUNDA E GOVERNANÇA (SINCRONIZADO NO FIREBASE) -->
@@ -522,6 +522,22 @@
         <label class="dificuldade">Maior problema ou dificuldade da semana
           <input value={pp.dificuldade ?? ''} onchange={(e) => (planoDe(pessoa.id).dificuldade = e.currentTarget.value || undefined)} placeholder="Ex.: depende do retorno do cliente sobre o certificado" />
         </label>
+        <div class="prints-pessoa">
+          <span class="etiqueta">Prints da semana ({printsDaPessoa(pessoa.id, pessoa.nome).length})</span>
+          {#each printsDaPessoa(pessoa.id, pessoa.nome) as { registro, cap } (cap.id)}
+            <details class="print-pessoa">
+              <summary>
+                {#if cap.imagemDataUrl}<img src={cap.imagemDataUrl} alt="Print de {pessoa.nome}" />{/if}
+                <span><b>{registro.data.split('-').reverse().join('/')}</b> {cap.oQueVaiFazer ?? (cap.comentario || registro.motivo || cap.nome)}</span>
+              </summary>
+              {#if cap.imagemDataUrl}<img class="grande" src={cap.imagemDataUrl} alt="Print de {pessoa.nome}" />{/if}
+              {#if cap.oQueVaiFazer}<p><b>O que vai fazer:</b> {cap.oQueVaiFazer}</p>{/if}
+              {#if cap.porque}<p><b>Por quê:</b> {cap.porque}</p>{/if}
+              {#if registro.resumo}<p class="dica">Registro: {registro.resumo}</p>{/if}
+            </details>
+          {/each}
+          <a class="botao mini" href="/painel?pessoa={pessoa.id}&semana={semana}">+ Print de {pessoa.nome.split(' ')[0]} para esta semana</a>
+        </div>
 
         {#each pp.itens as item (item.id)}
           {@const card = item.cardCodigo ? porCodigo.get(item.cardCodigo) : undefined}
@@ -951,5 +967,49 @@
     color: var(--azul);
     text-decoration: underline;
     padding: 2px 4px;
+  }
+  .prints-pessoa
+  {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--size-2);
+    margin: var(--size-2) 0 var(--size-3);
+  }
+  .prints-pessoa .etiqueta
+  {
+    flex-basis: 100%;
+  }
+  .print-pessoa
+  {
+    border: 1px solid var(--borda);
+    border-radius: var(--raio-pequeno);
+    padding: var(--size-2);
+    max-width: 360px;
+    background: var(--superficie-2);
+  }
+  .print-pessoa summary
+  {
+    display: flex;
+    gap: var(--size-2);
+    align-items: center;
+    font-size: 0.84rem;
+  }
+  .print-pessoa summary img
+  {
+    width: 72px;
+    height: 44px;
+    object-fit: cover;
+    border-radius: 2px;
+  }
+  .print-pessoa img.grande
+  {
+    width: 100%;
+    margin-top: var(--size-2);
+  }
+  .print-pessoa p
+  {
+    margin: var(--size-1) 0 0;
+    font-size: 0.86rem;
   }
 </style>
