@@ -10,6 +10,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { carregar, exportarJson } from '#lib/armazenamento.ts';
+  import { chuva } from '#lib/chuva.ts';
   import Abertura from '#lib/Abertura.svelte';
   import FaixaSomenteLeitura from '#lib/FaixaSomenteLeitura.svelte';
   import Paleta from '#lib/Paleta.svelte';
@@ -159,6 +160,7 @@
 <div class="pagina">
   {#if !aberta}
     <nav>
+      <canvas class="chuva-nav" use:chuva={{ fundo: 'rgba(15, 19, 24, 0.2)', cor: '#4cc38a', tamanho: 12 }}></canvas>
       <a href="/" class="marca">OrbisOS<span>_</span></a>
       <div class="links" role="menubar">
         <a href="/" class="item-topo" class:ativo={page.url.pathname === '/'}>Início</a>
@@ -415,6 +417,18 @@
     {
       align-items: flex-start;
     }
+  }
+  canvas
+  {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  .chuva-nav
+  {
+    opacity: 0.3;
   }
   .marca, .links, .direita
   {
