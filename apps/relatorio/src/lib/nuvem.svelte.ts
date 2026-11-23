@@ -399,6 +399,8 @@ export function textoDoErro(e: unknown): string
     'auth/network-request-failed': 'Sem conexão com a internet.',
     'auth/requires-recent-login': 'Por segurança, saia e entre de novo antes de fazer isso.',
     'auth/operation-not-allowed': 'Login por e-mail e senha ainda não foi ativado no Firebase.',
+    'auth/missing-email': 'Digite o e-mail da conta.',
+    'auth/unauthorized-continue-uri': 'Este endereço do site não está autorizado no Firebase.',
     'permission-denied': 'Sem permissão para isso. Confira seu papel neste espaço e as regras do Firestore.',
   };
   return frases[codigo] ?? `Não deu certo (${codigo}).`;
@@ -412,6 +414,20 @@ async function persistencia(manter: boolean)
   return { auth, autenticacao };
 }
 
+// perfil da conta no Firestore (usuarios/{uid}/conta/perfil): nome, e-mail, quando criou e o último acesso
+async function gravarPerfil(conta: string, campos: Record<string, unknown>): Promise<void>
+{
+  const { fs, banco } = await servico();
+  try
+  {
+    await fs.setDoc(fs.doc(banco, 'usuarios', conta, 'conta', 'perfil'), { ...campos, ultimoAcesso: new Date().toISOString() }, { merge: true });
+  }
+  catch (e)
+  {
+    nuvem.aviso = `Entrou, mas o perfil não foi salvo no Firebase: ${textoDoErro(e)}`;
+  }
+}
+
 export async function criarConta(nome: string, email: string, senha: string, manter: boolean): Promise<void>
 {
   const { auth, autenticacao } = await persistencia(manter);
@@ -420,6 +436,7 @@ export async function criarConta(nome: string, email: string, senha: string, man
   uid = user.uid;
   nuvem.email = user.email ?? email;
   nuvem.nome = nome;
+  await gravarPerfil(user.uid, { nome, email: nuvem.email, criadoEm: new Date().toISOString(), manterConectada: manter });
 }
 
 export async function entrarComEmail(email: string, senha: string, manter: boolean): Promise<{ nome?: string | undefined; email?: string | undefined }>
@@ -429,13 +446,16 @@ export async function entrarComEmail(email: string, senha: string, manter: boole
   uid = user.uid;
   nuvem.email = user.email ?? email;
   nuvem.nome = user.displayName ?? undefined;
+  await gravarPerfil(user.uid, { email: nuvem.email, ...(user.displayName ? { nome: user.displayName } : {}), manterConectada: manter });
   return { nome: user.displayName ?? undefined, email: user.email ?? email };
 }
 
+// e-mail em português, e o link do e-mail volta para a tela de entrar com o e-mail preenchido
 export async function recuperarSenha(email: string): Promise<void>
 {
   const { auth, autenticacao } = await servico();
-  await auth.sendPasswordResetEmail(autenticacao, email);
+  autenticacao.languageCode = 'pt-BR';
+  await auth.sendPasswordResetEmail(autenticacao, email, { url: `${location.origin}/entrar?email=${encodeURIComponent(email)}` });
 }
 
 export async function trocarSenha(senhaAtual: string, nova: string): Promise<void>
