@@ -84,21 +84,21 @@
 </script>
 
 <div class="tela">
-  <aside class="marca">
-    <canvas use:chuva={{ fundo: 'rgba(16, 32, 29, 0.2)', cor: '#4cc38a', tamanho: 14, fps: 12 }}></canvas>
-    <div class="marca-conteudo">
+  <canvas use:chuva={{ fundo: 'rgba(16, 36, 32, 0.2)', cor: '#4cc38a', tamanho: 14, fps: 12 }}></canvas>
+
+  <div class="centro-tela">
+    <div class="marca">
       <span class="prompt">&gt; supervisao_dev</span>
       <h1>OrbisOS<span class="cursor">_</span></h1>
       <p>Painel, plano da semana, riscos e relatório num lugar só.</p>
-      <ul>
-        <li><span class="ponto"></span>Prints do painel lidos e organizados por pessoa</li>
-        <li><span class="ponto"></span>Metas de prazo e qualidade semana a semana</li>
-        <li><span class="ponto"></span>Tudo salvo na sua conta do Firebase</li>
-      </ul>
     </div>
-  </aside>
 
-  <div class="lado-form">
+    <div class="janela">
+      <div class="barra">
+        <span class="luzes" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="caminho">orbisos://{semConta ? 'local' : modo === 'esqueci' ? 'recuperar' : modo}</span>
+        <span class="status-barra" class:on={comConta}>{comConta ? 'firebase on' : 'local'}</span>
+      </div>
     <form class="caixa" onsubmit={enviar}>
       {#if modo === 'esqueci' && enviadoPara}
         <div class="enviado">
@@ -174,62 +174,63 @@
         {/if}
       {/if}
       {#if erro && enviadoPara}<p class="erro" role="alert">{erro}</p>{/if}
-      <p class="rodape"><span class="status" class:on={comConta}></span>{comConta ? 'Firebase conectado: conta e dados ficam salvos na nuvem' : 'Nuvem desligada: dados só neste navegador'}</p>
     </form>
+    </div>
   </div>
 </div>
 
 <style>
-  /* cobre a tela toda, inclusive a barra do topo */
+  /* cobre a tela toda, inclusive a barra do topo; a chuva ocupa o fundo inteiro */
   .tela
   {
     position: fixed;
     inset: 0;
     z-index: 100;
     display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-    background: #eef3f1;
+    place-items: center;
+    background:
+      radial-gradient(ellipse at 50% 0%, #1d5a4c 0%, transparent 60%),
+      linear-gradient(160deg, #164a40 0%, #123a33 45%, #10241f 100%);
     color: #14201c;
     overflow: auto;
     animation: surgir 0.4s ease-out;
   }
-  .marca
-  {
-    position: relative;
-    overflow: hidden;
-    background: linear-gradient(150deg, #123a33 0%, #10241f 55%, #0c1a17 100%);
-    color: #e9f3ee;
-    display: grid;
-    align-items: center;
-    padding: 48px;
-  }
   canvas
   {
-    position: absolute;
+    position: fixed;
     inset: 0;
     width: 100%;
     height: 100%;
-    opacity: 0.28;
-    mask-image: linear-gradient(to bottom, #000 0%, transparent 85%);
+    opacity: 0.32;
   }
-  .marca-conteudo
+  .centro-tela
   {
     position: relative;
-    max-width: 440px;
+    width: min(440px, calc(100vw - 32px));
     display: grid;
-    gap: 14px;
+    gap: 22px;
+    padding: 32px 0;
+  }
+  .marca
+  {
+    display: grid;
+    gap: 6px;
+    justify-items: center;
+    text-align: center;
+    color: #e9f3ee;
   }
   .prompt
   {
     font-family: var(--fonte-maquina);
     font-size: 0.8rem;
-    color: #6fdba5;
+    color: #8be6b8;
   }
   h1
   {
     margin: 0;
-    font-size: 3rem;
+    font-size: 3.2rem;
     color: #fff;
+    text-shadow: 0 0 24px rgba(76, 195, 138, 0.35);
   }
   .cursor
   {
@@ -239,52 +240,75 @@
   .marca p
   {
     margin: 0;
-    color: #b9cdc4;
-    font-size: 1rem;
+    color: #c4d8cf;
+    font-size: 0.95rem;
   }
-  .marca ul
+  /* o formulário é uma janela de terminal: barra com caminho e estado da nuvem */
+  .janela
   {
-    list-style: none;
-    margin: 10px 0 0;
-    padding: 0;
-    display: grid;
-    gap: 10px;
-    font-size: 0.9rem;
-    color: #d5e4dd;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(139, 230, 184, 0.35);
+    box-shadow: 0 0 0 4px rgba(76, 195, 138, 0.08), 0 24px 60px rgba(0, 0, 0, 0.35);
+    animation: subir 0.5s ease-out;
   }
-  .marca li
+  .barra
   {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
+    padding: 9px 14px;
+    background: #0f2924;
+    font-family: var(--fonte-maquina);
+    font-size: 0.76rem;
+    color: #8fb3a5;
   }
-  .ponto
+  .luzes
   {
-    width: 8px;
-    height: 8px;
+    display: flex;
+    gap: 6px;
+  }
+  .luzes i
+  {
+    width: 9px;
+    height: 9px;
+    background: #2c5248;
+  }
+  .luzes i:first-child
+  {
     background: #4cc38a;
-    box-shadow: 0 0 10px #4cc38a;
-    flex: none;
   }
-  .lado-form
+  .caminho
   {
-    display: grid;
-    place-items: center;
-    padding: 32px 16px;
-    background:
-      radial-gradient(circle at 85% 10%, rgba(76, 195, 138, 0.14), transparent 45%),
-      #eef3f1;
+    flex: 1;
+    color: #d5ebe1;
+  }
+  .status-barra
+  {
+    color: #8fb3a5;
+  }
+  .status-barra.on
+  {
+    color: #6fdba5;
+  }
+  .status-barra.on::before
+  {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: #4cc38a;
+    box-shadow: 0 0 8px #4cc38a;
+    vertical-align: middle;
   }
   .caixa
   {
-    width: min(400px, 100%);
     display: grid;
     gap: 16px;
-    padding: 32px 28px 22px;
-    border: 1px solid #d5e0db;
-    border-radius: 16px;
+    padding: 26px 26px 22px;
     background: #ffffff;
-    box-shadow: 0 1px 2px rgba(16, 36, 31, 0.06), 0 18px 50px rgba(16, 36, 31, 0.1);
   }
   header
   {
@@ -477,28 +501,6 @@
   {
     font-size: 0.8rem !important;
   }
-  .rodape
-  {
-    margin: 2px 0 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    font-size: 0.75rem;
-    color: #6f7d77;
-  }
-  .status
-  {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #b3bdb9;
-  }
-  .status.on
-  {
-    background: #1f9d68;
-    box-shadow: 0 0 0 3px rgba(31, 157, 104, 0.18);
-  }
   @keyframes piscar
   {
     50%
@@ -513,29 +515,17 @@
       opacity: 0;
     }
   }
-  @media (max-width: 820px)
+  @keyframes subir
   {
-    .tela
+    from
     {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr;
-    }
-    .marca
-    {
-      padding: 28px 20px;
-    }
-    .marca ul
-    {
-      display: none;
-    }
-    h1
-    {
-      font-size: 2.2rem;
+      opacity: 0;
+      transform: translateY(12px);
     }
   }
   @media (prefers-reduced-motion: reduce)
   {
-    .tela, .cursor
+    .tela, .cursor, .janela
     {
       animation: none;
     }
