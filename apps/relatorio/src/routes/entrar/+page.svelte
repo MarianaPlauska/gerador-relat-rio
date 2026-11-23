@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { carregar, salvar } from '#lib/armazenamento.ts';
   import { chuva } from '#lib/chuva.ts';
   import { criarConta, entrarComEmail, nuvem, recuperarSenha, textoDoErro } from '#lib/nuvem.svelte.ts';
@@ -7,8 +8,9 @@
 
   const dados = carregar();
   const comConta = nuvem.estado !== 'desligada';
-  let modo = $state<'entrar' | 'criar' | 'esqueci'>('entrar');
-  let semConta = $state(!comConta);
+  const pedidoModo = page.url.searchParams.get('modo');
+  let modo = $state<'entrar' | 'criar' | 'esqueci'>(pedidoModo === 'esqueci' ? 'esqueci' : pedidoModo === 'criar' ? 'criar' : 'entrar');
+  let semConta = $state(!comConta && pedidoModo !== 'conta' && pedidoModo !== 'esqueci');
   let nome = $state(dados.identificacao.elaboradoPor);
   let email = $state('');
   let senha = $state('');
@@ -51,9 +53,8 @@
       }
       else
       {
-        await entrarComEmail(email.trim(), senha, manter);
-        // o nome da conta vem do Firebase, que já avisou a nuvem; se faltar, usa o começo do e-mail
-        concluir(nuvem.nome || dados.identificacao.elaboradoPor || email.split('@')[0]!, email.trim());
+        const conta = await entrarComEmail(email.trim(), senha, manter);
+        concluir(conta.nome || nuvem.nome || dados.identificacao.elaboradoPor || email.split('@')[0]!, conta.email ?? email.trim());
       }
     }
     catch (e2)

@@ -2,9 +2,13 @@
   import { agoraLocal, marcasAtuais, nomesMarca, pontosDoRelatorio, resumirRetornos, type Publicacao, type RespostaInterativa } from '@supervisao/core';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import { carregar } from '#lib/armazenamento.ts';
   import { apagarResposta, excluirPublicacao, linkDe, mudarAtivo, minhasPublicacoes, ouvirRespostas } from '#lib/links.ts';
   import { nuvem, textoDoErro } from '#lib/nuvem.svelte.ts';
   import { copiar } from '#lib/saidas.ts';
+
+  // garante que a autenticação na nuvem esteja iniciada mesmo abrindo /retornos diretamente
+  carregar();
 
   type Item = { codigo: string } & Publicacao;
   const chaveVisto = 'orbisos-retornos-visto';
@@ -153,8 +157,14 @@
 
   {#if nuvem.estado === 'desligada'}
     <section class="cartao"><p>Os links dependem da nuvem, que ainda está desligada. Veja <a href="/perfil">Meu perfil</a>.</p></section>
+  {:else if nuvem.verificando}
+    <section class="cartao"><p class="dica">Verificando sua conta na nuvem...</p></section>
   {:else if !logada}
-    <section class="cartao"><p>Entre na sua conta para ver os relatórios publicados e as respostas. <a href="/entrar">Entrar</a></p></section>
+    <section class="cartao">
+      <h2>Conecte sua conta na nuvem</h2>
+      <p>Sua sessão atual está apenas no modo local deste navegador. Para ver os relatórios publicados e as respostas recebidas, entre com seu e-mail e senha.</p>
+      <p><a class="botao principal" href="/entrar?modo=conta">Entrar com e-mail e senha</a></p>
+    </section>
   {:else}
     {#if erro}<p class="aviso">{erro}</p>{/if}
 

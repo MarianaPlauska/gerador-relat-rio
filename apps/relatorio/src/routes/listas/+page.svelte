@@ -8,7 +8,8 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { carregar, salvar, type Dados } from '#lib/armazenamento.ts';
+  import { carregar, salvar, salvarAgora, type Dados } from '#lib/armazenamento.ts';
+  import { nuvem } from '#lib/nuvem.svelte.ts';
   import { lerImagem } from '#lib/ocr.ts';
   import { baixarCsv, lerArquivoPlanilha } from '#lib/planilha.ts';
   import { copiar } from '#lib/saidas.ts';
@@ -95,8 +96,11 @@
   function criar()
   {
     const modelo = modelosDeLista.find((m) => m.nome === nomeNova.trim());
-    const l = novaLista(nomeNova.trim() || 'Nova lista', etapasNova.split('\n'), modelo?.descricao ?? '', dia, fasesNova.split('\n').map((f) => f.trim()).filter(Boolean));
-    dados.listas.push(l);
+    const etapasLimpas = etapasNova.split('\n').map((e) => e.trim()).filter(Boolean);
+    const fasesLimpas = fasesNova.split('\n').map((f) => f.trim()).filter(Boolean);
+    const l = novaLista(nomeNova.trim() || 'Nova lista', etapasLimpas, modelo?.descricao ?? '', dia, fasesLimpas);
+    dados.listas = [...dados.listas, l];
+    salvarAgora($state.snapshot(dados));
     atualId = l.id;
     criando = false;
     aba = 'lista';
@@ -107,6 +111,7 @@
   {
     if (!confirm(`Excluir a lista "${l.nome}" com ${l.itens.length} itens, o diário e as anotações?`)) return;
     dados.listas = dados.listas.filter((x) => x.id !== l.id);
+    salvarAgora($state.snapshot(dados));
     atualId = dados.listas[0]?.id;
     criando = !dados.listas.length;
   }
@@ -155,6 +160,7 @@
     const novos = itensDoTexto(colado, l.itens.map((i) => i.nome), dia);
     for (const i of novos) i.faseId = faseDosNovos || undefined;
     l.itens.push(...novos);
+    salvarAgora($state.snapshot(dados));
     colado = '';
     avisoImport = `${novos.length} itens adicionados.`;
   }
@@ -194,6 +200,7 @@
   {
     if (!planilha) return;
     const r = importarPlanilha(planilha, l);
+    salvarAgora($state.snapshot(dados));
     avisoImport = `Importado: ${r.novos} novos, ${r.atualizados} atualizados${r.etapasNovas.length ? `, etapas novas: ${r.etapasNovas.join(', ')}` : ''}${r.fasesNovas.length ? `, fases novas: ${r.fasesNovas.join(', ')}` : ''}.`;
     planilha = undefined;
   }
@@ -256,7 +263,22 @@
 <main>
   <span class="prompt">&gt; listas</span>
   <h1>Listas de checagem<span class="cursor">_</span></h1>
-  <p class="dica">Fases com data, etapas suas, uma linha por empresa e um diário com tudo o que você marcou e anotou.</p>
+  <p class="dica">
+    Fases com data, etapas suas, uma linha por empresa e um diário com tudo o que você marcou e anotou.
+    <span class="pilula" class:verde={nuvem.estado === 'ok'} class:amarelo={nuvem.estado === 'sincronizando' || nuvem.estado === 'sem_login'} class:atencao={nuvem.estado === 'erro'}>
+      {#if nuvem.estado === 'ok'}
+        Salvo no banco ({nuvem.email})
+      {:else if nuvem.estado === 'sincronizando'}
+        Salvando no banco...
+      {:else if nuvem.estado === 'erro'}
+        Erro ao sincronizar no banco
+      {:else if nuvem.verificando}
+        Verificando conta...
+      {:else}
+        Salvo neste navegador (<a href="/entrar?modo=conta">entrar na conta</a> para salvar na nuvem)
+      {/if}
+    </span>
+  </p>
 
   <nav class="abas">
     {#each dados.listas as l (l.id)}

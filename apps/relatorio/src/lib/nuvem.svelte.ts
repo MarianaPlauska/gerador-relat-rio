@@ -18,8 +18,9 @@ import { idsDeImagemUsados, separarImagens } from './imagens.ts';
 // o espaço de outra pessoa (guardado em localStorage, 'orbisos-espaco'). Sem valor, vale o espaço próprio e as chaves
 // do navegador continuam as de sempre; num espaço compartilhado elas ganham o sufixo `--{dono}` para não misturar donos.
 
-export const nuvem = $state<{ estado: 'desligada' | 'sem_login' | 'sincronizando' | 'ok' | 'erro'; email?: string | undefined; nome?: string | undefined; ultimoEnvio?: string | undefined; erro?: string | undefined }>({
+export const nuvem = $state<{ estado: 'desligada' | 'sem_login' | 'sincronizando' | 'ok' | 'erro'; verificando: boolean; email?: string | undefined; nome?: string | undefined; ultimoEnvio?: string | undefined; erro?: string | undefined }>({
   estado: firebaseConfig.apiKey ? 'sem_login' : 'desligada',
+  verificando: !!firebaseConfig.apiKey,
 });
 
 const CHAVE_ESPACO = 'orbisos-espaco';
@@ -79,6 +80,9 @@ let registrosNaNuvem = new Map<string, string>();
 let imagensNaNuvem = new Set<string>();
 const imagensPendentes = new Map<string, string>();
 let espera: ReturnType<typeof setTimeout> | undefined;
+let ultimoDadosPendente: Dados | undefined;
+let iniciada = false;
+let ouvinteSaida = false;
 // só envia depois da primeira sincronização desta sessão
 let pronto = false;
 
@@ -152,13 +156,25 @@ const idDaFoto = (f: Snapshot): string => (f.pasta && f.pasta.toUpperCase() !== 
 
 export function iniciarNuvem(aoReceber: (dados: Dados, quando: string, primeiraVez: boolean) => void, local: () => Dados): void
 {
-  if (nuvem.estado === 'desligada' || servicos) return;
+  if (nuvem.estado === 'desligada' || iniciada) return;
+  iniciada = true;
+  if (!ouvinteSaida && typeof document !== 'undefined')
+  {
+    ouvinteSaida = true;
+    const descarregar = () =>
+    {
+      if (document.visibilityState === 'hidden') void enviarPendenteAgora();
+    };
+    document.addEventListener('visibilitychange', descarregar);
+    window.addEventListener('pagehide', () => void enviarPendenteAgora());
+  }
   servico().then(({ auth, autenticacao }) =>
   {
     auth.onAuthStateChanged(autenticacao, async (usuario) =>
     {
       uid = usuario?.uid;
       pronto = false;
+      nuvem.verificando = false;
       nuvem.email = usuario?.email ?? undefined;
       nuvem.nome = usuario?.displayName ?? undefined;
       if (!uid)
@@ -177,9 +193,15 @@ export function iniciarNuvem(aoReceber: (dados: Dados, quando: string, primeiraV
         pronto = true;
         // leitor nunca envia: a nuvem sempre vence, e o que ele mexer na tela não volta para o dono
         if (remoto && (primeiraVez || somenteLeitura() || remoto.quando > quandoLocal())) aoReceber(remoto.dados, remoto.quando, primeiraVez);
-        else if (!somenteLeitura()) await enviar(local());
+        else if (!somenteLeitura()) await enviar(ultimoDadosPendente ?? local());
+        ultimoDadosPendente = undefined;
       });
     });
+  }).catch((e) =>
+  {
+    nuvem.verificando = false;
+    nuvem.estado = 'erro';
+    nuvem.erro = String(e);
   });
 }
 
@@ -292,10 +314,26 @@ async function enviar(dadosCompletos: Dados)
 export function agendarEnvio(dados: Dados, imagens: Map<string, string> = new Map()): void
 {
   // leitor não grava nada no espaço do dono (as regras do Firestore também recusam)
-  if (!uid || !pronto || somenteLeitura()) return;
+  if (somenteLeitura()) return;
   for (const [id, url] of imagens) imagensPendentes.set(id, url);
+  ultimoDadosPendente = dados;
+  if (!uid || !pronto) return;
   clearTimeout(espera);
-  espera = setTimeout(() => executar(() => enviar(dados)), 2000);
+  espera = setTimeout(() =>
+  {
+    const enviarDados = ultimoDadosPendente;
+    ultimoDadosPendente = undefined;
+    if (enviarDados) void executar(() => enviar(enviarDados));
+  }, 800);
+}
+
+export async function enviarPendenteAgora(): Promise<void>
+{
+  if (!uid || !pronto || somenteLeitura() || !ultimoDadosPendente) return;
+  clearTimeout(espera);
+  const enviarDados = ultimoDadosPendente;
+  ultimoDadosPendente = undefined;
+  await executar(() => enviar(enviarDados));
 }
 
 // uma imagem de print guardada na nuvem; o cache do Firestore evita baixar de novo
@@ -342,13 +380,19 @@ export async function criarConta(nome: string, email: string, senha: string, man
   const { auth, autenticacao } = await persistencia(manter);
   const { user } = await auth.createUserWithEmailAndPassword(autenticacao, email, senha);
   await auth.updateProfile(user, { displayName: nome });
+  uid = user.uid;
+  nuvem.email = user.email ?? email;
   nuvem.nome = nome;
 }
 
-export async function entrarComEmail(email: string, senha: string, manter: boolean): Promise<void>
+export async function entrarComEmail(email: string, senha: string, manter: boolean): Promise<{ nome?: string | undefined; email?: string | undefined }>
 {
   const { auth, autenticacao } = await persistencia(manter);
-  await auth.signInWithEmailAndPassword(autenticacao, email, senha);
+  const { user } = await auth.signInWithEmailAndPassword(autenticacao, email, senha);
+  uid = user.uid;
+  nuvem.email = user.email ?? email;
+  nuvem.nome = user.displayName ?? undefined;
+  return { nome: user.displayName ?? undefined, email: user.email ?? email };
 }
 
 export async function recuperarSenha(email: string): Promise<void>

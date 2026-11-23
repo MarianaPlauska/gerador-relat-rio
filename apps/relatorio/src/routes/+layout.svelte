@@ -10,7 +10,6 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { carregar, exportarJson } from '#lib/armazenamento.ts';
-  import { chuva } from '#lib/chuva.ts';
   import Abertura from '#lib/Abertura.svelte';
   import FaixaSomenteLeitura from '#lib/FaixaSomenteLeitura.svelte';
   import Paleta from '#lib/Paleta.svelte';
@@ -80,9 +79,11 @@
   let paletaAberta = $state(false);
   let abertura = $state(false);
 
-  // a abertura com o nome aparece uma vez por navegador, na Início, para quem tem movimento reduzido ela não aparece
+  // inicia a sincronização da conta em todas as telas (incluindo /retornos e /perfil)
+  // e controla a abertura (uma vez por navegador, na Início)
   onMount(() =>
   {
+    carregar();
     try
     {
       if (localStorage.getItem('orbisos-abertura') || page.url.pathname !== '/' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -93,6 +94,25 @@
       // sem armazenamento: sem abertura
     }
   });
+
+  let quadroMouse = 0;
+  function moverMouse(e: PointerEvent)
+  {
+    if (quadroMouse) return;
+    const x = e.clientX;
+    const y = e.clientY;
+    quadroMouse = requestAnimationFrame(() =>
+    {
+      quadroMouse = 0;
+      document.documentElement.style.setProperty('--mx', `${x}px`);
+      document.documentElement.style.setProperty('--my', `${y}px`);
+    });
+  }
+  function sairMouse()
+  {
+    document.documentElement.style.setProperty('--mx', '-999px');
+    document.documentElement.style.setProperty('--my', '-999px');
+  }
 
   function terminarAbertura()
   {
@@ -134,10 +154,11 @@
   }
 </script>
 
+<svelte:window onpointermove={moverMouse} onpointerleave={sairMouse} />
+
 <div class="pagina">
   {#if !aberta}
     <nav>
-      <canvas class="chuva-nav" use:chuva={{ fundo: 'rgba(15, 19, 24, 0.2)', cor: '#4cc38a', tamanho: 12 }}></canvas>
       <a href="/" class="marca">OrbisOS<span>_</span></a>
       <div class="links" role="menubar">
         <a href="/" class="item-topo" class:ativo={page.url.pathname === '/'}>Início</a>
@@ -192,8 +213,13 @@
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content class="menu-conta" sideOffset={8} align="end">
-              <div class="menu-titulo">{nome || 'sem nome'}</div>
-              <DropdownMenu.Item class="menu-item" onSelect={() => goto('/perfil')}>Meu perfil</DropdownMenu.Item>
+              <div class="menu-titulo">
+                {nome || 'sem nome'}
+                <span class="menu-sub">{nuvem.email ?? (nuvem.verificando ? 'verificando conta...' : 'modo local')}</span>
+              </div>
+              <DropdownMenu.Item class="menu-item" onSelect={() => goto('/perfil')}>Meu perfil e pedidos</DropdownMenu.Item>
+              <DropdownMenu.Item class="menu-item" onSelect={() => goto('/perfil#seguranca')}>Trocar / recuperar senha</DropdownMenu.Item>
+              <DropdownMenu.Item class="menu-item" onSelect={() => goto('/retornos')}>Retornos dos links</DropdownMenu.Item>
               <DropdownMenu.Item class="menu-item" onSelect={() => exportarJson(carregar())}>Baixar backup</DropdownMenu.Item>
               <DropdownMenu.Item class="menu-item" onSelect={trocarTema}>Tema {escuro ? 'claro' : 'escuro'}</DropdownMenu.Item>
               <DropdownMenu.Separator class="menu-separador" />
@@ -389,18 +415,6 @@
     {
       align-items: flex-start;
     }
-  }
-  canvas
-  {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-  }
-  .chuva-nav
-  {
-    opacity: 0.3;
   }
   .marca, .links, .direita
   {
@@ -609,6 +623,14 @@
     font-size: 0.78rem;
     color: var(--suave);
     padding: var(--size-1) var(--size-2) var(--size-2);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .menu-sub
+  {
+    font-size: 0.7rem;
+    opacity: 0.8;
   }
   :global(.menu-item)
   {

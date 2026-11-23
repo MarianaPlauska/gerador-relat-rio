@@ -3,7 +3,7 @@ import
   agoraLocal, dicionarioPadrao, migrarAta, migrarFluxograma, migrarLista, migrarMatriz, migrarPlanilha, migrarVivo,
   type Ata, type Fluxograma, type MatrizPriorizacao, type Planilha, type RelatorioVivo, pessoasExemplo, type Bloco, type ControleCard, type Lista, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type RegistroPainel, type Risco, type Snapshot,
 } from '@supervisao/core';
-import { agendarEnvio, baixarImagem, chaveDoEspaco, imagemConfirmada, iniciarNuvem, marcarLocal, nuvemPronta, somenteLeitura } from './nuvem.svelte.ts';
+import { agendarEnvio, baixarImagem, chaveDoEspaco, enviarPendenteAgora, imagemConfirmada, iniciarNuvem, marcarLocal, nuvemPronta, somenteLeitura } from './nuvem.svelte.ts';
 import { capturasSemImagem, separarImagens } from './imagens.ts';
 
 // o que eu escrevo no relatório de cada foto
@@ -140,9 +140,31 @@ export function salvar(dados: Dados): void
     if (imagens.size) agendarEnvio(leve, imagens);
     return;
   }
-  localStorage.setItem(chave(), json);
+  try
+  {
+    localStorage.setItem(chave(), json);
+  }
+  catch
+  {
+    // se o localStorage encher por causa de prints em base64, salva a versão leve (sem imagemDataUrl) para não perder listas nem dados
+    const semImagens = separarImagens(dados);
+    try
+    {
+      localStorage.setItem(chave(), JSON.stringify(semImagens.leve));
+    }
+    catch
+    {
+      // navegador sem espaço: segue enviando para a nuvem
+    }
+  }
   marcarLocal();
   agendarEnvio(leve, imagens);
+}
+
+export function salvarAgora(dados: Dados): void
+{
+  salvar(dados);
+  void enviarPendenteAgora();
 }
 
 // as telas que mostram ou emitem prints (diário, relatório) chamam isto: baixa da nuvem as imagens que os dados

@@ -147,7 +147,7 @@
         <p class="mudou"><b>Mudou desde antes:</b> {cap.repetidos.filter((r) => r.mudou.length).slice(0, 5).map((r) => `${r.codigo} (${r.mudou.join('; ')})`).join(' | ')}</p>
       {/if}
       <label class="comentario">Seu comentário sobre este print
-        <textarea rows="2" value={cap.comentario} oninput={(e) => { cap.comentario = e.currentTarget.value; }} placeholder="O que você acha desta etapa? O que está acontecendo, o que vai fazer, o que preocupa..."></textarea>
+        <textarea rows="2" value={cap.comentario} oninput={(e) => { cap.comentario = e.currentTarget.value; }} placeholder="O que cada pessoa vai fazer, comentários por etapa, por que faremos isso, uso do tempo livre (ex.: suporte)..."></textarea>
       </label>
       {#if cap.sugestoes.length}
         <p class="dica"><b>Sugestões:</b> {cap.sugestoes.join(' ')}
