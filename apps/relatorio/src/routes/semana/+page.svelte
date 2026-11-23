@@ -2,11 +2,12 @@
   import EstadoNuvem from '#lib/EstadoNuvem.svelte';
   import
   {
-    agoraLocal, alertasDoPlano, confirmarPlano, horasPlanejadas, kpisDosItens, pendenciasDaSemana, segundaDaSemana, somarDias, sugerirItens,
+    agoraLocal, alertasDoPlano, chaveDoItemPlano, confirmarPlano, historicoDaFila, horasPlanejadas, kpisDosItens, pendenciasDaSemana, segundaDaSemana, somarDias, sugerirItens,
     type Alerta, type CardSnapshot, type ItemPlano, type PlanoPessoa, type PlanoSemana, type Ritmo, type Risco,
   } from '@supervisao/core';
   import { carregar, hidratarImagens, salvar, salvarAgora, type Dados, type GovernancaSemana } from '#lib/armazenamento.ts';
   import { nuvem } from '#lib/nuvem.svelte.ts';
+  import { etapasDoItem, etapasHerdadas, historicoDasSemanas, metaDoMes, type EtapaItem } from '#lib/governanca.ts';
   import { copiar } from '#lib/saidas.ts';
 
   let dados = $state<Dados>(carregar());
@@ -105,6 +106,8 @@
     return { ok, total, maioriaOk: total > 0 && ok >= Math.ceil(total / 2) };
   });
 
+  const historico = $derived(historicoDasSemanas(dados, semana));
+
   // radar 48h: itens não concluídos vencendo em até 2 dias (48h) ou já em risco/atrasados
   const limite48h = $derived(somarDias(hoje, 2));
   const radar48h = $derived.by(() =>
@@ -166,35 +169,64 @@
     salvarAgora($state.snapshot(dados));
   }
 
-  function adicionarEtapaItem(itemId: string)
+  const etapasDe = (item: ItemPlano): EtapaItem[] => etapasDoItem(dados, semana, item);
+  const herdou = (item: ItemPlano) => !gov.etapasPorItem?.[item.id] && etapasHerdadas(dados, semana, item).length > 0;
+
+  // ao mexer pela primeira vez numa etapa herdada, ela passa a ser desta semana (cópia; a semana anterior fica como estava)
+  function etapasEditaveis(item: ItemPlano): EtapaItem[]
   {
-    const texto = (novaEtapaPorItem[itemId] ?? '').trim();
-    if (!texto) return;
     const g = garantirGov();
     g.etapasPorItem ??= {};
-    g.etapasPorItem[itemId] = [...(g.etapasPorItem[itemId] ?? []), { texto, feita: false }];
+    g.etapasPorItem[item.id] ??= etapasHerdadas(dados, semana, item).map((e) => ({ ...e }));
+    return g.etapasPorItem[item.id]!;
+  }
+
+  function gravarEtapas()
+  {
     dados.governancaSemanal = { ...dados.governancaSemanal };
-    novaEtapaPorItem[itemId] = '';
     salvarAgora($state.snapshot(dados));
   }
 
-  function alternarEtapaItem(itemId: string, idx: number)
+  function adicionarEtapaItem(item: ItemPlano)
   {
-    const g = garantirGov();
-    const lista = g.etapasPorItem?.[itemId];
-    if (!lista?.[idx]) return;
+    const texto = (novaEtapaPorItem[item.id] ?? '').trim();
+    if (!texto) return;
+    etapasEditaveis(item).push({ texto, feita: false });
+    novaEtapaPorItem[item.id] = '';
+    gravarEtapas();
+  }
+
+  function alternarEtapaItem(item: ItemPlano, idx: number)
+  {
+    const lista = etapasEditaveis(item);
+    if (!lista[idx]) return;
     lista[idx]!.feita = !lista[idx]!.feita;
-    dados.governancaSemanal = { ...dados.governancaSemanal };
-    salvarAgora($state.snapshot(dados));
+    gravarEtapas();
   }
 
-  function removerEtapaItem(itemId: string, idx: number)
+  function removerEtapaItem(item: ItemPlano, idx: number)
   {
     const g = garantirGov();
-    if (!g.etapasPorItem?.[itemId]) return;
-    g.etapasPorItem[itemId] = g.etapasPorItem[itemId]!.filter((_, i) => i !== idx);
-    dados.governancaSemanal = { ...dados.governancaSemanal };
-    salvarAgora($state.snapshot(dados));
+    g.etapasPorItem![item.id] = etapasEditaveis(item).filter((_, i) => i !== idx);
+    gravarEtapas();
+  }
+
+  function horasDaEtapa(item: ItemPlano, idx: number, campo: 'horasEstimadas' | 'horasReais', valor: string)
+  {
+    const lista = etapasEditaveis(item);
+    if (!lista[idx]) return;
+    lista[idx]![campo] = valor === '' ? undefined : Number(valor);
+    gravarEtapas();
+  }
+
+  // soma das horas das etapas do item, quando foram preenchidas
+  function horasDasEtapas(item: ItemPlano): { est?: number; real?: number }
+  {
+    const lista = etapasDe(item);
+    const soma = (f: (e: EtapaItem) => number | undefined) => (lista.some((e) => f(e) !== undefined) ? lista.reduce((s, e) => s + (f(e) ?? 0), 0) : undefined);
+    const est = soma((e) => e.horasEstimadas);
+    const real = soma((e) => e.horasReais);
+    return { ...(est !== undefined ? { est } : {}), ...(real !== undefined ? { real } : {}) };
   }
 
   function definirHorasReais(itemId: string, val: string)
@@ -237,7 +269,7 @@
       linhas.push(`- ${pessoa.nome} (${horasPlanejadas(pp)}h / ${pessoa.capacidadeHorasSemana}h):`);
       for (const item of pp.itens)
       {
-        const etapas = gov.etapasPorItem?.[item.id] ?? [];
+        const etapas = etapasDe(item);
         const etTxt = etapas.length ? ` [etapas: ${etapas.map((e) => `${e.feita ? '✓' : '○'} ${e.texto}`).join('; ')}]` : '';
         linhas.push(`  • ${item.cardCodigo ? `[${item.cardCodigo}] ` : ''}${item.descricao || 'Sem descrição'}${item.ate ? ` (até ${dataCurta(item.ate)})` : ''}${item.horasEstimadas ? ` ~${item.horasEstimadas}h` : ''}${etTxt}`);
       }
@@ -437,6 +469,28 @@
         <label>Backlog fim <input type="number" min="0" class="mini" value={gov.backlogFimSemana ?? statusBacklog.atual ?? ''} onchange={(e) => atualizarGov({ backlogFimSemana: e.currentTarget.value === '' ? undefined : Number(e.currentTarget.value) })} /></label>
       </div>
     </div>
+    {#if historico.length}
+      <div class="historico-fila">
+        <h3>Semana a semana</h3>
+        <table>
+          <thead><tr><th>Semana</th><th class="num">Entradas</th><th class="num">Saídas</th><th class="num">Saldo</th><th class="num">Backlog</th><th class="num">Prazo (meta)</th><th class="num">Qualidade</th></tr></thead>
+          <tbody>
+            {#each historico as h (h.semana)}
+              <tr class:atual={h.semana === semana}>
+                <td class="maquina">{dataCurta(h.semana)}</td>
+                <td class="num">{h.entradas ?? '-'}</td>
+                <td class="num">{h.saidas ?? '-'}</td>
+                <td class="num" class:ruim={h.saidasOk === false} class:bom={h.saidasOk === true}>{h.saldo === undefined ? '-' : `${h.saldo > 0 ? '+' : ''}${h.saldo}`}</td>
+                <td class="num" class:ruim={h.cresceu2Seguidas}>{h.backlog ?? '-'}{h.backlogCresceu === true ? ' ▲' : h.backlogCresceu === false ? ' ▼' : ''}</td>
+                <td class="num" class:ruim={h.prazoPct !== undefined && h.prazoPct < metaDoMes(h.semana)}>{h.prazoPct !== undefined ? `${h.prazoPct}%` : '-'} ({metaDoMes(h.semana)}%)</td>
+                <td class="num" class:ruim={h.qualidadePct !== undefined && h.qualidadePct < 95}>{h.qualidadePct !== undefined ? `${h.qualidadePct}%` : '-'}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+        <p class="dica">Saldo é saídas menos entradas (positivo: a fila diminuiu). Backlog em vermelho: cresceu 2 semanas seguidas. Entradas, saídas e backlog vêm do que você preenche acima; sem isso, saídas e backlog vêm da foto do painel.</p>
+      </div>
+    {/if}
   </section>
 
   {#if !plano}
@@ -542,7 +596,8 @@
         {#each pp.itens as item (item.id)}
           {@const card = item.cardCodigo ? porCodigo.get(item.cardCodigo) : undefined}
           {@const meus = alertasDoItem(item.id)}
-          {@const etapasItem = gov.etapasPorItem?.[item.id] ?? []}
+          {@const etapasItem = etapasDe(item)}
+          {@const somaEtapas = horasDasEtapas(item)}
           <div class="item" class:feito={item.status === 'feito'} class:com-alerta={meus.length}>
             <div class="linha1">
               <select bind:value={item.cardCodigo} class="card">
@@ -565,25 +620,31 @@
             <!-- quebra da demanda em etapas (sincronizada no Firebase) -->
             <div class="etapas-quebra">
               {#if etapasItem.length}
+                {#if herdou(item)}<span class="dica">Etapas trazidas da semana anterior (mesmo card e descrição).</span>{/if}
                 <div class="etapas-chips">
                   {#each etapasItem as et, idx (idx)}
-                    <label class="etapa-chip" class:concluida={et.feita}>
-                      <input type="checkbox" checked={et.feita} onchange={() => alternarEtapaItem(item.id, idx)} />
+                    <span class="etapa-chip" class:concluida={et.feita}>
+                      <input type="checkbox" checked={et.feita} onchange={() => alternarEtapaItem(item, idx)} aria-label="Etapa feita" />
                       <span>{et.texto}</span>
-                      <button type="button" class="link" onclick={() => removerEtapaItem(item.id, idx)} aria-label="Remover etapa">&times;</button>
-                    </label>
+                      <input type="number" min="0" step="0.5" class="micro" value={et.horasEstimadas ?? ''} placeholder="est h" title="Horas estimadas da etapa" onchange={(e) => horasDaEtapa(item, idx, 'horasEstimadas', e.currentTarget.value)} />
+                      <input type="number" min="0" step="0.5" class="micro" value={et.horasReais ?? ''} placeholder="real h" title="Horas reais da etapa" onchange={(e) => horasDaEtapa(item, idx, 'horasReais', e.currentTarget.value)} />
+                      <button type="button" class="link" onclick={() => removerEtapaItem(item, idx)} aria-label="Remover etapa">&times;</button>
+                    </span>
                   {/each}
                 </div>
+                {#if somaEtapas.est !== undefined || somaEtapas.real !== undefined}
+                  <span class="dica">Etapas somam {somaEtapas.est ?? '-'} h estimadas e {somaEtapas.real ?? '-'} h reais{item.horasEstimadas && somaEtapas.est !== undefined && somaEtapas.est !== item.horasEstimadas ? ` (o item diz ${item.horasEstimadas} h)` : ''}.</span>
+                {/if}
               {/if}
               <div class="etapa-nova">
                 <input
                   value={novaEtapaPorItem[item.id] ?? ''}
                   oninput={(e) => (novaEtapaPorItem[item.id] = e.currentTarget.value)}
-                  onkeydown={(e) => e.key === 'Enter' && adicionarEtapaItem(item.id)}
+                  onkeydown={(e) => e.key === 'Enter' && adicionarEtapaItem(item)}
                   placeholder="+ Quebrar demanda em etapa (Enter para adicionar)..."
                 />
                 {#if (novaEtapaPorItem[item.id] ?? '').trim()}
-                  <button type="button" onclick={() => adicionarEtapaItem(item.id)}>+ Etapa</button>
+                  <button type="button" onclick={() => adicionarEtapaItem(item)}>+ Etapa</button>
                 {/if}
               </div>
             </div>
@@ -735,6 +796,29 @@
     align-items: center;
     gap: 6px;
     color: var(--texto);
+  }
+  .historico-fila
+  {
+    margin-top: var(--size-4);
+    overflow-x: auto;
+  }
+  .historico-fila tr.atual td
+  {
+    font-weight: 700;
+  }
+  .historico-fila .ruim
+  {
+    color: var(--vermelho);
+  }
+  .historico-fila .bom
+  {
+    color: var(--verde);
+  }
+  .micro
+  {
+    width: 62px;
+    padding: 1px 4px;
+    font-size: 0.78rem;
   }
   .gov-fluxo-inputs
   {

@@ -42,7 +42,7 @@ export interface GovernancaSemana
   saidasSemana?: number | undefined;
   backlogFimSemana?: number | undefined;
   qualidadeManualPct?: number | undefined;
-  etapasPorItem?: Record<string, { texto: string; feita: boolean }[]> | undefined;
+  etapasPorItem?: Record<string, { texto: string; feita: boolean; horasEstimadas?: number | undefined; horasReais?: number | undefined }[]> | undefined;
   horasReaisPorItem?: Record<string, number> | undefined;
   sinalizado48hPorItem?: Record<string, string> | undefined;
 }

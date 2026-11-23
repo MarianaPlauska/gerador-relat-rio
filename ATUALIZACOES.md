@@ -211,3 +211,7 @@ Registro de diretrizes visuais, regras de negocio e funcionalidades implementada
 - **Semana**: cada pessoa mostra os prints da semana (miniatura, o que vai fazer e por quê) e tem "+ Print para esta semana", que abre o Diário com a pessoa e a semana marcadas.
 - **Firebase** (`nuvem.svelte.ts`, `EstadoNuvem.svelte`): os dados sobem antes das imagens; imagem que falha não segura o resto; aviso perto de 1 MB; estado real com o erro escrito e "tentar de novo" na Semana e no Diário.
 - **PDF**: nova seção "Extrato da semana" no modelo semanal (metas do mês, quem fica com o quê com estimado x realizado e etapas, riscos de prazo e avisos de 48 h, entradas, saídas e backlog, o que cada pessoa vai fazer e por quê). "Baixar PDF" mostra o erro; fonte que falhou carrega de novo; seção desconhecida e imagem fora de JPEG/PNG não derrubam o PDF.
+
+- **Etapas que acompanham o item** (`lib/governanca.ts`): o item que passa para a semana seguinte traz as etapas da semana anterior (mesmo card e descrição, `chaveDoItemPlano`); ao editar, elas viram desta semana.
+- **Horas por etapa**: cada etapa tem horas estimadas e reais; a Semana mostra a soma e o PDF mostra "(est/real h)" por etapa.
+- **Semana a semana** (`historicoDaFila` no core): entradas, saídas, saldo, backlog, prazo com a meta do mês e qualidade das últimas 8 semanas, na Semana e no extrato do PDF, com o backlog em vermelho quando cresce 2 semanas seguidas.

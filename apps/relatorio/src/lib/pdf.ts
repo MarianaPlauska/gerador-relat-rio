@@ -14,6 +14,7 @@ import texto600 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-600-no
 import type { Dados, NotasRelatorio } from './armazenamento.ts';
 import { svgDoFluxo } from './fluxograma.ts';
 import { cores, svgBarrasComparadas, svgBarrasEmpilhadas, svgLinha } from './graficos.ts';
+import { etapasDoItem, historicoDasSemanas, metaDoMes } from './governanca.ts';
 import { dataCurta, dataMedia, semaforoDoRelatorio, type Contexto } from './semana.ts';
 
 const LARGURA = 515;
@@ -364,7 +365,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
       conteudo.push(h2('Quem fica com o quê'));
       conteudo.push(tabela('Plano da semana com estimado x realizado e etapas', ['Pessoa', 'Card e o que', 'Até', 'Est. / real', 'Etapas', 'Situação'], itens.map(({ pp, i }) =>
       {
-        const etapas = gov.etapasPorItem?.[i.id] ?? [];
+        const etapas = etapasDoItem(dados, atual.inicio, i);
         const horasReais = i.horasRealizadas ?? gov.horasReaisPorItem?.[i.id];
         est += i.horasEstimadas ?? 0;
         real += horasReais ?? 0;
@@ -373,7 +374,7 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
           { stack: [{ text: i.cardCodigo ?? 'sem card', bold: true, font: 'Maquina' }, i.descricao, i.objetivo ? pequeno(`para quê: ${i.objetivo}`) : ''] },
           { text: dataCurta(i.ate), font: 'Maquina' },
           direita(`${i.horasEstimadas ?? '-'} h / ${horasReais ?? '-'} h`),
-          { text: etapas.length ? `${etapas.filter((e) => e.feita).length}/${etapas.length}: ${etapas.map((e) => e.texto).join(', ')}` : '-', fontSize: 8 },
+          { text: etapas.length ? `${etapas.filter((e) => e.feita).length}/${etapas.length}: ${etapas.map((e) => `${e.texto}${e.horasEstimadas !== undefined || e.horasReais !== undefined ? ` (${e.horasEstimadas ?? '-'}/${e.horasReais ?? '-'} h)` : ''}`).join(', ')}` : '-', fontSize: 8 },
           marcador(nomesStatus[i.status], corStatus(i.status)),
         ];
       }), [56, '*', 40, 56, 110, 50], 'plano da supervisão'));
@@ -389,6 +390,22 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
         const itemDe = (id: string) => itens.find((x) => x.i.id === id)?.i;
         conteudo.push(p(`Avisos de risco dados com antecedência (meta: pelo menos 48 h antes do prazo): ${avisos48.map(([id, quando]) => `${itemDe(id)?.cardCodigo ?? 'item'} em ${dataCurta(quando.slice(0, 10))}`).join('; ')}.`));
       }
+    }
+    const historicoFila = historicoDasSemanas(dados, atual.inicio);
+    if (historicoFila.some((h) => h.entradas !== undefined || h.saidas !== undefined || h.backlog !== undefined))
+    {
+      conteudo.push(h2('Semana a semana'));
+      conteudo.push(tabela('Entradas, saídas, backlog, prazo e qualidade das últimas semanas', ['Semana', 'Entradas', 'Saídas', 'Saldo', 'Backlog', 'Prazo (meta)', 'Qualidade'], historicoFila.map((h) => [
+        { text: dataCurta(h.semana), font: 'Maquina', bold: h.semana === atual.inicio },
+        direita(h.entradas !== undefined ? String(h.entradas) : '-'),
+        direita(h.saidas !== undefined ? String(h.saidas) : '-'),
+        direita(h.saldo !== undefined ? `${h.saldo > 0 ? '+' : ''}${h.saldo}` : '-', { color: h.saidasOk === false ? cores.vermelho : h.saidasOk ? cores.verde : cores.tinta }),
+        direita(h.backlog !== undefined ? String(h.backlog) : '-', { color: h.cresceu2Seguidas ? cores.vermelho : cores.tinta }),
+        direita(`${h.prazoPct !== undefined ? `${h.prazoPct}%` : '-'} (${metaDoMes(h.semana)}%)`, { color: h.prazoPct !== undefined && h.prazoPct < metaDoMes(h.semana) ? cores.vermelho : cores.tinta }),
+        direita(h.qualidadePct !== undefined ? `${h.qualidadePct}%` : '-', { color: h.qualidadePct !== undefined && h.qualidadePct < 95 ? cores.vermelho : cores.tinta }),
+      ]), [52, 50, 46, 44, 50, '*', 58], 'diário do painel e governança da semana'));
+      const comFila = historicoFila.filter((h) => h.saidasOk !== undefined);
+      if (comFila.length) conteudo.push(pequeno(`Saídas maiores ou iguais às entradas em ${comFila.filter((h) => h.saidasOk).length} de ${comFila.length} semanas. ${historicoFila.at(-1)?.cresceu2Seguidas ? 'O backlog cresceu 2 semanas seguidas.' : 'O backlog não cresceu 2 semanas seguidas.'}`));
     }
     if (gov.entradasSemana !== undefined || gov.saidasSemana !== undefined || gov.backlogFimSemana !== undefined)
     {

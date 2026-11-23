@@ -35,3 +35,4 @@ export * from './planilha';
 export * from './etapas-tempo';
 export * from './ata';
 export * from './priorizacao';
+export * from './historico-semanal';
