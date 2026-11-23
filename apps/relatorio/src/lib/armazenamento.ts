@@ -138,8 +138,11 @@ function receberDaNuvem(dados: Dados, quando: string, semDono: boolean): void
   if (mudou) location.reload();
 }
 
+// os dados que estavam aqui viram um arquivo de backup baixado neste computador antes de sair do navegador
 function comecarVazia(): void
 {
+  const local = lerLocal();
+  if (local.fotos.length || local.planos.length || local.registros.length || local.listas.length) exportarJson(local);
   localStorage.removeItem(chave());
   marcarLocal('');
   location.reload();
