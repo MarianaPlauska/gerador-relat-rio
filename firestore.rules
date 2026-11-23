@@ -2,6 +2,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // só entra quem está na lista permitidos/{e-mail em minúsculo}, mantida pela dona no console do Firebase
+    // (fora do código, que é público). Conta criada por qualquer outra pessoa não lê nem grava nada.
+    function liberado() {
+      return request.auth != null
+        && request.auth.token.email is string
+        && exists(/databases/$(database)/documents/permitidos/$(request.auth.token.email.lower()));
+    }
+
     // e-mail de quem está logado, em minúsculo (os convites guardam o e-mail em minúsculo)
     function emailAtual() {
       return request.auth.token.email.lower();
@@ -9,7 +17,7 @@ service cloud.firestore {
 
     // o dono do espaço: a pessoa logada é o uid do caminho
     function ehDono(uid) {
-      return request.auth != null && request.auth.uid == uid;
+      return liberado() && request.auth.uid == uid;
     }
 
     // documento de membro de quem está logado no espaço do dono (só existe depois de um convite aceito)
@@ -18,7 +26,7 @@ service cloud.firestore {
     }
 
     function ehMembro(dono) {
-      return request.auth != null && exists(/databases/$(database)/documents/usuarios/$(dono)/membros/$(request.auth.uid));
+      return liberado() && exists(/databases/$(database)/documents/usuarios/$(dono)/membros/$(request.auth.uid));
     }
 
     // leitor e supervisor leem os dados do dono; um papel desconhecido não lê
@@ -59,11 +67,11 @@ service cloud.firestore {
     // membros do espaço do dono. A lista (list) é só do dono (regra geral acima).
     match /usuarios/{dono}/membros/{membroUid} {
       // cada membro lê só o próprio documento, nunca o de outro membro nem o de outro dono
-      allow get: if request.auth != null && request.auth.uid == membroUid;
+      allow get: if liberado() && request.auth.uid == membroUid;
 
       // o convidado cria o próprio documento só se houver convite pendente para o e-mail dele, deste dono e com o mesmo papel e pastas.
       // Papel e pastas vêm do convite, então não dá para entrar como supervisor com convite de leitor
-      allow create: if request.auth != null
+      allow create: if liberado()
         && request.auth.uid == membroUid
         && request.resource.data.keys().hasOnly(['uid', 'email', 'nome', 'papel', 'pastas'])
         && request.resource.data.keys().hasAll(['uid', 'email', 'papel', 'pastas'])
@@ -78,17 +86,17 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/convites/$(emailAtual() + '__' + dono)).data.pastas == request.resource.data.pastas;
 
       // o membro pode sair do espaço apagando o próprio documento; não existe update, então ninguém muda o próprio papel
-      allow delete: if request.auth != null && request.auth.uid == membroUid;
+      allow delete: if liberado() && request.auth.uid == membroUid;
     }
 
     // convites: o id é e-mail__donoUid (e-mail em minúsculo)
     match /convites/{id} {
       // o dono lê os convites que fez; o convidado lê os endereçados ao e-mail dele
-      allow get, list: if request.auth != null
+      allow get, list: if liberado()
         && (resource.data.donoUid == request.auth.uid || resource.data.email == emailAtual());
 
       // só o dono cria convite, com id coerente, e-mail em minúsculo, papel válido e status pendente
-      allow create: if request.auth != null
+      allow create: if liberado()
         && request.resource.data.keys().hasOnly(['email', 'donoUid', 'papel', 'pastas', 'criadoEm', 'status', 'donoEmail', 'donoNome'])
         && request.resource.data.keys().hasAll(['email', 'donoUid', 'papel', 'pastas', 'criadoEm', 'status'])
         && request.resource.data.donoUid == request.auth.uid
@@ -99,7 +107,7 @@ service cloud.firestore {
         && request.resource.data.status == 'pendente';
 
       // o dono reenvia ou revoga o próprio convite, sem trocar de dono nem de e-mail
-      allow update: if request.auth != null
+      allow update: if liberado()
         && resource.data.donoUid == request.auth.uid
         && request.resource.data.donoUid == resource.data.donoUid
         && request.resource.data.email == resource.data.email
@@ -108,26 +116,26 @@ service cloud.firestore {
         && request.resource.data.status in ['pendente', 'revogado'];
 
       // o convidado só marca o convite como aceito (pendente para aceito), sem mudar mais nada
-      allow update: if request.auth != null
+      allow update: if liberado()
         && resource.data.email == emailAtual()
         && resource.data.status == 'pendente'
         && request.resource.data.status == 'aceito'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
 
       // só o dono apaga
-      allow delete: if request.auth != null && resource.data.donoUid == request.auth.uid;
+      allow delete: if liberado() && resource.data.donoUid == request.auth.uid;
     }
 
     // relatórios publicados por link: quem tem o código (24 letras, impossível de adivinhar) lê enquanto estiver ativo
     match /publicados/{codigo} {
-      allow get: if resource.data.ativo == true || (request.auth != null && resource.data.dono == request.auth.uid);
-      allow list: if request.auth != null && resource.data.dono == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.dono == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.dono == request.auth.uid && request.resource.data.dono == resource.data.dono;
+      allow get: if resource.data.ativo == true || (liberado() && resource.data.dono == request.auth.uid);
+      allow list: if liberado() && resource.data.dono == request.auth.uid;
+      allow create: if liberado() && request.resource.data.dono == request.auth.uid;
+      allow update, delete: if liberado() && resource.data.dono == request.auth.uid && request.resource.data.dono == resource.data.dono;
 
       // marcas e comentários: qualquer pessoa com o link cria (sem editar nem apagar); só a dona lê e apaga
       match /respostas/{id} {
-        allow read, delete: if request.auth != null && get(/databases/$(database)/documents/publicados/$(codigo)).data.dono == request.auth.uid;
+        allow read, delete: if liberado() && get(/databases/$(database)/documents/publicados/$(codigo)).data.dono == request.auth.uid;
         allow create: if get(/databases/$(database)/documents/publicados/$(codigo)).data.ativo == true
           && request.resource.data.keys().hasOnly(['secaoId', 'itemId', 'marca', 'texto', 'nome', 'em'])
           && request.resource.data.keys().hasAll(['secaoId', 'texto', 'nome', 'em'])
