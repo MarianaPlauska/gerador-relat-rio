@@ -126,21 +126,28 @@ function lerLocal(): Dados
 }
 
 // a versão mais nova da nuvem substitui a deste navegador e a tela recarrega com ela
-function receberDaNuvem(dados: Dados, quando: string, primeiraVez: boolean): void
+function receberDaNuvem(dados: Dados, quando: string, semDono: boolean): void
 {
   const json = JSON.stringify(completar(dados));
   const mudou = json !== localStorage.getItem(chave());
-  // primeira vez nesta conta: o que havia só neste navegador vira um backup baixado antes de ser trocado
+  // o que havia só neste navegador, de uso sem conta, vira um backup baixado antes de ser trocado
   const local = lerLocal();
-  if (primeiraVez && mudou && (local.fotos.length || local.planos.length)) exportarJson(local);
+  if (semDono && mudou && (local.fotos.length || local.planos.length)) exportarJson(local);
   localStorage.setItem(chave(), json);
   marcarLocal(quando);
   if (mudou) location.reload();
 }
 
+function comecarVazia(): void
+{
+  localStorage.removeItem(chave());
+  marcarLocal('');
+  location.reload();
+}
+
 export function carregar(): Dados
 {
-  iniciarNuvem(receberDaNuvem, lerLocal);
+  iniciarNuvem(receberDaNuvem, lerLocal, comecarVazia);
   return lerLocal();
 }
 

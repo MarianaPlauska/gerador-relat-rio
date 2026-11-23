@@ -147,11 +147,12 @@
     }
   }
 
-  function sair()
+  // recarrega a página: nada da conta que saiu fica na memória da tela
+  async function sair()
   {
+    if (!(await sairDaNuvem().catch(() => true))) return;
     fecharSessao();
-    sairDaNuvem().catch(() => {});
-    goto('/entrar');
+    location.href = '/entrar';
   }
 </script>
 

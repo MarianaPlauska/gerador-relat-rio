@@ -164,11 +164,11 @@
     }
   }
 
-  function sair()
+  async function sair()
   {
+    if (!(await sairDaNuvem().catch(() => true))) return;
     fecharSessao();
-    sairDaNuvem().catch(() => {});
-    goto('/entrar');
+    location.href = '/entrar';
   }
 </script>
 

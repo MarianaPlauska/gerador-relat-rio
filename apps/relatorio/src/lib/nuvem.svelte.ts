@@ -158,7 +158,12 @@ async function confirmarPapel(): Promise<boolean>
 // foto de outro projeto no mesmo dia não pode sobrescrever a do DEV: o DEV mantém o id antigo (a data)
 const idDaFoto = (f: Snapshot): string => (f.pasta && f.pasta.toUpperCase() !== 'DEV' ? `${f.pasta.replace(/[/\\]/g, '_')}__${f.data}` : f.data);
 
-export function iniciarNuvem(aoReceber: (dados: Dados, quando: string, primeiraVez: boolean) => void, local: () => Dados): void
+const temConteudo = (d: Dados): boolean =>
+  !!(d.fotos.length || d.planos.length || d.registros.length || d.listas.length || d.riscos.length || Object.keys(d.relatorios).length);
+
+// aoReceber: semDono = o que havia no navegador era de uso sem conta (vale guardar um backup antes de trocar)
+// comecarVazia: apaga a cópia do navegador e recarrega, para a conta nova não herdar dados de outra pessoa
+export function iniciarNuvem(aoReceber: (dados: Dados, quando: string, semDono: boolean) => void, local: () => Dados, comecarVazia: () => void): void
 {
   if (nuvem.estado === 'desligada' || iniciada) return;
   iniciada = true;
@@ -192,12 +197,27 @@ export function iniciarNuvem(aoReceber: (dados: Dados, quando: string, primeiraV
         if (!(await confirmarPapel())) return;
         const remoto = await baixar();
         const chaveConta = chaveDoEspaco(CHAVE_CONTA);
-        const primeiraVez = localStorage.getItem(chaveConta) !== uid;
+        // conta que sincronizou por último neste navegador (vazio = os dados daqui são de uso sem conta)
+        const dono = localStorage.getItem(chaveConta);
+        const primeiraVez = dono !== uid;
         localStorage.setItem(chaveConta, uid!);
         pronto = true;
         // leitor nunca envia: a nuvem sempre vence, e o que ele mexer na tela não volta para o dono
-        if (remoto && (primeiraVez || somenteLeitura() || remoto.quando > quandoLocal())) aoReceber(remoto.dados, remoto.quando, primeiraVez);
-        else if (!somenteLeitura()) await enviar(ultimoDadosPendente ?? local());
+        if (remoto && (primeiraVez || somenteLeitura() || remoto.quando > quandoLocal())) aoReceber(remoto.dados, remoto.quando, primeiraVez && !dono);
+        else if (!somenteLeitura())
+        {
+          // conta sem nada na nuvem num navegador com dados: os de outra conta nunca vão para ela; os de uso sem conta, só se a pessoa quiser
+          const levar = !remoto && primeiraVez && temConteudo(local())
+            ? !dono && confirm(`Este navegador tem dados usados sem conta. Levar esses dados para a conta ${nuvem.email ?? ''}?\n\nOK: levar. Cancelar: começar a conta vazia.`)
+            : true;
+          if (!levar)
+          {
+            ultimoDadosPendente = undefined;
+            comecarVazia();
+            return;
+          }
+          await enviar(ultimoDadosPendente ?? local());
+        }
         ultimoDadosPendente = undefined;
       });
     });
@@ -474,11 +494,23 @@ export async function trocarNomeDaConta(nome: string): Promise<void>
   nuvem.nome = nome;
 }
 
-export async function sairDaNuvem(): Promise<void>
+// sair da conta apaga deste navegador a cópia dos dados dela (inclusive o cache do Firestore):
+// quem entrar depois aqui não vê nem herda nada. Sem conta os dados só existem aqui, então nada é apagado.
+// Devolve false quando a pessoa desiste de sair porque havia mudança que não chegou ao Firebase.
+export async function sairDaNuvem(): Promise<boolean>
 {
-  if (nuvem.estado === 'desligada') return;
-  const { auth, autenticacao } = await servico();
+  if (nuvem.estado === 'desligada' || !uid) return true;
+  await enviarPendenteAgora();
+  if (nuvem.estado === 'erro' && !confirm('Algumas mudanças ainda não chegaram ao Firebase. Se sair agora, elas se perdem deste navegador. Sair mesmo assim?')) return false;
+  const { auth, autenticacao, fs, banco } = await servico();
   await auth.signOut(autenticacao);
+  for (const k of Object.keys(localStorage))
+  {
+    if (k.startsWith('relatorio-semanal-v1') || (k.startsWith('orbisos-') && k !== 'orbisos-tema' && k !== 'orbisos-abertura')) localStorage.removeItem(k);
+  }
+  await fs.terminate(banco);
+  await fs.clearIndexedDbPersistence(banco).catch(() => {});
+  return true;
 }
 
 // para quem precisa falar com o Firestore (links publicados): os mesmos serviços e o usuário atual

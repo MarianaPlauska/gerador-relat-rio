@@ -88,7 +88,7 @@
 
   <div class="centro-tela">
     <div class="marca">
-      <span class="prompt">&gt; supervisao_dev</span>
+      <span class="prompt">&gt; acesso_restrito</span>
       <h1>OrbisOS<span class="cursor">_</span></h1>
       <p>Painel, plano da semana, riscos e relatório num lugar só.</p>
     </div>
