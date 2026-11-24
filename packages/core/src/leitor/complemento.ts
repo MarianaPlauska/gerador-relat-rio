@@ -105,27 +105,29 @@ export function unirCapturas(capturas: CapturaLida[], opcoes: { motivo?: string;
   if (opcoes.motivo?.trim()) partes.push(`Motivo: ${opcoes.motivo.trim()}.`);
   if (opcoes.observacao?.trim()) partes.push(opcoes.observacao.trim());
 
+  // um bloco por print, uma informação por linha: fica legível na tela e no PDF
   capturas.forEach((c, i) =>
   {
     const o = nomesOrigem[c.origem] ?? c.origem;
     const lido = [
-      c.cards.length && `${c.cards.length} ${c.cards.length === 1 ? 'card' : 'cards'} (${c.cards.slice(0, 6).join(', ')}${c.cards.length > 6 ? '...' : ''})`,
+      c.cards.length && `${c.cards.length} ${c.cards.length === 1 ? 'card' : 'cards'}`,
       c.totais.length && `${c.totais.length} ${c.totais.length === 1 ? 'indicador' : 'indicadores'}`,
       c.ondas && `${c.ondas} ${c.ondas === 1 ? 'onda' : 'ondas'}`,
     ].filter(Boolean).join(', ');
-    const linhas = [`${i + 1}) ${c.nome.split(' · ')[0]} (${o})${lido ? `: ${lido}` : ''}.`];
-    if (c.porPessoa?.length)
-    {
-      linhas.push(`Divisão por pessoa: ${c.porPessoa.map((p) => `${p.pessoa} -> ${p.tarefas.join(', ')}`).join(' | ')}.`);
-    }
+    const linhas = [`${i + 1}) ${c.nome.split(' · ')[0]} - ${o}${lido ? ` (${lido})` : ''}`];
+    // só o código de cada tarefa: o título cortado deixava a linha longa demais
+    if (c.porPessoa?.length) for (const p of c.porPessoa) linhas.push(`- ${p.pessoa}: ${p.tarefas.map((t) => t.split(' ')[0]).join(', ')}`);
+    else if (c.cards.length) linhas.push(`- Cards: ${c.cards.slice(0, 10).join(', ')}${c.cards.length > 10 ? '...' : ''}`);
+    if (c.oQueVaiFazer?.trim()) linhas.push(`- O que vai fazer: ${c.oQueVaiFazer.trim()}`);
+    if (c.porque?.trim()) linhas.push(`- Por quê: ${c.porque.trim()}`);
     if (c.repetidos?.length)
     {
       const mudaram = c.repetidos.filter((r) => r.mudou.length);
-      if (mudaram.length) linhas.push(`Mudou desde antes: ${mudaram.slice(0, 5).map((r) => `${r.codigo} (${r.mudou.join('; ')})`).join(' | ')}.`);
-      else linhas.push(`Sem mudança desde o último registro: ${c.repetidos.slice(0, 6).map((r) => r.codigo).join(', ')}.`);
+      if (mudaram.length) linhas.push(`- Mudou desde antes: ${mudaram.slice(0, 5).map((r) => `${r.codigo} (${r.mudou.join('; ')})`).join(', ')}`);
+      else linhas.push(`- Sem mudança desde o último registro: ${c.repetidos.slice(0, 6).map((r) => r.codigo).join(', ')}`);
     }
-    if (c.comentario?.trim()) linhas.push(`Leitura: ${c.comentario.trim()}`);
-    partes.push(linhas.join(' '));
+    if (c.comentario?.trim()) linhas.push(`- Comentário: ${c.comentario.trim()}`);
+    partes.push(linhas.join('\n'));
   });
 
   const comentados = capturas.filter((c) => c.comentario?.trim());

@@ -207,15 +207,17 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
   };
   const p = (texto: string): Content => ({ text: texto, style: 'p' });
   const fonte = (texto = 'painel do gestor'): Content => ({ text: `Fonte: ${texto}.`, fontSize: 7, color: cores.suave, italics: true, margin: [0, -4, 0, 10] });
-  const legendaTabela = (texto: string): Content => ({ text: `Tabela ${++nTabela} - ${texto}`, style: 'legenda', headlineLevel: 3 });
-  const legendaFigura = (texto: string): Content => ({ text: `Figura ${++nFigura} - ${texto}`, style: 'legenda', headlineLevel: 3 });
+  // headlineLevel faz o pageBreakBefore levar a legenda para a próxima página; dentro de um bloco unbreakable
+  // isso gerava página em branco (e o print sumia). Figura é sempre unbreakable; tabela, só quando é curta.
+  const legendaTabela = (texto: string, solta = true): Content => ({ text: `Tabela ${++nTabela} - ${texto}`, style: 'legenda', ...(solta ? { headlineLevel: 3 } : {}) });
+  const legendaFigura = (texto: string): Content => ({ text: `Figura ${++nFigura} - ${texto}`, style: 'legenda' });
 
   function tabela(legenda: string, cabecalho: string[], linhas: TableCell[][], larguras: (number | string)[], origem?: string): Content
   {
     return {
       unbreakable: linhas.length <= 4,
       stack: [
-        legendaTabela(legenda),
+        legendaTabela(legenda, linhas.length > 4),
         {
           table: {
             headerRows: 1,
@@ -1133,7 +1135,15 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
     for (const r of alvos)
     {
       conteudo.push(h2(`${dataMedia(r.data)} · ${r.pasta}${r.motivo ? ` · ${r.motivo}` : ''}`));
-      for (const paragrafo of r.texto.split('\n\n').filter(Boolean)) conteudo.push(p(paragrafo));
+      // cada print vira um bloco: a primeira linha em destaque e as linhas com "-" em lista
+      for (const paragrafo of r.texto.split('\n\n').filter(Boolean))
+      {
+        const linhas = paragrafo.split('\n').map((l) => l.trim()).filter(Boolean);
+        const itens = linhas.filter((l) => /^[-*]\s+/.test(l)).map((l) => l.replace(/^[-*]\s+/, ''));
+        const outras = linhas.filter((l) => !/^[-*]\s+/.test(l));
+        if (outras.length) conteudo.push({ text: outras.join('\n'), style: 'p', bold: itens.length > 0, margin: [0, 4, 0, itens.length ? 3 : 6] });
+        if (itens.length) conteudo.push({ ul: itens, style: 'p', margin: [8, 0, 0, 8] });
+      }
       if (b.comImagens === false) continue;
       // o pdfmake só aceita JPEG e PNG: outro formato derrubaria o PDF inteiro
       for (const cap of r.capturas.filter((c) => /^data:image\/(jpeg|jpg|png)/i.test(c.imagemDataUrl ?? '')))
@@ -1142,13 +1152,21 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
           unbreakable: true,
           stack: [
             legendaFigura(`${cap.nome.split(' · ')[0]} (${cap.cards.length} cards, ${cap.totais.length} indicadores)`),
-            { image: cap.imagemDataUrl!, fit: [LARGURA, 500], alignment: 'center', margin: [0, 2, 0, 4] },
+            { image: cap.imagemDataUrl!, fit: [LARGURA, 430], alignment: 'center', margin: [0, 2, 0, 4] },
             ...(cap.comentario?.trim() ? [pequeno(`Comentário: ${cap.comentario.trim()}`)] : []),
             fonte(`print do diário em ${dataMedia(r.data)} (${r.pasta})`),
           ],
         });
       }
     }
+  }
+
+  // o resumo executivo escrito na tela sempre entra no documento, mesmo em modelo sem a seção de resumo
+  const resumoEscrito = notas.resumo?.trim();
+  if (resumoEscrito && !blocos.some((b) => b.tipo === 'secao' && b.secao === 'resumo'))
+  {
+    conteudo.push(h1(nomesSecoes.resumo));
+    conteudo.push(p(resumoEscrito));
   }
 
   for (const b of blocos)

@@ -2,7 +2,7 @@ import { nomesTotais } from './leitor/totais';
 import type { PlanoPessoa, PlanoSemana, TotaisPainel } from './tipos';
 
 export const nomesSecoes = {
-  resumo: 'Sumário executivo',
+  resumo: 'Resumo executivo',
   extrato: 'Extrato da semana',
   apresentacao: 'Apresentação e metodologia',
   comparativo: 'Indicadores do painel',
@@ -87,7 +87,7 @@ export const modelosProntos: Modelo[] = [
     periodo: 'semana',
     capa: 'completa',
     sumario: true,
-    blocos: secoes('resumo', 'extrato', 'apresentacao', 'comparativo', 'ondas', 'fluxo', 'estatistica', 'execucao', 'time', 'analise', 'frentes', 'atencao', 'riscos', 'compromissos', 'notas', 'plano', 'movimento', 'glossario'),
+    blocos: secoes('resumo', 'extrato', 'apresentacao', 'comparativo', 'ondas', 'fluxo', 'estatistica', 'execucao', 'time', 'analise', 'frentes', 'atencao', 'riscos', 'compromissos', 'notas', 'plano', 'movimento'),
   },
   {
     id: 'executivo',
@@ -113,7 +113,7 @@ export const modelosProntos: Modelo[] = [
     periodo: 'livre',
     capa: 'completa',
     sumario: true,
-    blocos: secoes('resumo', 'apresentacao', 'comparativo', 'ondas', 'fluxo', 'estatistica', 'execucao', 'time', 'analise', 'riscos', 'compromissos', 'notas', 'glossario'),
+    blocos: secoes('resumo', 'apresentacao', 'comparativo', 'ondas', 'fluxo', 'estatistica', 'execucao', 'time', 'analise', 'riscos', 'compromissos', 'notas'),
   },
   {
     id: 'diario',

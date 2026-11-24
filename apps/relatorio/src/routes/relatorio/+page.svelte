@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { agoraLocal, alternarItem, dicionarioPadrao, filtrarRegistros, idCurto, itemFeito, novoVivo, progressoVivo, resumoSugerido, segundaDaSemana, somarDias, type Bloco, type CorSemaforo } from '@supervisao/core';
+  import { agoraLocal, alternarItem, filtrarRegistros, idCurto, itemFeito, novoVivo, progressoVivo, resumoSugerido, segundaDaSemana, somarDias, type Bloco, type CorSemaforo } from '@supervisao/core';
   import { carregar, hidratarImagens, salvar, type Dados, type NotasRelatorio } from '#lib/armazenamento.ts';
   import { montarInterativo } from '#lib/interativo.ts';
   import EscreverComIa from '#lib/EscreverComIa.svelte';
@@ -60,7 +60,10 @@
   function puxarDoDiario()
   {
     if (!registrosDoPeriodo.length || blocos.some((b) => b.tipo === 'anotacao')) return;
-    mudarBlocos([...blocos, { tipo: 'anotacao', registroIds: registrosDoPeriodo.map((r) => r.id), comImagens: true }]);
+    // o diário entra antes dos anexos (plano, movimento, glossário), não depois deles
+    const novo: Bloco = { tipo: 'anotacao', registroIds: registrosDoPeriodo.map((r) => r.id), comImagens: true };
+    const anexo = blocos.findIndex((b) => b.tipo === 'secao' && (b.secao === 'plano' || b.secao === 'movimento' || b.secao === 'glossario'));
+    mudarBlocos(anexo < 0 ? [...blocos, novo] : [...blocos.slice(0, anexo), novo, ...blocos.slice(anexo)]);
   }
 
   function anotar<K extends keyof NotasRelatorio>(campo: K, valor: NotasRelatorio[K])
@@ -235,19 +238,6 @@
     {#if !ctx.atual.foto}<p class="aviso">{ctx.livre ? "Este período" : "Esta semana"} ainda não tem foto do painel. <a href="/painel">Abrir o diário do painel</a></p>{/if}
     {#if !ctx.anterior}<p class="dica">{ctx.livre ? "Sem foto antes do período: o comparativo usa a primeira foto do período quando houver duas." : "Sem dados da semana anterior: o comparativo aparece quando existir uma semana antes desta."}</p>{/if}
 
-    {#if registrosDoPeriodo.length}
-      <div class="bloco destaque-material">
-        <div class="titulo-bloco">
-          <h2>Diário do painel neste período ({registrosDoPeriodo.length})</h2>
-          <button class="link" onclick={puxarDoDiario} disabled={blocos.some((b) => b.tipo === 'anotacao')}>incluir no relatório</button>
-        </div>
-        {#each registrosDoPeriodo.slice(0, 6) as r (r.id)}
-          <p class="dica"><b>{dataCurta(r.data)} · {r.pasta}</b> {r.motivo || r.resumo}</p>
-        {/each}
-        <p class="dica">Os registros entram com o texto unido e os prints. Para escolher só alguns, use o bloco "Diário do painel" abaixo.</p>
-      </div>
-    {/if}
-
     <div class="bloco">
       <div class="titulo-bloco">
         <h2>Resumo executivo</h2>
@@ -285,6 +275,19 @@
       <ListaDeBlocos listas={dados.listas} fluxos={dados.fluxos} pessoas={dados.pessoas} {pastas} {registrosLista} {blocos} onmudar={mudarBlocos} />
       <button class="link salvar-modelo" onclick={salvarComoModelo}>salvar estes blocos como modelo novo</button>
     </div>
+
+    {#if registrosDoPeriodo.length}
+      <div class="bloco destaque-material">
+        <div class="titulo-bloco">
+          <h2>Diário do painel neste período ({registrosDoPeriodo.length})</h2>
+          <button class="link" onclick={puxarDoDiario} disabled={blocos.some((b) => b.tipo === 'anotacao')}>incluir no relatório</button>
+        </div>
+        {#each registrosDoPeriodo.slice(0, 6) as r (r.id)}
+          <p class="dica"><b>{dataCurta(r.data)} · {r.pasta}</b> {r.motivo || r.resumo}</p>
+        {/each}
+        <p class="dica">Os registros entram antes dos anexos, com o texto e os prints. Para escolher só alguns, use o bloco "Diário do painel" acima.</p>
+      </div>
+    {/if}
 
     <div class="bloco">
       <h2>Identificação (capa e aprovação)</h2>
@@ -334,13 +337,6 @@
         <p class="dica">Crie o checklist diário deste período para ter um checklist de tarefas, marcar o que foi feito e registrar o dia.</p>
         <button onclick={criarVivo}>Criar checklist diário deste período</button>
       {/if}
-    </div>
-
-    <div class="bloco">
-      <h2>Dicionário do painel</h2>
-      <p class="dica">O que significa cada número do painel do gestor. Uma linha por termo, no formato "Termo: definição". Vai para o glossário do PDF e para o pacote da IA.</p>
-      <textarea rows="8" bind:value={dados.dicionario}></textarea>
-      <button class="link" onclick={() => (dados.dicionario = dicionarioPadrao)}>voltar ao texto inicial</button>
     </div>
 
     <div class="bloco">

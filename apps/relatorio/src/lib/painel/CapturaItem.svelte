@@ -110,13 +110,26 @@
           <button class="link perigo" onclick={() => aoRemover()}>remover</button>
         </span>
       </div>
+      <h4 class="rotulo-bloco">O que o print mostra</h4>
       <div class="chips">
-        <span class="pilula">{cap.cards.length} demandas{cap.cards.length ? `: ${cap.cards.slice(0, 6).join(', ')}${cap.cards.length > 6 ? '...' : ''}` : ''}</span>
+        <span class="pilula">{cap.cards.length} demandas</span>
         <span class="pilula">{cap.totais.length} indicadores calculados</span>
         {#if cap.ondas}<span class="pilula">{cap.ondas} ondas</span>{/if}
         {#if cap.novos?.length}<span class="pilula novo">{cap.novos.length} novos</span>{/if}
         {#if cap.repetidos?.length}<span class="pilula repetido">{cap.repetidos.length} já vistos</span>{/if}
       </div>
+      {#if cap.porPessoa?.length}
+        <ul class="por-pessoa-print">
+          {#each cap.porPessoa as gp (gp.pessoa)}
+            <li class="item-pessoa-print"><b>{gp.pessoa}</b><span class="codigos">{#each gp.tarefas as t, i (i)}<span class="codigo" title={t}>{t.split(' ')[0]}</span>{/each}</span></li>
+          {/each}
+        </ul>
+      {/if}
+      {#if cap.avisos.length}<p class="alerta">{cap.avisos.join(' ')}</p>{/if}
+      {#if cap.repetidos?.some((r) => r.mudou.length)}
+        <p class="mudou"><b>Mudou desde antes:</b> {cap.repetidos.filter((r) => r.mudou.length).slice(0, 5).map((r) => `${r.codigo} (${r.mudou.join('; ')})`).join(' | ')}</p>
+      {/if}
+      <h4 class="rotulo-bloco">De quem é e por quê</h4>
       <div class="linha-pessoa">
         <label class="mini">Este print é de
           <select value={cap.pessoaId ?? ''} onchange={(e) => { cap.pessoaId = e.currentTarget.value || undefined; aoRecalcular(); }}>
@@ -158,20 +171,8 @@
           {/if}
         </div>
       {/if}
-      {#if cap.porPessoa?.length}
-        <div class="por-pessoa-print">
-          {#each cap.porPessoa as gp (gp.pessoa)}
-            <span class="item-pessoa-print"><b>{gp.pessoa}</b> &rarr; {gp.tarefas.join(', ')}</span>
-          {/each}
-        </div>
-      {/if}
-      {#if cap.avisos.length}<p class="alerta">[Atenção] {cap.avisos.join(' ')}</p>{/if}
-      {#if cap.repetidos?.some((r) => r.mudou.length)}
-        <p class="mudou"><b>Mudou desde antes:</b> {cap.repetidos.filter((r) => r.mudou.length).slice(0, 5).map((r) => `${r.codigo} (${r.mudou.join('; ')})`).join(' | ')}</p>
-      {/if}
-      <label class="comentario">Seu comentário sobre este print
-        <textarea rows="2" value={cap.comentario} oninput={(e) => { cap.comentario = e.currentTarget.value; }} placeholder="O que cada pessoa vai fazer, comentários por etapa, por que faremos isso, uso do tempo livre (ex.: suporte)..."></textarea>
-      </label>
+      <h4 class="rotulo-bloco">Seu comentário</h4>
+      <textarea rows="2" value={cap.comentario} oninput={(e) => { cap.comentario = e.currentTarget.value; }} placeholder="Algo a mais sobre este print: dependências, riscos, uso do tempo livre..." aria-label="Seu comentário sobre este print"></textarea>
       {#if cap.sugestoes.length}
         <p class="dica"><b>Sugestões:</b> {cap.sugestoes.join(' ')}
           <button class="link" onclick={() => (cap.comentario = [cap.comentario, ...cap.sugestoes].filter(Boolean).join(' '))}>usar no comentário</button></p>
@@ -217,8 +218,11 @@
   .btn-ampliar-captura { font-size: 0.76rem; padding: 3px 8px; background: var(--superficie); border: 1px solid var(--marca); color: var(--marca); border-radius: 4px; cursor: var(--cursor-clique); }
   .vinculo-arvore-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; padding: 6px 10px; background: var(--superficie); border: 1px solid var(--borda); border-left: 3px solid var(--marca); border-radius: 4px; }
   .vinculo-arvore-barra select { font-size: 0.78rem; padding: 2px 6px; max-width: 280px; }
-  .por-pessoa-print { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; padding: 6px 10px; background: var(--superficie); border-radius: 4px; border: 1px solid var(--borda); font-size: 0.82rem; }
-  .item-pessoa-print { color: var(--texto); }
+  .por-pessoa-print { list-style: none; display: grid; gap: 6px; margin: 8px 0; padding: 0; font-size: 0.85rem; }
+  .item-pessoa-print { display: grid; grid-template-columns: minmax(140px, 200px) 1fr; gap: 10px; align-items: start; padding: 6px 10px; background: var(--superficie); border: 1px solid var(--borda); border-radius: 4px; color: var(--texto); }
+  .codigos { display: flex; flex-wrap: wrap; gap: 4px; }
+  .codigo { font-family: var(--fonte-maquina); font-size: 0.78rem; padding: 1px 6px; border: 1px solid var(--borda-forte); border-radius: 3px; }
+  .rotulo-bloco { margin: 14px 0 4px; padding-top: 10px; border-top: 1px dashed var(--borda); font-family: var(--fonte-maquina); font-size: 0.74rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--suave); }
   .captura { display: grid; grid-template-columns: minmax(180px, 280px) 1fr; gap: 14px; padding: 12px; margin: 10px 0; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie-2); }
   .img img { width: 100%; max-height: 240px; object-fit: contain; border-radius: 6px; border: 1px solid var(--borda); background: var(--fundo); }
   .sem-img { height: 100px; display: grid; place-items: center; border: 1px dashed var(--borda); border-radius: 6px; color: var(--suave); }
@@ -226,9 +230,8 @@
   .chips { margin: 8px 0; }
   .pilula.novo { background: var(--verde-fundo); color: var(--verde); }
   .pilula.repetido { background: var(--amarelo-fundo); color: var(--amarelo); }
-  .alerta { color: var(--vermelho); font-size: 0.86rem; margin: 4px 0; }
+  .alerta { color: var(--vermelho); font-size: 0.84rem; margin: 6px 0; padding: 6px 10px; border-left: 3px solid var(--vermelho); background: var(--superficie); }
   .mudou { font-size: 0.84rem; margin: 4px 0; }
-  .comentario { display: block; font-weight: 600; font-size: 0.86rem; }
   .complemento { margin: 4px 0 8px 18px; padding: 0; font-size: 0.82rem; color: var(--suave); }
   @media (max-width: 800px) { .captura { grid-template-columns: 1fr; } }
   .linha-pessoa

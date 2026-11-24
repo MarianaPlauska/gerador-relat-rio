@@ -866,16 +866,20 @@
 
     {#if capturas.length}
       <section class="cartao passo" class:feito={comentados > 0}>
-        <h2><span class="num">{comentados ? '✓' : '2'}</span> Árvore de correlação e conferência dos prints <small>({comentados}/{capturas.length} comentados)</small></h2>
-        <p class="dica">Clique em qualquer tarefa para abrir as etapas ticáveis, anotações e impacto à direita (ou ampliar em modal). Clique no print para ampliar a imagem.</p>
+        <h2><span class="num">{comentados ? '✓' : '2'}</span> Conferir os prints <small>({comentados}/{capturas.length} comentados)</small></h2>
+        <p class="dica">Confira o que foi lido em cada print, diga de quem é e por quê. Clique no print para ampliar.</p>
 
-        {#if cardsLidos.length}
-          <ArvoreEnvio {cardsLidos} {pessoasDaPasta} {pastaAtual} {analiseEnvio} gantt={ganttEnvio} acoes={acoesCards} bind:selecionadoCodigo={cardSelecionadoCodigo} bind:pessoaExpandidaEnvio aoAmpliarModal={() => (modalCardAberto = true)} />
-        {/if}
 
         {#each capturas as cap, idx (cap.id)}
           <CapturaItem {cap} indice={idx} {cardsLidos} {nomesOrigemPadrao} origensPersonalizadas={dados.origensPersonalizadas} {obterNomeOrigem} aoAmpliar={() => (capturaModalId = cap.id)} aoRecalcular={recalcular} aoRemover={() => removerCaptura(cap.id)} aoCriarOpcao={(nome) => criarOpcaoOrigem(cap.id, nome)} aoDescartarTexto={(l) => adicionarRegras([l])} pessoas={dados.pessoas} aoRelerImagem={() => relerImagem(cap.id)} />
         {/each}
+
+        {#if cardsLidos.length}
+          <details class="conferir">
+            <summary>Tarefas por pessoa: etapas, impacto na semana e cronograma ({cardsLidos.length} demandas)</summary>
+            <ArvoreEnvio {cardsLidos} {pessoasDaPasta} {pastaAtual} {analiseEnvio} gantt={ganttEnvio} acoes={acoesCards} bind:selecionadoCodigo={cardSelecionadoCodigo} bind:pessoaExpandidaEnvio aoAmpliarModal={() => (modalCardAberto = true)} />
+          </details>
+        {/if}
 
         <details class="conferir painel-inteligencia-auto">
           <summary>
@@ -902,7 +906,7 @@
       </div>
       <label class="bloco">
         <span class="linha-entre">Texto do registro (prints e comentários unidos){#if editouTexto}<button class="link" onclick={() => (editouTexto = false)}>refazer a partir dos comentários</button>{/if}</span>
-        <textarea rows="5" value={textoFinal} oninput={(e) => { textoFinal = e.currentTarget.value; editouTexto = true; }} placeholder="Montado automaticamente conforme você comenta os prints, ou digite livremente aqui."></textarea>
+        <textarea rows="8" class="texto-registro" value={textoFinal} oninput={(e) => { textoFinal = e.currentTarget.value; editouTexto = true; }} placeholder="Montado automaticamente conforme você comenta os prints, ou digite livremente aqui."></textarea>
       </label>
     </section>
 
@@ -1115,6 +1119,7 @@
   .barra-compacta-conteudo { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
   .status-upload-linha { display: flex; align-items: center; gap: 8px; flex: none; }
   .status-txt { font-size: 0.86rem; color: var(--texto); }
+  .texto-registro { line-height: 1.55; font-size: 0.9rem; }
   .acoes-upload-rapido { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1; justify-content: flex-end; }
   .zona-micro { width: 260px; min-width: 180px; height: 32px; padding: 5px 8px; font-size: 0.78rem; border: 1.5px dashed var(--borda-forte); border-radius: 4px; resize: none; margin: 0; }
   .botoes-upload-feita { display: flex; align-items: center; gap: 6px; }
