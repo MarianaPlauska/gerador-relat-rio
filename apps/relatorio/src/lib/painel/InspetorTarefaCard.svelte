@@ -42,6 +42,12 @@
   let novaEtapaTexto = $state('');
   let novaEtapaDescricao = $state('');
   let cardRelacionadoNovo = $state('');
+  let verTodas = $state(false);
+  $effect(() =>
+  {
+    void card.codigo;
+    verTodas = false;
+  });
 
   function criarEtapa()
   {
@@ -144,15 +150,15 @@
   </div>
 
   {#if card.origemHoras === 'manual'}
-    <small class="dica">Tempo definido por você: o histórico não altera.</small>
-  {:else if card.origemHoras === 'historico' && card.notaHoras}
-    <small class="dica">Tempo estimado pelo histórico. {card.notaHoras} Digite outro valor para fixar.</small>
+    <small class="dica">Tempo fixado por você.</small>
+  {:else if card.origemHoras === 'historico'}
+    <small class="dica" title={card.notaHoras}>Tempo pelo histórico. Digite outro valor para fixar.</small>
   {:else if card.origemHoras === 'regra'}
-    <small class="dica">Tempo estimado pela regra de prioridade (ainda sem histórico suficiente deste tipo). Digite outro valor para fixar.</small>
+    <small class="dica">Tempo pela prioridade. Digite outro valor para fixar.</small>
   {/if}
 
   <label class="bloco-campo-direita">
-    <span class="etiqueta">O que foi pedido / Descrição da tarefa</span>
+    <h4 class="rotulo-bloco">O que foi pedido</h4>
     <textarea
       rows={modo === 'modal' ? 4 : 3}
       value={card.descricaoCompleta ?? card.titulo ?? ''}
@@ -162,9 +168,7 @@
   </label>
 
   <div class="bloco-campo-direita">
-    <div class="linha-entre">
-      <span class="etiqueta">Etapas e o que a pessoa vai fazer ({card.etapasConcluidas ?? 0}/{card.etapas?.length ?? 0} concluídas)</span>
-    </div>
+    <h4 class="rotulo-bloco">Etapas ({card.etapasConcluidas ?? 0} de {card.etapas?.length ?? 0} feitas)</h4>
     <div class="lista-etapas-editor">
       {#each card.etapas ?? [] as et (et.ordem)}
         <div class="item-etapa-editor" class:concluida={et.situacao === 'concluida'}>
@@ -207,8 +211,8 @@
     </div>
   </div>
 
-  <div class="bloco-campo-direita caixa-impacto-correlacao">
-    <span class="etiqueta">Correlação com etapas futuras e impacto na semana</span>
+  <details class="bloco-campo-direita caixa-impacto-correlacao">
+    <summary>Tarefas relacionadas e impacto na semana ({card.cardsRelacionados?.length ?? 0})</summary>
     {#if modo === 'modal'}
       <textarea
         rows="2"
@@ -219,12 +223,15 @@
       <p class="texto-impacto-semana">{card.impactoSemana}</p>
     {/if}
     <div class="chips-relacionados">
-      {#each card.cardsRelacionados ?? [] as relCodigo (relCodigo)}
+      {#each (card.cardsRelacionados ?? []).slice(0, verTodas ? undefined : 8) as relCodigo (relCodigo)}
         <span class="pilula pilula-rel-card">
           <button type="button" class="btn-ir-card" onclick={() => aoSelecionarOutroCard(relCodigo)}>{relCodigo}</button>
           <button type="button" class="btn-rem-rel" onclick={() => aoDesvincularRelacionado(card.codigo, relCodigo)}>×</button>
         </span>
       {/each}
+      {#if !verTodas && (card.cardsRelacionados?.length ?? 0) > 8}
+        <button type="button" class="link" onclick={() => (verTodas = true)}>ver todas</button>
+      {/if}
     </div>
     <div class="linha-vincular-rel">
       <select bind:value={cardRelacionadoNovo}>
@@ -237,10 +244,10 @@
         Vincular
       </button>
     </div>
-  </div>
+  </details>
 
   <label class="bloco-campo-direita">
-    <span class="etiqueta">Anotações da supervisão nesta tarefa</span>
+    <h4 class="rotulo-bloco">Sua anotação</h4>
     <textarea
       rows={modo === 'modal' ? 3 : 2}
       value={card.comentario ?? ''}
@@ -271,7 +278,9 @@
   .input-desc-etapa { width: 100%; font-size: 0.78rem; padding: 4px 6px; }
   .nova-etapa-inline { display: grid; grid-template-columns: 1fr 1.2fr auto; gap: 6px; margin-top: 4px; }
   .nova-etapa-inline input { font-size: 0.78rem; padding: 4px 6px; }
-  .caixa-impacto-correlacao { padding: 8px 10px; background: var(--superficie-2); border-radius: 6px; border: 1px solid var(--borda); }
+  .rotulo-bloco { margin: 6px 0 0; padding-top: 10px; border-top: 1px dashed var(--borda); font-family: var(--fonte-maquina); font-size: 0.74rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--suave); }
+  .caixa-impacto-correlacao summary { cursor: var(--cursor-clique); color: var(--marca); font-weight: 600; font-size: 0.82rem; }
+  .caixa-impacto-correlacao {padding: 8px 10px; background: var(--superficie-2); border-radius: 6px; border: 1px solid var(--borda); }
   .texto-impacto-semana { margin: 0; font-size: 0.78rem; color: var(--texto); line-height: 1.35; }
   .chips-relacionados { display: flex; flex-wrap: wrap; gap: 6px; }
   .pilula-rel-card { display: inline-flex; align-items: center; gap: 4px; background: var(--superficie); border: 1px solid var(--marca); }

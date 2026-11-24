@@ -19,13 +19,26 @@
   } = $props();
 
   let ordenacaoTarefas = $state<CriterioOrdenacaoCards>('prioridade_maior');
-  const cardsOrdenadosResumo = $derived(ordenarCardsResumidos(cardsLidos, ordenacaoTarefas));
+  let filtroPessoa = $state('');
+  const donoDe = (c: CardSnapshot) => c.responsavelEtapaAtual ?? c.responsaveis[0] ?? '';
+  const nomeDe = (id: string) => pessoasDaPasta.find((p) => p.id === id)?.nome ?? id;
+  const donos = $derived([...new Set(cardsLidos.map(donoDe))].sort((a, b) => nomeDe(a).localeCompare(nomeDe(b))));
+  const cardsOrdenadosResumo = $derived(ordenarCardsResumidos(cardsLidos, ordenacaoTarefas).filter((c) => !filtroPessoa || donoDe(c) === filtroPessoa));
   const cardSelecionado = $derived(cardsLidos.find((c) => c.codigo === selecionadoCodigo) ?? null);
 </script>
           <div class="grade-arvore-envio" class:com-painel-direito={!!cardSelecionado}>
             <div class="caixa-arvore">
               <div class="linha-entre topo-caixa-arvore">
-                <span class="etiqueta">Resumo das tarefas identificadas ({cardsLidos.length})</span>
+                <span class="etiqueta">Resumo das tarefas ({cardsOrdenadosResumo.length} de {cardsLidos.length})</span>
+                <label class="organizador-select">
+                  <span>Pessoa:</span>
+                  <select bind:value={filtroPessoa}>
+                    <option value="">todas ({donos.length})</option>
+                    {#each donos as d (d)}
+                      <option value={d}>{d ? nomeDe(d) : 'sem responsável'} ({cardsLidos.filter((c) => donoDe(c) === d).length})</option>
+                    {/each}
+                  </select>
+                </label>
                 <label class="organizador-select">
                   <span>Organizar:</span>
                   <select bind:value={ordenacaoTarefas}>
@@ -56,28 +69,16 @@
                           <span class="badge-status-card">{card.statusCard}</span>
                         {/if}
                       </span>
-                      <span class="fontes-vetor">
-                        {#if card.fontesCorrelacionadas?.length}
-                          [{card.fontesCorrelacionadas.join(' + ')}]
-                        {/if}
-                        {#if card.etapas?.length}
-                          · {card.etapasConcluidas ?? 0}/{card.etapas.length} etapas
-                        {/if}
-                        · ~{card.horasEstimadas ?? 4}h
-                      </span>
+                      <span class="fontes-vetor">~{card.horasEstimadas ?? 4}h</span>
                     </div>
                     <div class="assunto-tarefa">{card.assunto || card.titulo || 'Demanda do painel'}</div>
-                    {#if card.cardsRelacionados?.length}
-                      <div class="mini-relacoes-resumo">
-                        Relação na semana: {card.cardsRelacionados.slice(0, 3).join(', ')}
-                      </div>
-                    {/if}
+                    <div class="dono-tarefa">{donoDe(card) ? nomeDe(donoDe(card)) : 'sem responsável'}</div>
                   </button>
                 {/each}
               </div>
             </div>
 
-            <div class="caixa-arvore">
+            <div class="caixa-arvore caixa-pessoas">
               <span class="etiqueta">Pessoas na semana (clique para expandir tarefas e etapas)</span>
               <div class="lista-pessoas-arvore">
                 {#each analiseEnvio.filter((p) => p.total > 0) as p (p.pessoa.id)}
@@ -225,7 +226,12 @@
 
 <style>
   .grade-arvore-envio { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 14px; margin: 12px 0; align-items: start; }
-  .grade-arvore-envio.com-painel-direito { grid-template-columns: minmax(290px, 1fr) minmax(320px, 1.1fr) minmax(350px, 1.25fr); }
+  /* com uma tarefa aberta: lista à esquerda, inspeção à direita e as pessoas embaixo, na largura toda */
+  .grade-arvore-envio.com-painel-direito { grid-template-columns: minmax(300px, 1fr) minmax(380px, 1.4fr); }
+  .com-painel-direito .painel-detalhe-direita { order: 1; }
+  .com-painel-direito .caixa-pessoas { order: 2; grid-column: 1 / -1; }
+  .dono-tarefa { font-size: 0.74rem; color: var(--suave); }
+  .assunto-tarefa { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .caixa-arvore { background: var(--superficie-2); border: 1px solid var(--borda); border-radius: var(--raio-pequeno); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
   .topo-caixa-arvore { gap: 8px; }
   .organizador-select { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--suave); }
@@ -266,7 +272,6 @@
   .item-tarefa-resumo { flex-shrink: 0; width: 100%; text-align: left; background: var(--superficie); border: 1px solid var(--borda); border-left: 3px solid var(--cor-barra); border-radius: 6px; padding: 9px 12px; font-size: 0.82rem; display: flex; flex-direction: column; gap: 4px; cursor: var(--cursor-clique); transition: border-color 0.15s, background 0.15s; }
   .item-tarefa-resumo:hover, .item-tarefa-resumo.selecionado { border-color: var(--marca); border-left-color: var(--marca); background: var(--marca-clara); }
   .assunto-tarefa { color: var(--texto); line-height: 1.35; font-weight: 500; }
-  .mini-relacoes-resumo { font-size: 0.72rem; color: var(--marca); font-family: var(--fonte-maquina); }
   .fontes-vetor { font-family: var(--fonte-maquina); font-size: 0.72rem; color: var(--suave); }
   .badge-status-card { font-family: var(--fonte-maquina); font-size: 0.7rem; padding: 1px 6px; border-radius: 4px; background: var(--superficie-2); border: 1px solid var(--borda); color: var(--suave); margin-left: 4px; }
   .pilula.prio-crítica, .pilula.prio-critica, .pilula.prio-urgente { background: var(--vermelho-fundo); color: var(--vermelho); }

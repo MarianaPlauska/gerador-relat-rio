@@ -667,3 +667,15 @@ describe('prints reais fora de ordem: listas reais do Tesseract com card e etapa
     for (const ordem of ordens) expect(resolver(ordem).final, ordem.map((e) => e.id).join(' > ')).toEqual(referencia.final);
   }, TEMPO_LIMITE);
 });
+
+describe('lista de Demandas com pessoa ainda não cadastrada', () =>
+{
+  it('lê o nome que vem antes do tempo como responsável', () =>
+  {
+    const texto = 'DEV-501 — Kitu Sistema Ajustar o relatório de exames Ana Paula Souza 3,2 d • Novo\n21/11/26 continuação da descrição.\nDEV-502 — Kitu Sistema Revisar importador Bruno Lima 5 h • Em andamento';
+    const cards = ler(texto, 'demandas');
+    expect(cards.find((c) => c.codigo === 'DEV-501')?.responsaveis).toEqual(['Ana Paula Souza']);
+    expect(cards.find((c) => c.codigo === 'DEV-502')?.responsaveis).toEqual(['Bruno Lima']);
+    expect(cards.find((c) => c.codigo === 'DEV-501')?.titulo).not.toContain('Ana Paula');
+  });
+});

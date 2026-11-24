@@ -114,6 +114,7 @@ const RE_STATUS_CARD = /em\s*andamento|planejado|novo|resolvido|cancelado|aguard
 const RE_COLUNAS_FINAIS = /min\b|andamento|resolvido|planejado|cancelado|\(\s*e\s*\w+/i;
 // coluna Tempo da lista ("0 min", "3 h"); a imagem lê 0 como O
 const RE_TEMPO = /\b[O0o\d][\d,]*\s*(?:min|h|d)\b/;
+const RE_NOME_ANTES_DO_TEMPO = /([A-ZÀ-Ý][a-zà-ÿ]+(?: (?:d[aeo]s? )?[A-ZÀ-Ý][a-zà-ÿ]+){1,3})\s+[O0o\d][\d,]*\s*(?:min|h|d)\b/;
 
 // "KituSistema" -> "Kitu Sistema"
 function tipoCanonico(lido: string | undefined): string | undefined
@@ -139,6 +140,12 @@ function lerDemanda(codigo: string, trecho: string, pessoas: Pessoa[], regrasDes
   const card: CardSnapshot = { codigo, responsaveis: [], origens: ['demandas'], fontesCorrelacionadas: ['lista'] };
   const normal = semAcento(trecho);
   const achadas = pessoasNoTexto(normal, pessoas);
+  // pessoa ainda não cadastrada: o nome é a coluna logo antes do tempo
+  if (!achadas.length)
+  {
+    const nome = trecho.match(RE_NOME_ANTES_DO_TEMPO)?.[1];
+    if (nome) achadas.push({ id: nome, nome, capacidadeHorasSemana: 40 });
+  }
   card.responsaveis = achadas.map((p) => p.id);
   if (card.responsaveis.length > 0) card.responsavelEtapaAtual = card.responsaveis[0];
 
