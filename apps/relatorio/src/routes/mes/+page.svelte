@@ -53,6 +53,7 @@
       <span class="prompt">&gt; mes</span>
       <h1>Visão do mês<span class="cursor">_</span></h1>
     </div>
+    <a class="botao" href="/calendario">Ver calendário</a>
     <select bind:value={mes} aria-label="Mês">
       {#each meses as m (m)}<option value={m}>{rotuloMes(m)}</option>{/each}
     </select>

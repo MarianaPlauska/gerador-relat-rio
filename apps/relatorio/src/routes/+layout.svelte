@@ -48,6 +48,7 @@
       nome: 'Ciclo e Rotina',
       itens: [
         { href: '/semana', nome: 'Semana', dica: 'Plano semanal, entregas, alertas e compromissos' },
+        { href: '/calendario', nome: 'Calendário', dica: 'Cronograma geral do mês, com vencimentos, plano, atas e ausências' },
         { href: '/mes', nome: 'Mês', dica: 'Visão consolidada do período e evolução' },
         { href: '/vivos', nome: 'Checklist diário', dica: 'Tarefas do período para marcar e registrar o dia' },
         { href: '/atas', nome: 'Atas e Combinados', dica: 'Atas de diretoria, resumos executivos e radar de prazos' },
@@ -269,6 +270,7 @@
             <a href="/painel">Diário</a>
             <a href="/cards">Cards</a>
             <a href="/semana">Semana</a>
+            <a href="/calendario">Calendário</a>
             <a href="/atas">Atas</a>
             <a href="/fluxos">Fluxos</a>
             <a href="/priorizacao">Priorização</a>

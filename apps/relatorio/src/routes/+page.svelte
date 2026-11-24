@@ -302,7 +302,10 @@
           <span class="etiqueta">Projeto {projetoAtual}</span>
           <h2>Tarefas da semana ({baseCards.length})</h2>
         </div>
-        <a href="/cards" class="link-subtil">todos os cards &rarr;</a>
+        <span class="links-cabeca">
+          <a href="/calendario" class="link-subtil">calendário</a>
+          <a href="/cards" class="link-subtil">todos os cards &rarr;</a>
+        </span>
       </div>
 
       {#if tarefasDaSemana.length === 0}
@@ -793,6 +796,12 @@
   {
     margin: 2px 0 0;
     font-size: 1.05rem;
+  }
+  .links-cabeca
+  {
+    display: flex;
+    gap: 12px;
+    align-items: center;
   }
   .link-subtil
   {

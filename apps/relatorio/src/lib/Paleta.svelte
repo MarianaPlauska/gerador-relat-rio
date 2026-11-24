@@ -26,7 +26,7 @@
   {
     const dados = carregar();
     const paginas: [string, string, string?][] = [
-      ['Início', '/'], ['Diário do painel', '/painel'], ['Cards', '/cards'], ['Semana', '/semana'], ['Atas e Combinados', '/atas'], ['Listas', '/listas'], ['Fluxos', '/fluxos'], ['Planilhas', '/planilhas'], ['Priorização', '/priorizacao'],
+      ['Início', '/'], ['Diário do painel', '/painel'], ['Cards', '/cards'], ['Semana', '/semana'], ['Calendário', '/calendario'], ['Atas e Combinados', '/atas'], ['Listas', '/listas'], ['Fluxos', '/fluxos'], ['Planilhas', '/planilhas'], ['Priorização', '/priorizacao'],
       ['Checklist diário', '/vivos'], ['Relatório (PDF)', '/relatorio'], ['Visão do mês', '/mes'], ['Modelos de relatório', '/modelos'],
       ['Retornos dos links', '/retornos'], ['Meu perfil', '/perfil'], ['Roadmap', '/roadmap'],
     ];

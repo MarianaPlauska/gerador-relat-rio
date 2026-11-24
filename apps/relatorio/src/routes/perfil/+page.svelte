@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { carregar, exportarJson, importarJson, salvar, type Dados } from '#lib/armazenamento.ts';
   import { minhasPublicacoes } from '#lib/links.ts';
+  import { firebaseConfig } from '#lib/firebaseConfig.ts';
   import { nuvem, recuperarSenha, sairDaNuvem, textoDoErro, trocarNomeDaConta, trocarSenha } from '#lib/nuvem.svelte.ts';
   import { dataCurta } from '#lib/semana.ts';
   import { atualizarSessao, fecharSessao, lerSessao } from '#lib/sessao.ts';
@@ -13,6 +14,14 @@
   const sessao = lerSessao();
   let nome = $state(nuvem.nome ?? sessao?.nome ?? dados.identificacao.elaboradoPor ?? '');
   const logada = $derived(nuvem.estado === 'ok' || nuvem.estado === 'sincronizando' || nuvem.estado === 'erro');
+  const rotuloNuvem = $derived(
+    nuvem.estado === 'ok' ? (nuvem.email ?? 'conectado')
+    : nuvem.estado === 'sincronizando' ? 'sincronizando'
+    : nuvem.verificando ? 'verificando a conta'
+    : nuvem.estado === 'erro' ? 'erro ao salvar'
+    : nuvem.estado === 'sem_login' ? 'sem login'
+    : 'desligada',
+  );
   let escuro = $state(document.documentElement.dataset.tema !== 'claro');
   let senhaAtual = $state('');
   let senhaNova = $state('');
@@ -206,9 +215,10 @@
         <small><a href="/retornos">Ver retornos &rarr;</a></small>
       </div>
       <div class="mini-kpi">
-        <span class="etiqueta">Banco na nuvem</span>
-        <strong class="maquina">{nuvem.estado === 'ok' ? 'OK' : nuvem.estado === 'sincronizando' ? '...' : nuvem.verificando ? '...' : 'Local'}</strong>
-        <small>{nuvem.email ?? 'Sem login na nuvem'}</small>
+        <span class="etiqueta">Backend</span>
+        <strong class="maquina">{firebaseConfig.projectId ? 'Firebase' : 'Local'}</strong>
+        <small>{firebaseConfig.projectId ? `Firestore · ${firebaseConfig.projectId}` : 'sem projeto na nuvem'}</small>
+        <small>{rotuloNuvem}</small>
       </div>
     </div>
 
@@ -311,9 +321,13 @@
         {#if msg.nome}<span class:ok={msg.nome.ok} class:ruim={!msg.nome.ok}>{msg.nome.texto}</span>{/if}
       </div>
       <p class="dica">
-        Nuvem: <b>{nuvem.estado === 'desligada' ? 'desligada' : nuvem.verificando ? 'verificando...' : nuvem.estado === 'sem_login' ? 'sem login' : nuvem.estado === 'sincronizando' ? 'sincronizando' : nuvem.estado === 'erro' ? 'com erro' : 'tudo guardado'}</b>
-        {#if nuvem.estado === 'sem_login' && !nuvem.verificando}- <a href="/entrar?modo=conta">entrar ou criar conta</a>{/if}
-        {#if nuvem.estado === 'desligada'}- ainda sem projeto Firebase configurado.{/if}
+        Backend: <b>{firebaseConfig.projectId ? 'Firebase' : 'só neste navegador'}</b>
+        {#if firebaseConfig.projectId}
+          (Authentication e Firestore, projeto <span class="maquina">{firebaseConfig.projectId}</span>).
+          O site é estático; a cópia de trabalho fica no navegador e a conta grava no Firestore.
+        {/if}
+        Estado: <b>{rotuloNuvem}</b>
+        {#if nuvem.estado === 'sem_login' && !nuvem.verificando}<a href="/entrar?modo=conta">entrar ou criar conta</a>{/if}
       </p>
     </section>
 
