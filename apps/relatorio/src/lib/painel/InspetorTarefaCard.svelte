@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { CardSnapshot, EtapaCard, Pessoa } from '@supervisao/core';
+  import type { AnexosCard } from './acoes.ts';
 
   let {
     card,
@@ -19,6 +20,7 @@
     aoSelecionarOutroCard,
     aoAmpliarModal,
     aoFechar,
+    anexos,
   }: {
     card: CardSnapshot;
     todosCards: CardSnapshot[];
@@ -37,6 +39,7 @@
     aoSelecionarOutroCard: (codigo: string) => void;
     aoAmpliarModal?: () => void;
     aoFechar: () => void;
+    anexos?: AnexosCard | undefined;
   } = $props();
 
   let novaEtapaTexto = $state('');
@@ -155,6 +158,49 @@
     <small class="dica" title={card.notaHoras}>Tempo pelo histórico. Digite outro valor para fixar.</small>
   {:else if card.origemHoras === 'regra'}
     <small class="dica">Tempo pela prioridade. Digite outro valor para fixar.</small>
+  {/if}
+
+  {#if anexos}
+    {@const prints = anexos.listar(card.codigo)}
+    {@const lendo = anexos.progresso()}
+    <div class="bloco-campo-direita">
+      <h4 class="rotulo-bloco">Prints desta tarefa</h4>
+      <textarea
+        class="zona-print"
+        rows="2"
+        value=""
+        placeholder="Cole aqui o print do card (Ctrl+V) ou arraste a imagem. Eu leio e preencho o pedido e as etapas abaixo."
+        aria-label="Colar o print desta tarefa"
+        onpaste={(e) => { e.preventDefault(); anexos.colar(card.codigo, e); }}
+        ondragover={(e) => e.preventDefault()}
+        ondrop={(e) => { e.preventDefault(); anexos.soltar(card.codigo, e); }}
+      ></textarea>
+      <div class="linha-print">
+        <label class="botao mini">
+          Escolher imagem
+          <input
+            type="file"
+            accept="image/*"
+            hidden
+            onchange={(e) => { const f = e.currentTarget.files?.[0]; if (f) anexos.escolher(card.codigo, f); e.currentTarget.value = ''; }}
+          />
+        </label>
+        {#if lendo !== null}
+          <span class="pilula">lendo... {Math.round(lendo * 100)}%</span>
+        {/if}
+      </div>
+      {#if prints.length}
+        <ul class="lista-prints">
+          {#each prints as p (p.id)}
+            <li>
+              {#if p.imagemDataUrl}<img src={p.imagemDataUrl} alt={p.nome} />{/if}
+              <span>{p.nome.split(' · ')[0]}</span>
+              <button type="button" class="link perigo" onclick={() => anexos.remover(p.id)}>remover</button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
   {/if}
 
   <label class="bloco-campo-direita">
@@ -278,6 +324,11 @@
   .input-desc-etapa { width: 100%; font-size: 0.78rem; padding: 4px 6px; }
   .nova-etapa-inline { display: grid; grid-template-columns: 1fr 1.2fr auto; gap: 6px; margin-top: 4px; }
   .nova-etapa-inline input { font-size: 0.78rem; padding: 4px 6px; }
+  .zona-print { border: 1.5px dashed var(--borda-forte); text-align: center; padding: 8px 10px; font-size: 0.8rem; resize: none; }
+  .linha-print { display: flex; align-items: center; gap: 8px; }
+  .lista-prints { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 0.78rem; }
+  .lista-prints li { display: flex; align-items: center; gap: 8px; }
+  .lista-prints img { width: 64px; height: 44px; object-fit: cover; border: 1px solid var(--borda); border-radius: 4px; background: var(--fundo); }
   .rotulo-bloco { margin: 6px 0 0; padding-top: 10px; border-top: 1px dashed var(--borda); font-family: var(--fonte-maquina); font-size: 0.74rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--suave); }
   .caixa-impacto-correlacao summary { cursor: var(--cursor-clique); color: var(--marca); font-weight: 600; font-size: 0.82rem; }
   .caixa-impacto-correlacao {padding: 8px 10px; background: var(--superficie-2); border-radius: 6px; border: 1px solid var(--borda); }

@@ -14,3 +14,14 @@ export interface AcoesCards
   desvincular: (codigo: string, outro: string) => void;
   reordenarFila: (pessoaId: string, codigos: string[]) => void;
 }
+
+// prints presos a uma tarefa: a inspeção manda ler e pergunta o que já está preso nela
+export interface AnexosCard
+{
+  colar: (codigo: string, e: ClipboardEvent) => void;
+  soltar: (codigo: string, e: DragEvent) => void;
+  escolher: (codigo: string, imagem: Blob) => void;
+  listar: (codigo: string) => { id: string; nome: string; imagemDataUrl?: string | undefined }[];
+  remover: (id: string) => void;
+  progresso: () => number | null;
+}

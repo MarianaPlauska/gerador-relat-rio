@@ -1,17 +1,18 @@
 <script lang="ts">
   import { ordenarCardsResumidos, type CardSnapshot, type CriterioOrdenacaoCards, type GanttSemana as DadosGantt, type Pessoa, type ResumoPessoaProjeto } from '@supervisao/core';
-  import type { AcoesCards } from './acoes.ts';
+  import type { AcoesCards, AnexosCard } from './acoes.ts';
   import GanttSemana from './GanttSemana.svelte';
   import InspetorTarefaCard from './InspetorTarefaCard.svelte';
 
   // resumo das tarefas, pessoas da semana com etapas ticáveis, painel lateral da tarefa e cronograma da semana
-  let { cardsLidos, pessoasDaPasta, pastaAtual, analiseEnvio, gantt, acoes, selecionadoCodigo = $bindable(null), pessoaExpandidaEnvio = $bindable(null), aoAmpliarModal }: {
+  let { cardsLidos, pessoasDaPasta, pastaAtual, analiseEnvio, gantt, acoes, anexos, selecionadoCodigo = $bindable(null), pessoaExpandidaEnvio = $bindable(null), aoAmpliarModal }: {
     cardsLidos: CardSnapshot[];
     pessoasDaPasta: Pessoa[];
     pastaAtual: string;
     analiseEnvio: ResumoPessoaProjeto[];
     gantt: DadosGantt;
     acoes: AcoesCards;
+    anexos?: AnexosCard | undefined;
     selecionadoCodigo?: string | null;
     // pessoa aberta na árvore (a barra de equipe da página também abre uma)
     pessoaExpandidaEnvio?: string | null;
@@ -214,6 +215,7 @@
                   aoSelecionarOutroCard={(cod) => (selecionadoCodigo = cod)}
                   aoAmpliarModal={() => aoAmpliarModal()}
                   aoFechar={() => (selecionadoCodigo = null)}
+                  {anexos}
                 />
               </aside>
             {/if}
@@ -226,10 +228,15 @@
 
 <style>
   .grade-arvore-envio { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 14px; margin: 12px 0; align-items: start; }
-  /* com uma tarefa aberta: lista à esquerda, inspeção à direita e as pessoas embaixo, na largura toda */
+  /* com uma tarefa aberta: lista e pessoas na coluna da esquerda, inspeção na direita ocupando as duas linhas
+     (é o que deixa o sticky dela ter espaço para grudar; numa linha só ela escorregava junto com a página) */
   .grade-arvore-envio.com-painel-direito { grid-template-columns: minmax(300px, 1fr) minmax(380px, 1.4fr); }
-  .com-painel-direito .painel-detalhe-direita { order: 1; }
-  .com-painel-direito .caixa-pessoas { order: 2; grid-column: 1 / -1; }
+  .com-painel-direito .caixa-arvore { grid-area: 1 / 1; }
+  .com-painel-direito .caixa-pessoas { grid-area: 2 / 1; }
+  .com-painel-direito .painel-detalhe-direita { grid-area: 1 / 2 / 3 / 3; }
+  /* com a inspeção aberta as listas crescem na página: é o que dá altura para a inspeção ficar parada enquanto
+     a lista rola, e tira a rolagem de dentro da rolagem */
+  .com-painel-direito .lista-tarefas-resumo, .com-painel-direito .lista-pessoas-arvore { max-height: none; overflow: visible; padding-right: 0; }
   .dono-tarefa { font-size: 0.74rem; color: var(--suave); }
   .assunto-tarefa { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .caixa-arvore { background: var(--superficie-2); border: 1px solid var(--borda); border-radius: var(--raio-pequeno); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
@@ -306,7 +313,7 @@
   .impacto-card-filho { font-size: 0.75rem; color: var(--suave); padding: 5px 8px; background: var(--superficie-2); border-left: 2px solid var(--marca); border-radius: 4px; }
   .input-desc-etapa { width: 100%; font-size: 0.78rem; padding: 4px 6px; margin-top: 4px; }
 
-  .painel-detalhe-direita { background: var(--superficie); border: 1.5px solid var(--marca); border-radius: var(--raio); padding: 14px; position: sticky; top: 14px; max-height: 85vh; overflow-y: auto; }
+  .painel-detalhe-direita { background: var(--superficie); border: 1.5px solid var(--marca); border-radius: var(--raio); padding: 14px; position: sticky; top: 14px; max-height: calc(100vh - 28px); overflow-y: auto; overscroll-behavior: contain; }
   .linha-entre { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
   .mini { font-size: 0.78rem; display: flex; gap: 6px; align-items: center; }
   .conferir { margin-top: 10px; }

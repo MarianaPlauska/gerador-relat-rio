@@ -17,7 +17,7 @@
   import CapturaItem from '#lib/painel/CapturaItem.svelte';
   import CapturaUmClique from '#lib/painel/CapturaUmClique.svelte';
   import EstadoNuvem from '#lib/EstadoNuvem.svelte';
-  import type { AcoesCards } from '#lib/painel/acoes.ts';
+  import type { AcoesCards, AnexosCard } from '#lib/painel/acoes.ts';
   import InspetorTarefaCard from '#lib/painel/InspetorTarefaCard.svelte';
   import ModalCapturaAmpliada from '#lib/painel/ModalCapturaAmpliada.svelte';
   import ModalGerenciarEquipe from '#lib/painel/ModalGerenciarEquipe.svelte';
@@ -350,14 +350,14 @@
   }
 
   // o print entra na lista e tudo é refeito: assim a ordem de envio não muda o resultado
-  function registrarCaptura(conteudo: string, nome: string, imagemDataUrl?: string)
+  function registrarCaptura(conteudo: string, nome: string, imagemDataUrl?: string, presoAoCard?: string)
   {
-    const origem = detectarOrigem(conteudo);
+    const origem = presoAoCard ? 'card' : detectarOrigem(conteudo);
     const textoLimpo = aplicarRegrasDescarte(conteudo, dados.regrasDescarte);
     capturas = [
       ...capturas,
       {
-        id: idCurto(), nome: `${nome} · ${nomesOrigem[origem]}`, origem, texto: textoLimpo, ...(imagemDataUrl ? { imagemDataUrl } : {}), ...(pessoaDaSemana ? { pessoaId: pessoaDaSemana } : {}),
+        id: idCurto(), nome: `${nome} · ${nomesOrigem[origem]}`, origem, texto: textoLimpo, ...(imagemDataUrl ? { imagemDataUrl } : {}), ...(pessoaDaSemana ? { pessoaId: pessoaDaSemana } : {}), ...(presoAoCard ? { cardPaiManual: presoAoCard } : {}),
         totais: [], cards: [], ondas: 0, avisos: [], sugestoes: [], comentario: '',
       },
     ];
@@ -542,6 +542,50 @@
     reordenarFila,
   };
 
+  // print anexado dentro da inspeção: vira captura presa a esta tarefa, então o pedido e as etapas do print caem nela
+  async function lerPrintNoCard(codigo: string, imagem: Blob)
+  {
+    aviso = `Lendo o print do ${codigo}. Na primeira vez baixa o idioma, pode demorar.`;
+    progresso = 0;
+    try
+    {
+      const [texto, miniatura] = await Promise.all([lerImagem(imagem, (p) => (progresso = p), pastaAtual || dados.prefixo), miniaturaDataUrl(imagem).catch(() => undefined)]);
+      registrarCaptura(texto, `Print do ${codigo}`, miniatura, codigo);
+      aviso = `Print lido e preso ao ${codigo}. Confira o pedido e as etapas.`;
+    }
+    catch (erro)
+    {
+      aviso = `Não consegui ler o print: ${String(erro)}`;
+    }
+    finally
+    {
+      progresso = null;
+    }
+  }
+
+  const anexosCard: AnexosCard = {
+    colar: (codigo, e) =>
+    {
+      const colado = lerColagem(e);
+      if (!colado) return;
+      if (colado.tipo === 'texto')
+      {
+        registrarCaptura(colado.texto, `Texto do ${codigo}`, undefined, codigo);
+        aviso = `Texto preso ao ${codigo}. Confira o pedido e as etapas.`;
+      }
+      else void lerPrintNoCard(codigo, colado.imagem);
+    },
+    soltar: (codigo, e) =>
+    {
+      const imagem = [...(e.dataTransfer?.files ?? [])].find((f) => f.type.startsWith('image/'));
+      if (imagem) void lerPrintNoCard(codigo, imagem);
+    },
+    escolher: (codigo, imagem) => void lerPrintNoCard(codigo, imagem),
+    listar: (codigo) => capturas.filter((c) => c.cardPaiManual === codigo).map((c) => ({ id: c.id, nome: c.nome, imagemDataUrl: c.imagemDataUrl })),
+    remover: (id) => removerCaptura(id),
+    progresso: () => progresso,
+  };
+
   // roda o OCR outra vez sobre a imagem guardada, sem precisar enviar de novo
   async function relerImagem(id: string)
   {
@@ -571,11 +615,15 @@
 
   function removerCaptura(id: string)
   {
-    const saindo = capturas.find((c) => c.id === id);
-    if (saindo && cardSelecionadoCodigo && saindo.cards.includes(cardSelecionadoCodigo)) cardSelecionadoCodigo = null;
     capturas = capturas.filter((c) => c.id !== id);
     if (capturaModalId === id) capturaModalId = null;
     recalcular();
+    // a tarefa aberta na inspeção só fecha se tiver sumido junto com o print que a trouxe
+    if (cardSelecionadoCodigo && !cardsLidos.some((c) => c.codigo === cardSelecionadoCodigo))
+    {
+      cardSelecionadoCodigo = null;
+      modalCardAberto = false;
+    }
   }
 
   async function lerImagens(imagens: Blob[])
@@ -877,7 +925,7 @@
         {#if cardsLidos.length}
           <details class="conferir">
             <summary>Tarefas por pessoa: etapas, impacto na semana e cronograma ({cardsLidos.length} demandas)</summary>
-            <ArvoreEnvio {cardsLidos} {pessoasDaPasta} {pastaAtual} {analiseEnvio} gantt={ganttEnvio} acoes={acoesCards} bind:selecionadoCodigo={cardSelecionadoCodigo} bind:pessoaExpandidaEnvio aoAmpliarModal={() => (modalCardAberto = true)} />
+            <ArvoreEnvio {cardsLidos} {pessoasDaPasta} {pastaAtual} {analiseEnvio} gantt={ganttEnvio} acoes={acoesCards} anexos={anexosCard} bind:selecionadoCodigo={cardSelecionadoCodigo} bind:pessoaExpandidaEnvio aoAmpliarModal={() => (modalCardAberto = true)} />
           </details>
         {/if}
 
@@ -1069,6 +1117,7 @@
           aoDesvincularRelacionado={desvincularCardRelacionado}
           aoSelecionarOutroCard={(cod) => (cardSelecionadoCodigo = cod)}
           aoFechar={() => (modalCardAberto = false)}
+          anexos={anexosCard}
         />
       </div>
     </div>
