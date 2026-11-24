@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { carregar, exportarJson, importarJson, salvar, type Dados } from '#lib/armazenamento.ts';
   import { minhasPublicacoes } from '#lib/links.ts';
+  import QuemPodeEntrar from '#lib/QuemPodeEntrar.svelte';
   import { firebaseConfig } from '#lib/firebaseConfig.ts';
   import { nuvem, recuperarSenha, sairDaNuvem, textoDoErro, trocarNomeDaConta, trocarSenha } from '#lib/nuvem.svelte.ts';
   import { dataCurta } from '#lib/semana.ts';
@@ -374,6 +375,10 @@
         {#if msg.senha}<p class:ok={msg.senha.ok} class:ruim={!msg.senha.ok}>{msg.senha.texto}</p>{/if}
       {/if}
     </section>
+
+    {#if logada}
+      <QuemPodeEntrar />
+    {/if}
 
     <section class="cartao">
       <h2>Seus dados</h2>

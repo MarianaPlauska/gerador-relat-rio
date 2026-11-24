@@ -7,3 +7,5 @@ coverage
 
 .vercel
 .env*
+__pycache__
+*.pyc

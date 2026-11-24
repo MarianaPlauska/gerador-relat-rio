@@ -4,5 +4,10 @@
   "installCommand": "npm install",
   "buildCommand": "npm run build",
   "outputDirectory": "apps/relatorio/build",
-  "cleanUrls": true
+  "cleanUrls": true,
+  "functions": {
+    "api/admin.py": {
+      "excludeFiles": "{node_modules/**,apps/**,packages/**,docs/**,build/**,static/**}"
+    }
+  }
 }

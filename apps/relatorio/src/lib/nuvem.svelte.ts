@@ -104,6 +104,13 @@ async function abrir()
 
 const servico = () => (servicos ??= abrir());
 
+// crachá da conta para o servidor (api/admin.py) conferir quem está pedindo
+export async function tokenDaConta(): Promise<string | null>
+{
+  const { autenticacao } = await servico();
+  return (await autenticacao.currentUser?.getIdToken()) ?? null;
+}
+
 // a nuvem já está conectada e sincronizada nesta sessão: só então as imagens saem de dentro dos dados locais
 export const nuvemPronta = (): boolean => !!uid && pronto;
 // a imagem já foi gravada na nuvem desta conta
