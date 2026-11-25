@@ -129,8 +129,10 @@
     }
   }
   let escuro = $state(typeof document === 'undefined' || document.documentElement.dataset.tema !== 'claro');
-  // telas abertas sem conta: entrada e relatório recebido por link
-  const aberta = $derived(page.url.pathname === '/entrar' || page.url.pathname === '/ler');
+  // telas sem o cabeçalho do app: entrada, relatório recebido por link e as perguntas de início
+  const aberta = $derived(page.url.pathname === '/entrar' || page.url.pathname === '/ler' || page.url.pathname === '/comecar');
+  // as perguntas de início também ficam sem o rodapé (as outras telas abertas mantêm um rodapé reduzido)
+  const semRodape = $derived(page.url.pathname === '/comecar');
   const nome = $derived(page.url.pathname && (lerSessao()?.nome ?? ''));
 
   function trocarTema()
@@ -252,7 +254,8 @@
     <Paleta bind:aberta={paletaAberta} {trocarTema} baixarBackup={() => exportarJson(carregar())} {sair} />
   {/if}
 
-  <!-- o rodapé aparece em todas as páginas; nas telas abertas (entrada e relatório por link) fica sem os atalhos do app -->
+  <!-- o rodapé aparece em quase todas as páginas; nas telas abertas (entrada e relatório por link) fica sem os atalhos do app -->
+  {#if !semRodape}
   <footer>
     <div class="rodape">
       <div class="rodape-sobre">
@@ -287,6 +290,7 @@
       </div>
     </div>
   </footer>
+  {/if}
 </div>
 
 <style>
