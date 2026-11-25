@@ -22,12 +22,13 @@
   // e-mail para onde foi o link de nova senha
   let enviadoPara = $state('');
 
-  function concluir(nomeFinal: string, emailFinal?: string)
+  function concluir(nomeFinal: string, emailFinal?: string, contaNova = false)
   {
     // o nome vai para "Elaborado por" do relatório e para a saudação da central
     if (!dados.identificacao.elaboradoPor) salvar({ ...dados, identificacao: { ...dados.identificacao, elaboradoPor: nomeFinal } });
     abrirSessao({ nome: nomeFinal, email: emailFinal, desde: new Date().toISOString() }, manter);
-    goto('/', { replaceState: true });
+    // conta (ou uso local) sem nenhuma pessoa cadastrada ainda: pergunta o uso antes de abrir a Início
+    goto(contaNova || !dados.pessoas.length ? '/comecar' : '/', { replaceState: true });
   }
 
   async function enviar(e: SubmitEvent)
@@ -50,7 +51,7 @@
       else if (modo === 'criar')
       {
         await criarConta(nome.trim(), email.trim(), senha, manter);
-        concluir(nome.trim(), email.trim());
+        concluir(nome.trim(), email.trim(), true);
       }
       else
       {
