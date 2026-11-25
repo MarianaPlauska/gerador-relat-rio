@@ -2,9 +2,9 @@ import pdfMake from 'pdfmake/build/pdfmake';
 import type { Content, CustomTableLayout, TableCell, TDocumentDefinitions } from 'pdfmake/interfaces';
 import
 {
-  aplicarControle, diarioDoPeriodo, estatisticasDoPlano, filtrarRegistros, itensDaFase, kpisDosItens, pendenciasPorEtapa, progressoDosItens, situacaoDaFase, lerDicionario, mapaDeDores, mapaDeFrentes, nomesSecoes, nomesTotais, posicaoNaFaixa,
+  aplicarControle, diarioDoPeriodo, estatisticasDoPlano, filtrarRegistros, itensDaFase, kpisDosItens, ordenarCardsResumidos, pendenciasPorEtapa, progressoDosItens, situacaoDaFase, lerDicionario, mapaDeDores, mapaDeFrentes, nomesSecoes, nomesTotais, posicaoNaFaixa,
   resumirSerie, resumoDoFluxo, ritmoPorPessoa, segundaDaSemana, semanaDoAno, serieSemanal, somarDias, textoProjecao,
-  type Bloco, type CorSemaforo, type ItemPlano, type Modelo, type ResumoSerie, type Ritmo, type SecaoPadrao, type Tendencia, type TotaisPainel,
+  type Bloco, type CardSnapshot, type CorSemaforo, type CriterioOrdenacaoCards, type ItemPlano, type Modelo, type ResumoSerie, type Ritmo, type SecaoPadrao, type Tendencia, type TotaisPainel,
 } from '@supervisao/core';
 import maquina400 from '@fontsource/courier-prime/files/courier-prime-latin-400-normal.woff?url';
 import maquina700 from '@fontsource/courier-prime/files/courier-prime-latin-700-normal.woff?url';
@@ -21,7 +21,15 @@ const LARGURA = 515;
 const corTendencia: Record<Tendencia, string> = { melhorou: cores.verde, piorou: cores.vermelho, igual: cores.suave, neutra: cores.suave };
 const nomesSemaforo: Record<CorSemaforo, string> = { verde: 'NO CAMINHO', amarelo: 'ATENÇÃO', vermelho: 'FORA DA META' };
 const corSemaforo: Record<CorSemaforo, string> = { verde: cores.verde, amarelo: cores.amarelo, vermelho: cores.vermelho };
-const nomesRitmo: Record<Ritmo, string> = { no_ritmo: 'no ritmo', em_risco: 'em risco', atrasado: 'atrasado' };
+const nomesOrdemTarefas: Record<CriterioOrdenacaoCards, string> = {
+  prioridade_maior: 'prioridade e tempo, da maior para a menor',
+  card_maior: 'número do card, do maior para o menor',
+  card_menor: 'número do card, do menor para o maior',
+  nomes_parecidos: 'assuntos parecidos juntos',
+  datas_proximas: 'prazo mais próximo primeiro',
+  datas_distantes: 'prazo mais longo primeiro',
+};
+const nomesRitmo: Record<Ritmo, string> ={ no_ritmo: 'no ritmo', em_risco: 'em risco', atrasado: 'atrasado' };
 const corRitmo: Record<Ritmo, string> = { no_ritmo: cores.verde, em_risco: cores.amarelo, atrasado: cores.vermelho };
 const nomesStatus: Record<ItemPlano['status'], string> = { a_fazer: 'a fazer', fazendo: 'fazendo', feito: 'feito', bloqueado: 'bloqueado', adiado: 'adiado' };
 const corStatus = (s: ItemPlano['status']) => (s === 'feito' ? cores.verde : s === 'bloqueado' || s === 'adiado' ? cores.vermelho : cores.suave);
@@ -349,7 +357,73 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
     }), LARGURA);
   };
 
+  // prazo que vale para a tarefa: o vencimento do painel ou, na falta dele, a previsão de resolução lida no print
+  const prazoDe = (c: CardSnapshot) => c.vencimento ?? c.previsao;
+  const donoDoCard = (c: CardSnapshot) => c.responsavelEtapaAtual ?? c.responsaveis[0];
+  const aberto = (c: CardSnapshot) => c.situacao !== 'concluido' && c.statusCard !== 'Resolvido';
+  const etapasDoCard = (c: CardSnapshot) =>
+  {
+    const total = c.etapas?.length ?? c.etapasTotal;
+    return total ? `${c.etapasConcluidas ?? 0}/${total}` : '-';
+  };
+
   const desenhar: Record<SecaoPadrao, () => void> = {
+  prazos: () =>
+  {
+    const abertos = cards.filter((c) => !!prazoDe(c) && aberto(c));
+    conteudo.push(h1(titulo('prazos')));
+    if (!abertos.length)
+    {
+      conteudo.push(p('Nenhuma tarefa aberta com prazo lido no painel neste período.'));
+      return;
+    }
+    const grupos: { nome: string; itens: CardSnapshot[]; cor: string }[] = [
+      { nome: 'Já passou do prazo', itens: abertos.filter((c) => prazoDe(c)! < atual.inicio), cor: cores.vermelho },
+      { nome: `Vence neste período (${periodo})`, itens: abertos.filter((c) => prazoDe(c)! >= atual.inicio && prazoDe(c)! <= ctx.fim), cor: cores.amarelo },
+      { nome: 'Vence depois', itens: abertos.filter((c) => prazoDe(c)! > ctx.fim), cor: cores.suave },
+    ];
+    conteudo.push(p(grupos.map((g) => `${g.nome.replace(/ \(.*\)/, '')}: ${g.itens.length}`).join(' · ') + '.'));
+    for (const g of grupos.filter((x) => x.itens.length))
+    {
+      conteudo.push(h2(g.nome));
+      const linhas = [...g.itens].sort((a, b) => prazoDe(a)!.localeCompare(prazoDe(b)!)).map((c) => [
+        { text: c.codigo, font: 'Maquina', bold: true },
+        { stack: [c.assunto || c.titulo || '-', pequeno([c.statusCard, c.etapaAtual].filter(Boolean).join(' - '))] },
+        primeiroNome(donoDoCard(c)),
+        direita(dataCurta(prazoDe(c)), { font: 'Maquina', color: g.cor, bold: true }),
+        direita(etapasDoCard(c)),
+      ]);
+      conteudo.push(tabela(`${g.nome}, da data mais próxima para a mais distante`, ['Card', 'Assunto', 'Pessoa', 'Prazo', 'Etapas'], linhas, [58, '*', 70, 58, 44], 'prints do painel'));
+    }
+  },
+  tarefas: () =>
+  {
+    const ordem = dados.ordemTarefas ?? 'prioridade_maior';
+    const comDono = cards.filter((c) => !!donoDoCard(c) && aberto(c));
+    const concluidas = cards.filter((c) => !!donoDoCard(c) && !aberto(c)).length;
+    conteudo.push(h1(titulo('tarefas')));
+    if (!comDono.length)
+    {
+      conteudo.push(p('Nenhuma tarefa aberta com responsável nos prints deste período.'));
+      return;
+    }
+    conteudo.push(p(`As tarefas abertas de cada pessoa na ordem escolhida no painel: ${nomesOrdemTarefas[ordem]}.${concluidas ? ` Outras ${concluidas} já estão concluídas e saem desta lista.` : ''}`));
+    const porPessoa = new Map<string, CardSnapshot[]>();
+    for (const c of comDono) porPessoa.set(donoDoCard(c)!, [...(porPessoa.get(donoDoCard(c)!) ?? []), c]);
+    for (const [pessoaId, lista] of [...porPessoa].sort((a, b) => nomePessoa(a[0]).localeCompare(nomePessoa(b[0]))))
+    {
+      const horas = lista.reduce((s, c) => s + (c.horasEstimadas ?? 0), 0);
+      conteudo.push(h2(`${nomePessoa(pessoaId)} (${lista.length} ${lista.length === 1 ? 'tarefa' : 'tarefas'}${horas ? `, ~${Math.round(horas)}h` : ''})`));
+      const linhas = ordenarCardsResumidos(lista, ordem).map((c) => [
+        { text: c.codigo, font: 'Maquina', bold: true },
+        { stack: [c.assunto || c.titulo || '-', pequeno([c.prioridadeCard, c.statusCard].filter(Boolean).join(' - '))] },
+        { stack: [c.etapaAtual ?? '-', pequeno(etapasDoCard(c) === '-' ? 'sem etapas lidas' : `${etapasDoCard(c)} etapas feitas`)] },
+        direita(dataCurta(prazoDe(c)) || '-', { font: 'Maquina' }),
+        direita(c.horasEstimadas ? `${c.horasEstimadas}h` : '-'),
+      ]);
+      conteudo.push(tabela(`Tarefas de ${nomePessoa(pessoaId)} no painel`, ['Card', 'Assunto', 'Etapa atual', 'Prazo', 'Tempo'], linhas, [58, '*', 130, 56, 40], 'prints do painel'));
+    }
+  },
   extrato: () =>
   {
     const gov = dados.governancaSemanal?.[atual.inicio] ?? {};
@@ -1151,7 +1225,11 @@ export function montarDocumento({ dados, ctx, notas, resumo, modelo, blocos }: E
         conteudo.push({
           unbreakable: true,
           stack: [
-            legendaFigura(`${cap.nome.split(' · ')[0]} (${cap.cards.length} cards, ${cap.totais.length} indicadores)`),
+            legendaFigura([
+              cap.nome.split(' · ')[0],
+              cap.cardPaiManual ? `tarefa ${cap.cardPaiManual}` : '',
+              cap.trouxe ? `preencheu: ${cap.trouxe}` : `${cap.cards.length} cards, ${cap.totais.length} indicadores`,
+            ].filter(Boolean).join(' · ')),
             { image: cap.imagemDataUrl!, fit: [LARGURA, 430], alignment: 'center', margin: [0, 2, 0, 4] },
             ...(cap.comentario?.trim() ? [pequeno(`Comentário: ${cap.comentario.trim()}`)] : []),
             fonte(`print do diário em ${dataMedia(r.data)} (${r.pasta})`),

@@ -606,3 +606,46 @@ export function analisarTimeNoProjeto(opcoes: {
 
   return parciais;
 }
+
+export interface QualificacaoPessoa
+{
+  nivel: 'sobrecarregada' | 'atencao' | 'no_ritmo' | 'em_dia';
+  rotulo: string;
+  motivo: string;
+}
+
+// nota da semana de cada pessoa, com o motivo escrito, a partir do que os prints do painel trouxeram
+export function qualificarPessoa(r: ResumoPessoaProjeto, hoje: string): QualificacaoPessoa
+{
+  const vencidas = r.tarefas.filter((t) => (t.vencimento ?? t.previsao ?? '9999') < hoje && t.situacao !== 'concluido');
+  const semPonto = (t: string) => t.trim().replace(/\.+$/, '');
+  const numeros = [
+    `${r.total} ${r.total === 1 ? 'tarefa' : 'tarefas'}`,
+    `${r.horasEstipuladasSemana}h de ${r.capacidadeHorasSemana}h`,
+    `entrega ${r.nivelEntregaPct}%`,
+    r.atrasado ? `${r.atrasado} atrasada${r.atrasado > 1 ? 's' : ''} no painel` : '',
+    vencidas.length ? `${vencidas.length} com prazo vencido` : '',
+  ].filter(Boolean).join(', ');
+
+  if (r.estagioCritico || r.horasEstipuladasSemana > r.capacidadeHorasSemana)
+  {
+    return {
+      nivel: 'sobrecarregada',
+      rotulo: 'Sobrecarregada',
+      motivo: `${semPonto(r.motivoEstagioCritico ?? 'O que está na mão dela passa da jornada da semana')}. ${numeros}.`,
+    };
+  }
+  if (r.atrasado > 0 || vencidas.length > 0 || r.nivelDemora === 'alto')
+  {
+    return {
+      nivel: 'atencao',
+      rotulo: 'Precisa de atenção',
+      motivo: `${semPonto(vencidas.length || r.atrasado ? 'Tem entrega fora do prazo' : r.motivoDemora)}. ${numeros}.`,
+    };
+  }
+  if (r.nivelEntregaPct >= 80 && r.nivelDemora === 'baixo')
+  {
+    return { nivel: 'em_dia', rotulo: 'Em dia', motivo: `Sem atraso e com folga na semana. ${numeros}.` };
+  }
+  return { nivel: 'no_ritmo', rotulo: 'No ritmo', motivo: `${semPonto(r.motivoDemora)}. ${numeros}.` };
+}

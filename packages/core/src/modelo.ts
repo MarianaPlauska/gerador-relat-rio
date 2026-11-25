@@ -4,6 +4,8 @@ import type { PlanoPessoa, PlanoSemana, TotaisPainel } from './tipos';
 export const nomesSecoes = {
   resumo: 'Resumo executivo',
   extrato: 'Extrato da semana',
+  prazos: 'Prazos das tarefas',
+  tarefas: 'Tarefas por pessoa',
   apresentacao: 'Apresentação e metodologia',
   comparativo: 'Indicadores do painel',
   ondas: 'Projetos por onda',
@@ -27,6 +29,8 @@ export type SecaoPadrao = keyof typeof nomesSecoes;
 export const descricoesSecoes: Record<SecaoPadrao, string> = {
   resumo: 'semáforo, resumo escrito, quadro-resumo dos indicadores-chave e principais constatações',
   extrato: 'extrato da reunião de segunda: metas do mês, quem fica com o quê com estimado x realizado e etapas, riscos de prazo e avisos de 48 h, backlog, entradas e saídas, e o que cada pessoa vai fazer e por quê',
+  prazos: 'o que já passou do prazo, o que vence neste período e o que vence depois, pela previsão de resolução lida nos prints',
+  tarefas: 'as tarefas de cada pessoa na ordem escolhida no painel, com etapas, prazo e situação',
   apresentacao: 'objetivo, fontes de dados e metodologia',
   comparativo: 'tabela de todos os indicadores do painel (anterior x atual), operação do time (etapas, ocioso, tempo limpo), gráficos de evolução e distribuição do ritmo',
   ondas: 'resumo por onda do cronograma (prioridade 1, 2...): janela, itens, concluídos e próximo vencimento',
@@ -87,7 +91,7 @@ export const modelosProntos: Modelo[] = [
     periodo: 'semana',
     capa: 'completa',
     sumario: true,
-    blocos: secoes('resumo', 'extrato', 'apresentacao', 'comparativo', 'ondas', 'fluxo', 'estatistica', 'execucao', 'time', 'analise', 'frentes', 'atencao', 'riscos', 'compromissos', 'notas', 'plano', 'movimento'),
+    blocos: secoes('resumo', 'extrato', 'prazos', 'tarefas', 'apresentacao', 'comparativo', 'ondas', 'fluxo', 'estatistica', 'execucao', 'time', 'analise', 'frentes', 'atencao', 'riscos', 'compromissos', 'notas', 'plano', 'movimento'),
   },
   {
     id: 'executivo',

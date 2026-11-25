@@ -1,14 +1,17 @@
 <script lang="ts">
-  import { ordenarCardsResumidos, type CardSnapshot, type CriterioOrdenacaoCards, type GanttSemana as DadosGantt, type Pessoa, type ResumoPessoaProjeto } from '@supervisao/core';
+  import { ordenarCardsResumidos, qualificarPessoa, type CardSnapshot, type CriterioOrdenacaoCards, type GanttSemana as DadosGantt, type Pessoa, type ResumoPessoaProjeto } from '@supervisao/core';
   import type { AcoesCards, AnexosCard } from './acoes.ts';
   import GanttSemana from './GanttSemana.svelte';
   import InspetorTarefaCard from './InspetorTarefaCard.svelte';
 
   // resumo das tarefas, pessoas da semana com etapas ticáveis, painel lateral da tarefa e cronograma da semana
-  let { cardsLidos, pessoasDaPasta, pastaAtual, analiseEnvio, gantt, acoes, anexos, selecionadoCodigo = $bindable(null), pessoaExpandidaEnvio = $bindable(null), aoAmpliarModal }: {
+  let { cardsLidos, pessoasDaPasta, pastaAtual, dataRegistro, analiseEnvio, gantt, acoes, anexos, ordenacaoTarefas = $bindable('prioridade_maior'), selecionadoCodigo = $bindable(null), pessoaExpandidaEnvio = $bindable(null), aoAmpliarModal }: {
     cardsLidos: CardSnapshot[];
     pessoasDaPasta: Pessoa[];
     pastaAtual: string;
+    dataRegistro: string;
+    // a ordem escolhida aqui é a que o relatório da semana usa para listar as tarefas de cada pessoa
+    ordenacaoTarefas?: CriterioOrdenacaoCards;
     analiseEnvio: ResumoPessoaProjeto[];
     gantt: DadosGantt;
     acoes: AcoesCards;
@@ -19,7 +22,6 @@
     aoAmpliarModal: () => void;
   } = $props();
 
-  let ordenacaoTarefas = $state<CriterioOrdenacaoCards>('prioridade_maior');
   let filtroPessoa = $state('');
   const donoDe = (c: CardSnapshot) => c.responsavelEtapaAtual ?? c.responsaveis[0] ?? '';
   const nomeDe = (id: string) => pessoasDaPasta.find((p) => p.id === id)?.nome ?? id;
@@ -85,6 +87,7 @@
               <div class="lista-pessoas-arvore">
                 {#each analiseEnvio.filter((p) => p.total > 0) as p (p.pessoa.id)}
                   {@const aberta = pessoaExpandidaEnvio === p.pessoa.id}
+                  {@const nota = qualificarPessoa(p, dataRegistro)}
                   <div class="pessoa-no-arvore" class:aberta>
                     <button
                       type="button"
@@ -95,9 +98,7 @@
                         <span class="seta-arvore">{aberta ? '▾' : '▸'}</span>
                         <b>{p.pessoa.nome}</b>
                         <small>({p.total} {p.total === 1 ? 'tarefa' : 'tarefas'})</small>
-                        {#if p.estagioCritico}
-                          <span class="pilula perigo-sobrecarga" title={p.motivoEstagioCritico}>[Sobrecarga crítica]</span>
-                        {/if}
+                        <span class="pilula nota-{nota.nivel}" title={nota.motivo}>{nota.rotulo}</span>
                       </span>
                       <span class="metricas-pessoa-arvore">
                         <span class="pilula">{p.horasEstipuladasSemana}h / {p.capacidadeHorasSemana}h</span>
@@ -109,6 +110,7 @@
 
                     {#if aberta}
                       <div class="corpo-pessoa-arvore">
+                        <p class="motivo-nota"><b>{nota.rotulo}:</b> {nota.motivo}</p>
                         <div class="resumo-probabilistico">
                           <span>Entrega: <b>{p.nivelEntregaPct}%</b></span>
                           <span>Demora: <b>{p.nivelDemora}</b> ({p.motivoDemora})</span>
@@ -270,13 +272,12 @@
   .lista-tarefas-resumo::-webkit-scrollbar-thumb:hover, .lista-pessoas-arvore::-webkit-scrollbar-thumb:hover {
     background: var(--marca);
   }
-  .pilula.perigo-sobrecarga {
-    background: var(--vermelho-fundo);
-    color: var(--vermelho);
-    border: 1px solid var(--vermelho);
-    font-weight: 700;
-    font-size: 0.7rem;
-  }
+  .pilula.nota-sobrecarregada { background: var(--vermelho-fundo); color: var(--vermelho); border: 1px solid var(--vermelho); font-weight: 700; font-size: 0.7rem; }
+  .pilula.nota-atencao { background: var(--amarelo-fundo); color: var(--amarelo); font-size: 0.7rem; }
+  .pilula.nota-no_ritmo { background: var(--superficie-2); color: var(--suave); font-size: 0.7rem; }
+  .pilula.nota-em_dia { background: var(--verde-fundo); color: var(--verde); font-size: 0.7rem; }
+  .motivo-nota { margin: 0; font-size: 0.78rem; color: var(--suave); line-height: 1.4; }
+  .motivo-nota b { color: var(--texto); }
   .item-tarefa-resumo { flex-shrink: 0; width: 100%; text-align: left; background: var(--superficie); border: 1px solid var(--borda); border-left: 3px solid var(--cor-barra); border-radius: 6px; padding: 9px 12px; font-size: 0.82rem; display: flex; flex-direction: column; gap: 4px; cursor: var(--cursor-clique); transition: border-color 0.15s, background 0.15s; }
   .item-tarefa-resumo:hover, .item-tarefa-resumo.selecionado { border-color: var(--marca); border-left-color: var(--marca); background: var(--marca-clara); }
   .assunto-tarefa { color: var(--texto); line-height: 1.35; font-weight: 500; }

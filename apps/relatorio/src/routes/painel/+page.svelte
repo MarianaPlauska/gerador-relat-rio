@@ -941,7 +941,7 @@
         {#if cardsLidos.length}
           <details class="conferir">
             <summary>Tarefas por pessoa: etapas, impacto na semana e cronograma ({cardsLidos.length} demandas)</summary>
-            <ArvoreEnvio {cardsLidos} {pessoasDaPasta} {pastaAtual} {analiseEnvio} gantt={ganttEnvio} acoes={acoesCards} anexos={anexosCard} bind:selecionadoCodigo={cardSelecionadoCodigo} bind:pessoaExpandidaEnvio aoAmpliarModal={() => (modalCardAberto = true)} />
+            <ArvoreEnvio {cardsLidos} {pessoasDaPasta} {pastaAtual} {dataRegistro} {analiseEnvio} gantt={ganttEnvio} acoes={acoesCards} anexos={anexosCard} bind:ordenacaoTarefas={dados.ordemTarefas} bind:selecionadoCodigo={cardSelecionadoCodigo} bind:pessoaExpandidaEnvio aoAmpliarModal={() => (modalCardAberto = true)} />
           </details>
         {/if}
 
