@@ -2,7 +2,7 @@
   import type { CapturaLida, CardSnapshot } from '@supervisao/core';
 
   // um print enviado: miniatura, "Entendi como", card ao qual pertence, resumo do que foi lido, comentÃ¡rio e texto lido
-  let { cap, indice, cardsLidos, nomesOrigemPadrao, origensPersonalizadas, obterNomeOrigem, aoAmpliar, aoRecalcular, aoRemover, aoCriarOpcao, aoDescartarTexto, pessoas = [], aoRelerImagem }: {
+  let { cap, indice, cardsLidos, nomesOrigemPadrao, origensPersonalizadas, obterNomeOrigem, aoAmpliar, aoRecalcular, aoRemover, aoCriarOpcao, aoDescartarTexto, pessoas = [], aoRelerImagem, abertaInicialmente = true }: {
     cap: CapturaLida;
     indice: number;
     cardsLidos: CardSnapshot[];
@@ -16,10 +16,15 @@
     aoDescartarTexto?: (texto: string) => void;
     pessoas?: { id: string; nome: string }[];
     aoRelerImagem?: () => void;
+    abertaInicialmente?: boolean;
   } = $props();
 
   let criando = $state(false);
   let textoNovaOpcao = $state('');
+  // com muitos prints, só o mais recente vem aberto: os outros ficam resumidos numa linha até clicar.
+  // undefined = segue o padrão (abertaInicialmente, que muda sozinho quando chega um print novo); depois do primeiro clique, a escolha da pessoa manda
+  let manual = $state<boolean | undefined>(undefined);
+  const aberta = $derived(manual ?? abertaInicialmente);
 
   function salvarOpcao()
   {
@@ -28,24 +33,40 @@
     criando = false;
     textoNovaOpcao = '';
   }
+
+  const nomeDaPessoa = $derived(pessoas.find((p) => p.id === cap.pessoaId)?.nome);
 </script>
-  <article class="captura">
-    <button
-      type="button"
-      class="img btn-img-modal"
-      onclick={aoAmpliar}
-      title="Clique para ampliar a imagem e ver todas as informações em modal"
-    >
-      {#if cap.imagemDataUrl}
-        <img src={cap.imagemDataUrl} alt={cap.nome} />
-        <span class="selo-ampliar-img">Clique para ampliar em modal</span>
-      {:else}
-        <div class="sem-img">texto / CSV (clique para abrir em modal)</div>
-      {/if}
-    </button>
+  <article class="captura" class:colapsada={!aberta}>
+    {#if aberta}
+      <button
+        type="button"
+        class="img btn-img-modal"
+        onclick={aoAmpliar}
+        title="Clique para ampliar a imagem e ver todas as informações em modal"
+      >
+        {#if cap.imagemDataUrl}
+          <img src={cap.imagemDataUrl} alt={cap.nome} />
+          <span class="selo-ampliar-img">Clique para ampliar em modal</span>
+        {:else}
+          <div class="sem-img">texto / CSV (clique para abrir em modal)</div>
+        {/if}
+      </button>
+    {/if}
     <div class="conteudo">
       <div class="linha-entre">
-        <b>#{indice + 1} {cap.nome.split(' · ')[0]}</b>
+        <button type="button" class="alternar-captura" onclick={() => (manual = !aberta)} aria-expanded={aberta}>
+          <span class="seta-captura">{aberta ? '▾' : '▸'}</span>
+          <b>#{indice + 1} {cap.nome.split(' · ')[0]}</b>
+        </button>
+        {#if !aberta}
+          <span class="linha linha-acoes-captura">
+            <span class="resumo-colapsada">
+              {cap.cards.length} {cap.cards.length === 1 ? 'demanda' : 'demandas'}{nomeDaPessoa ? ` · ${nomeDaPessoa}` : ''}{cap.comentario ? ' · comentado' : ''}
+            </span>
+            <button class="link perigo" onclick={() => aoRemover()}>remover</button>
+          </span>
+        {/if}
+        {#if aberta}
         <span class="linha linha-acoes-captura">
           <button
             type="button"
@@ -109,7 +130,9 @@
           {/if}
           <button class="link perigo" onclick={() => aoRemover()}>remover</button>
         </span>
+        {/if}
       </div>
+      {#if aberta}
       <h4 class="rotulo-bloco">O que o print mostra</h4>
       {#if cap.trouxe}<p class="dica">Preencheu: {cap.trouxe}.</p>{/if}
       <div class="chips">
@@ -199,6 +222,7 @@
         <textarea rows="5" value={cap.texto} oninput={(e) => { cap.texto = e.currentTarget.value; }}></textarea>
         <button onclick={aoRecalcular}>Reprocessar com o texto corrigido</button>
       </details>
+      {/if}
     </div>
   </article>
 <style>
@@ -225,7 +249,11 @@
   .codigo { font-family: var(--fonte-maquina); font-size: 0.78rem; padding: 1px 6px; border: 1px solid var(--borda-forte); border-radius: 3px; }
   .rotulo-bloco { margin: 14px 0 4px; padding-top: 10px; border-top: 1px dashed var(--borda); font-family: var(--fonte-maquina); font-size: 0.74rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--suave); }
   .captura { display: grid; grid-template-columns: minmax(180px, 280px) 1fr; gap: 14px; padding: 12px; margin: 10px 0; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie-2); }
+  .captura.colapsada { grid-template-columns: 1fr; padding: 8px 12px; }
   .conteudo { min-width: 0; }
+  .alternar-captura { display: flex; align-items: center; gap: 6px; border: none; background: none; padding: 0; color: var(--texto); font-size: 1rem; cursor: var(--cursor-clique); }
+  .seta-captura { color: var(--marca); font-size: 0.8rem; }
+  .resumo-colapsada { color: var(--suave); font-size: 0.84rem; }
   .img img { width: 100%; max-height: 240px; object-fit: contain; border-radius: 6px; border: 1px solid var(--borda); background: var(--fundo); }
   .sem-img { height: 100px; display: grid; place-items: center; border: 1px dashed var(--borda); border-radius: 6px; color: var(--suave); }
   .mini { font-size: 0.78rem; display: flex; gap: 6px; align-items: center; }
