@@ -1,20 +1,14 @@
 <script lang="ts">
   import { idCurto } from '@supervisao/core';
-  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { carregar, salvar } from '#lib/armazenamento.ts';
 
   const dados = carregar();
 
-  // a nuvem pode trazer uma conta já com gente cadastrada entre a navegação para cá e a sincronização: não pergunta de novo
-  onMount(() =>
-  {
-    if (dados.onboardingFeito || dados.pessoas.length) goto('/', { replaceState: true });
-  });
-
+  // quem já tem gente cadastrada pode abrir esta tela para rever a configuração; o formulário vem preenchido com o que já existe
   let uso = $state<'equipe' | 'sozinha'>('equipe');
   let pasta = $state(dados.prefixo || 'DEV');
-  let nomesEquipe = $state('');
+  let nomesEquipe = $state(dados.pessoas.map((p) => p.nome).join('\n'));
 
   function idDoNome(nome: string): string
   {
