@@ -682,10 +682,13 @@
 
   function aoSoltar(e: DragEvent)
   {
-    const imagens = [...(e.dataTransfer?.files ?? [])].filter((f) => f.type.startsWith('image/'));
-    if (!imagens.length) return;
+    const arquivos = [...(e.dataTransfer?.files ?? [])];
+    const imagens = arquivos.filter((f) => f.type.startsWith('image/'));
+    const csvs = arquivos.filter((f) => f.type === 'text/csv' || f.name.toLowerCase().endsWith('.csv'));
+    if (!imagens.length && !csvs.length) return;
     e.preventDefault();
-    lerImagens(imagens);
+    if (imagens.length) lerImagens(imagens);
+    for (const f of csvs) void f.text().then((texto) => registrarCaptura(texto, `CSV ${f.name}`));
   }
 
   function limpar()
@@ -872,7 +875,7 @@
       <section class="cartao passo upload-reduzido">
         <div class="linha-entre topo-upload">
           <h2><span class="num">1</span> Envie os prints do painel</h2>
-          <span class="dica-rapida">Cole prints (Ctrl+V), arraste imagens ou selecione arquivos:</span>
+          <span class="dica-rapida">Cole prints (Ctrl+V), arraste imagens/CSV ou selecione arquivos:</span>
         </div>
         <textarea
           class="zona-compacta"
@@ -881,7 +884,7 @@
           onpaste={aoColar}
           ondrop={aoSoltar}
           ondragover={(e) => e.preventDefault()}
-          placeholder="Clique aqui e cole com Ctrl+V (Win+Shift+S tira o print) ou solte as imagens aqui"
+          placeholder="Clique aqui e cole com Ctrl+V (Win+Shift+S tira o print) ou solte imagens/CSV aqui"
         ></textarea>
         <div class="linha botoes-upload">
           <label class="botao mini">Escolher imagens <input type="file" accept="image/*" multiple hidden onchange={(e) => { const arquivos = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; lerImagens(arquivos); }} /></label>
@@ -905,7 +908,7 @@
               onpaste={aoColar}
               ondrop={aoSoltar}
               ondragover={(e) => e.preventDefault()}
-              placeholder="＋ Cole mais prints (Ctrl+V) ou solte aqui..."
+              placeholder="＋ Cole mais prints (Ctrl+V) ou solte imagens/CSV aqui..."
             ></textarea>
             <div class="botoes-upload-feita">
               <label class="botao mini">＋ Imagens <input type="file" accept="image/*" multiple hidden onchange={(e) => { const arquivos = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; lerImagens(arquivos); }} /></label>

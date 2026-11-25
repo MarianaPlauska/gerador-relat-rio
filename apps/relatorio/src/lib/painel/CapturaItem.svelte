@@ -225,6 +225,7 @@
   .codigo { font-family: var(--fonte-maquina); font-size: 0.78rem; padding: 1px 6px; border: 1px solid var(--borda-forte); border-radius: 3px; }
   .rotulo-bloco { margin: 14px 0 4px; padding-top: 10px; border-top: 1px dashed var(--borda); font-family: var(--fonte-maquina); font-size: 0.74rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--suave); }
   .captura { display: grid; grid-template-columns: minmax(180px, 280px) 1fr; gap: 14px; padding: 12px; margin: 10px 0; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie-2); }
+  .conteudo { min-width: 0; }
   .img img { width: 100%; max-height: 240px; object-fit: contain; border-radius: 6px; border: 1px solid var(--borda); background: var(--fundo); }
   .sem-img { height: 100px; display: grid; place-items: center; border: 1px dashed var(--borda); border-radius: 6px; color: var(--suave); }
   .mini { font-size: 0.78rem; display: flex; gap: 6px; align-items: center; }
@@ -234,6 +235,7 @@
   .alerta { color: var(--vermelho); font-size: 0.84rem; margin: 6px 0; padding: 6px 10px; border-left: 3px solid var(--vermelho); background: var(--superficie); }
   .mudou { font-size: 0.84rem; margin: 4px 0; }
   .complemento { margin: 4px 0 8px 18px; padding: 0; font-size: 0.82rem; color: var(--suave); }
+  .complemento li { overflow-wrap: anywhere; }
   @media (max-width: 800px) { .captura { grid-template-columns: 1fr; } }
   .linha-pessoa
   {

@@ -1,8 +1,17 @@
 import type { CardSnapshot, Pessoa } from '../tipos';
 import { numeroBr, semAcento } from './normalizar';
 
-// CSV com aspas: campo entre aspas pode ter vírgula, quebra de linha e "" para aspas
-export function lerCsv(texto: string): string[][]
+// o Excel em português costuma exportar "CSV" com ; em vez de , (o , é o separador decimal no Brasil): olha a primeira linha e usa o que aparece mais
+function detectarSeparador(texto: string): ',' | ';'
+{
+  const primeiraLinha = texto.split(/\r?\n/, 1)[0] ?? '';
+  const porPontoVirgula = (primeiraLinha.match(/;/g) ?? []).length;
+  const porVirgula = (primeiraLinha.match(/,/g) ?? []).length;
+  return porPontoVirgula > porVirgula ? ';' : ',';
+}
+
+// CSV com aspas: campo entre aspas pode ter o separador, quebra de linha e "" para aspas
+export function lerCsv(texto: string, separador: ',' | ';' = detectarSeparador(texto)): string[][]
 {
   const linhas: string[][] = [];
   let linha: string[] = [];
@@ -22,7 +31,7 @@ export function lerCsv(texto: string): string[][]
       else campo += c;
     }
     else if (c === '"') aspas = true;
-    else if (c === ',')
+    else if (c === separador)
     {
       linha.push(campo);
       campo = '';
@@ -45,7 +54,7 @@ export function lerCsv(texto: string): string[][]
   return linhas.filter((l) => l.some((c) => c.trim()));
 }
 
-export const ehCsvDeDemandas = (texto: string) => /^﻿?ID,Time,Abertura,/.test(texto);
+export const ehCsvDeDemandas = (texto: string) => /^﻿?["']?ID["']?[,;]\s*["']?Time["']?[,;]\s*["']?Abertura["']?[,;]/i.test(texto);
 
 // 10/01/2028 08:00 -> 2028-01-10
 const dataCsv = (v: string) =>

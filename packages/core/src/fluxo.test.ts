@@ -47,6 +47,24 @@ describe('CSV da lista de demandas', () =>
   });
 });
 
+// o Excel em português às vezes exporta "CSV" com ; (o , é o separador decimal daqui) e com colunas novas no fim
+const csvComPontoVirgula = `ID;Time;Abertura;Solicitante;Tipo;Descricao;Status;Prioridade;Responsavel;Conclusao;Horas;Solucao;Satisfacao;Reuniao_Data;Reuniao_ItensOK;Reuniao_Total;Reuniao_Proxima;Reunioes_Comercial;Motivo_Sem_Interesse;Proposta_ID;Receita_Proposta
+DEV-400;DEV;10/11/2026 09:00;;Kitu Sistema;"Tarefa com, vírgula no meio";Novo;Normal;Mariana Coutinho;;;;;;;;;;;;
+DEV-401;DEV;11/11/2026 09:00;;Kitu Sistema;Outra tarefa;Em andamento;Alta;Rodrigo Cinelli;;;;;;;;;;;;
+`;
+
+describe('CSV com ponto e vírgula (Excel pt-BR) e colunas novas', () =>
+{
+  it('reconhece o separador sozinho e lê os cards mesmo assim', () =>
+  {
+    expect(ehCsvDeDemandas(csvComPontoVirgula)).toBe(true);
+    const { cards } = lerCsvDemandas(csvComPontoVirgula, opcoes);
+    expect(cards.map((c) => c.codigo)).toEqual(['DEV-400', 'DEV-401']);
+    expect(cards[0]).toMatchObject({ titulo: 'Tarefa com, vírgula no meio', statusCard: 'Novo', responsaveis: ['mariana-coutinho'] });
+    expect(cards[1]).toMatchObject({ statusCard: 'Em andamento', responsaveis: ['rodrigo-cinelli'] });
+  });
+});
+
 // saída real da leitura de imagem do card aberto (prints de 10/11/26)
 const cardImagem = `DEV-234 DEV x
 TIME ABERTURA
