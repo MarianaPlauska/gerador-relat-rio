@@ -194,6 +194,8 @@ export interface CapturaLida
   repetidos?: { codigo: string; mudou: string[] }[] | undefined;
   novos?: string[] | undefined;
   porPessoa?: { pessoa: string; tarefas: string[] }[] | undefined;
+  // o que este print preencheu na tarefa: o pedido, as etapas, os campos da tela
+  trouxe?: string | undefined;
   cardPaiVinculado?: string | undefined;
   // card pai escolhido à mão na tela; vale sobre o que o sistema descobriu
   cardPaiManual?: string | undefined;

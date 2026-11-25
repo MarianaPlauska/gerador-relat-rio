@@ -3,6 +3,7 @@ import type { CardSnapshot } from '../tipos';
 import { pessoasExemplo } from '../exemplo';
 import { lerCards } from './cards';
 import { consolidarArvoreDeCards } from './correlacao';
+import { semAcento } from './normalizar';
 import { CODIGO_ORFAO, correlacionarLote, type EntradaLote } from './lote';
 
 // Prints reais da usuária (semana de 17 e 18/11/2026) transformados em casos de teste.
@@ -677,5 +678,135 @@ describe('lista de Demandas com pessoa ainda não cadastrada', () =>
     expect(cards.find((c) => c.codigo === 'DEV-501')?.responsaveis).toEqual(['Ana Paula Souza']);
     expect(cards.find((c) => c.codigo === 'DEV-502')?.responsaveis).toEqual(['Bruno Lima']);
     expect(cards.find((c) => c.codigo === 'DEV-501')?.titulo).not.toContain('Ana Paula');
+  });
+});
+
+// print da tela de etapas (imagem da supervisora): cada linha tem os botões Reabrir, Concluir, Start e Subtarefa,
+// a linha 9 tem duas partes e as subtarefas têm responsável e status próprios
+const PRINT_ETAPAS_COM_BOTOES = [
+  'Etapas 4 de 9 concluídas · ocioso entre etapas: 0 min úteis (0%)',
+  '# ETAPA RESPONSÁVEL TEMPO',
+  '1 Levantamento de requisitos Mariana Coutinho feita · 25,7 h 03/11/26 → 04/11/26 Reabrir',
+  '+ o que vai fazer',
+  '2 Validação dos requisitos Mariana Coutinho feita · 5,7 d 03/11/26 → 09/11/26 Reabrir',
+  '+ o que vai fazer',
+  '3 Modelagem Mariana Coutinho feita · 7 d 03/11/26 → 10/11/26 Reabrir',
+  '+ o que vai fazer',
+  '4 Back-end Mariana Coutinho rodando há 15,3 d Concluir Subtarefa',
+  '+ o que vai fazer desde 09/11/2026 08:27',
+  '+ pessoa',
+  '5 Banco de dados Mariana Coutinho rodando há 14,1 d Concluir Subtarefa',
+  '+ o que vai fazer desde 10/11/2026 15:20',
+  '+ pessoa',
+  '6 Implementação Mariana Coutinho rodando há 18,3 d Concluir Subtarefa',
+  '+ o que vai fazer desde 06/11/2026 09:03',
+  '+ pessoa',
+  '7 Verificação/Criação de documentos Mariana Coutinho feita · 2,7 d 03/11/26 → 06/11/26 Reabrir',
+  '+ o que vai fazer',
+  '8 Testes Mariana Coutinho não iniciada Start Subtarefa',
+  '+ o que vai fazer',
+  '+ pessoa',
+  '9 Correção de bugs 2 responsáveis + pessoa 0 de 2 partes feitas fecha quando todos concluírem Subtarefa',
+  '↳ parte 1 Mariana Coutinho não iniciada Start',
+  '+ o que vai fazer',
+].join('\n');
+
+describe('print da tela de etapas: botões não viram etapa', () =>
+{
+  const [card] = ler(PRINT_ETAPAS_COM_BOTOES, 'card');
+
+  it('lê as 9 etapas com o nome da coluna ETAPA, sem Reabrir, Concluir ou Start', () =>
+  {
+    expect(card!.etapas?.map((e) => e.nome)).toEqual([
+      'Levantamento de requisitos',
+      'Validação dos requisitos',
+      'Modelagem',
+      'Back-end',
+      'Banco de dados',
+      'Implementação',
+      'Verificação/Criação de documentos',
+      'Testes',
+      'Correção de bugs',
+    ]);
+  });
+
+  it('não cria etapa chamada Reabrir, Concluir, Start, Subtarefa ou parte', () =>
+  {
+    const nomes = (card!.etapas ?? []).map((e) => semAcento(e.nome).toLowerCase());
+    for (const botao of ['reabrir', 'concluir', 'start', 'subtarefa', 'parte 1', '2 responsaveis'])
+    {
+      expect(nomes).not.toContain(botao);
+    }
+  });
+
+  it('mantém a situação e o tempo de cada etapa', () =>
+  {
+    expect(card!.etapas?.map((e) => e.situacao)).toEqual([
+      'concluida', 'concluida', 'concluida', 'rodando', 'rodando', 'rodando', 'concluida', 'nao_iniciada', 'nao_iniciada',
+    ]);
+    expect(card!.etapas?.[3]).toMatchObject({ tempoRodandoHoras: 15.3 * 8, desde: '2026-11-09T08:27' });
+    expect(card!.etapasConcluidas).toBe(4);
+    expect(card!.etapasTotal).toBe(9);
+  });
+});
+
+// print do card aberto (imagem da supervisora): Status, Prioridade, Responsável, Conclusão em branco e Planejamento
+const PRINT_CARD_CAMPOS = [
+  'DEV-040 CIPA — votação eletrônica',
+  'Funcionalidade de acompanhamento da CIPA com votação eletrônica.',
+  'ANEXOS',
+  'PDF, imagem, Word, Excel, PowerPoint, TXT/CSV ou ZIP · até 4 MB · até 10 por card.',
+  'STATUS',
+  'Em andamento',
+  'PRIORIDADE',
+  'Normal',
+  'RESPONSÁVEL',
+  'Mariana Coutinho',
+  'CONCLUSÃO',
+  'dd/mm/aaaa --:--',
+  'Preenchida automaticamente ao marcar um status de conclusão — e pode ser corrigida depois.',
+  'Planejamento',
+  'NÍVEL DE DIFICULDADE',
+  '3 · 6 a 10 dias úteis',
+  'PREVISÃO DE RESOLUÇÃO',
+  '19/11/2026',
+  'Calculada pelo nível (limite, em dias úteis) a partir da abertura.',
+].join('\n');
+
+describe('print do card aberto: status, prioridade, responsável e previsão', () =>
+{
+  const [card] = ler(PRINT_CARD_CAMPOS, 'card');
+
+  it('lê os campos da tela', () =>
+  {
+    expect(card).toMatchObject({
+      codigo: 'DEV-040',
+      statusCard: 'Em andamento',
+      situacao: 'em_execucao',
+      criticidade: 1,
+      previsao: '2026-11-19',
+      responsavelEtapaAtual: 'mariana-coutinho',
+    });
+  });
+
+  it('não inventa conclusão quando o campo está vazio', () =>
+  {
+    expect(card!.concluidoEm).toBeUndefined();
+  });
+});
+
+describe('print da tela do card sem o código em cima', () =>
+{
+  it('ainda lê status, prioridade, responsável e previsão', () =>
+  {
+    const semCodigo = PRINT_CARD_CAMPOS.split('\n').slice(1).join('\n');
+    const [orfao] = ler(semCodigo, 'card');
+    expect(orfao).toMatchObject({
+      codigo: CODIGO_ORFAO,
+      statusCard: 'Em andamento',
+      criticidade: 1,
+      previsao: '2026-11-19',
+      responsavelEtapaAtual: 'mariana-coutinho',
+    });
   });
 });

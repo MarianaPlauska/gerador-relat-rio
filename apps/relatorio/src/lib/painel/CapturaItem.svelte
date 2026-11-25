@@ -111,6 +111,7 @@
         </span>
       </div>
       <h4 class="rotulo-bloco">O que o print mostra</h4>
+      {#if cap.trouxe}<p class="dica">Preencheu: {cap.trouxe}.</p>{/if}
       <div class="chips">
         <span class="pilula">{cap.cards.length} demandas</span>
         <span class="pilula">{cap.totais.length} indicadores calculados</span>

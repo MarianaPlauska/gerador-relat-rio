@@ -307,6 +307,21 @@
     };
   }
 
+  // o que este print preencheu, contado só na leitura dele (sem o que veio dos outros prints da mesma tarefa)
+  function oQueTrouxe(lidos: CardSnapshot[]): string
+  {
+    const etapas = lidos.reduce((s, c) => s + (c.etapas?.length ?? 0), 0);
+    const comPrazo = lidos.filter((c) => c.previsao || c.vencimento).length;
+    const comPedido = lidos.some((c) => c.descricaoCompleta);
+    return [
+      comPedido ? 'o que foi pedido' : '',
+      etapas ? `${etapas} ${etapas === 1 ? 'etapa' : 'etapas'}` : '',
+      lidos.some((c) => c.statusCard || c.prioridadeCard) ? 'status e prioridade' : '',
+      comPrazo ? `prazo de ${comPrazo} ${comPrazo === 1 ? 'tarefa' : 'tarefas'}` : '',
+      lidos.length && !etapas && !comPedido ? `${lidos.length} ${lidos.length === 1 ? 'tarefa' : 'tarefas'}` : '',
+    ].filter(Boolean).join(' · ');
+  }
+
   function juntar(t: TotaisPainel, c: CardSnapshot[], novoT: TotaisPainel, novoC: CardSnapshot[])
   {
     const m = mesclarNaFoto({ data: dataRegistro, totais: t, cards: c }, novoT, novoC);
@@ -403,6 +418,7 @@
         repetidos: a.repetidos,
         novos: a.novos,
         porPessoa: a.porPessoa,
+        trouxe: oQueTrouxe(leituras.get(id)!.cards),
         ...(a.cardPaiVinculado ? { cardPaiVinculado: a.cardPaiVinculado } : {}),
         ...(a.confiancaVinculoPct !== undefined ? { confiancaVinculoPct: a.confiancaVinculoPct } : {}),
         ...(a.motivoVinculo ? { motivoVinculo: a.motivoVinculo } : {}),
@@ -581,7 +597,7 @@
       if (imagem) void lerPrintNoCard(codigo, imagem);
     },
     escolher: (codigo, imagem) => void lerPrintNoCard(codigo, imagem),
-    listar: (codigo) => capturas.filter((c) => c.cardPaiManual === codigo).map((c) => ({ id: c.id, nome: c.nome, imagemDataUrl: c.imagemDataUrl })),
+    listar: (codigo) => capturas.filter((c) => c.cardPaiManual === codigo).map((c) => ({ id: c.id, nome: c.nome, imagemDataUrl: c.imagemDataUrl, trouxe: c.trouxe })),
     remover: (id) => removerCaptura(id),
     progresso: () => progresso,
   };

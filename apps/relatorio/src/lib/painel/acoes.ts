@@ -21,7 +21,7 @@ export interface AnexosCard
   colar: (codigo: string, e: ClipboardEvent) => void;
   soltar: (codigo: string, e: DragEvent) => void;
   escolher: (codigo: string, imagem: Blob) => void;
-  listar: (codigo: string) => { id: string; nome: string; imagemDataUrl?: string | undefined }[];
+  listar: (codigo: string) => { id: string; nome: string; imagemDataUrl?: string | undefined; trouxe?: string | undefined }[];
   remover: (id: string) => void;
   progresso: () => number | null;
 }

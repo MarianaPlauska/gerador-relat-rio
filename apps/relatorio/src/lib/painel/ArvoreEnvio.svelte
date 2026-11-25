@@ -47,7 +47,8 @@
                     <option value="card_maior">Card {pastaAtual}-xxx (maior → menor)</option>
                     <option value="card_menor">Card {pastaAtual}-xxx (menor → maior)</option>
                     <option value="nomes_parecidos">Assuntos / nomes parecidos</option>
-                    <option value="datas_proximas">Datas próximas</option>
+                    <option value="datas_proximas">Prazo mais próximo primeiro</option>
+                    <option value="datas_distantes">Prazo mais longo primeiro</option>
                   </select>
                 </label>
               </div>

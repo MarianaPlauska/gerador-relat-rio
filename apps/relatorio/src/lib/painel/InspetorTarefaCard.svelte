@@ -194,7 +194,10 @@
           {#each prints as p (p.id)}
             <li>
               {#if p.imagemDataUrl}<img src={p.imagemDataUrl} alt={p.nome} />{/if}
-              <span>{p.nome.split(' · ')[0]}</span>
+              <span>
+                {p.nome.split(' · ')[0]}
+                <small class="dica">{p.trouxe ? `preencheu: ${p.trouxe}` : 'não achei nada neste print'}</small>
+              </span>
               <button type="button" class="link perigo" onclick={() => anexos.remover(p.id)}>remover</button>
             </li>
           {/each}

@@ -114,7 +114,21 @@ const RE_STATUS_CARD = /em\s*andamento|planejado|novo|resolvido|cancelado|aguard
 const RE_COLUNAS_FINAIS = /min\b|andamento|resolvido|planejado|cancelado|\(\s*e\s*\w+/i;
 // coluna Tempo da lista ("0 min", "3 h"); a imagem lê 0 como O
 const RE_TEMPO = /\b[O0o\d][\d,]*\s*(?:min|h|d)\b/;
-const RE_NOME_ANTES_DO_TEMPO = /([A-ZÀ-Ý][a-zà-ÿ]+(?: (?:d[aeo]s? )?[A-ZÀ-Ý][a-zà-ÿ]+){1,3})\s+[O0o\d][\d,]*\s*(?:min|h|d)\b/;
+// botões e avisos da tela de etapas: aparecem no print, mas não são nome, pessoa nem tempo da etapa
+const RE_BOTOES_ETAPA = /(?:\+\s*o que vai fazer|\+\s*pessoa|\bConcluir\s+Subtarefa\b|\bConcluir\s+card\b|\bSubtarefa\b|fecha quando todos conclu[ií]rem|\b\d+\s+respons[aá]ve(?:l|is)\b)/gi;
+// "0 de 2 partes feitas" é o status de uma etapa dividida: vira a palavra que o leitor já entende
+const RE_PARTES_FEITAS = /\b(\d+)\s+de\s+(\d+)\s+partes?\s+feitas?\b/gi;
+// "Concluir", "Reabrir" e "Start" no fim da linha são botões; no começo, "Concluir" é nome de etapa do painel
+const RE_BOTAO_NO_FIM = /(?:\s*\b(?:Concluir|Reabrir|Start)\b)+\s*$/i;
+const RE_TEM_TEMPO_OU_STATUS = /feita|conclu[ií]d|rodando h[aá]|n[aã]o iniciada|desde|\d{2}\/\d{2}\/\d{2}/i;
+
+function tirarBotoes(linha: string): string
+{
+  const limpa = linha.replace(RE_BOTOES_ETAPA, ' ').replace(/\s+/g, ' ').trim();
+  return RE_TEM_TEMPO_OU_STATUS.test(limpa) ? limpa.replace(RE_BOTAO_NO_FIM, '').trim() : limpa;
+}
+
+const RE_NOME_ANTES_DO_TEMPO =/([A-ZÀ-Ý][a-zà-ÿ]+(?: (?:d[aeo]s? )?[A-ZÀ-Ý][a-zà-ÿ]+){1,3})\s+[O0o\d][\d,]*\s*(?:min|h|d)\b/;
 
 // "KituSistema" -> "Kitu Sistema"
 function tipoCanonico(lido: string | undefined): string | undefined
@@ -363,11 +377,14 @@ function lerEtapasModernas(texto: string, pessoas: Pessoa[]): EtapaCard[]
 {
   const inicioEtapas = texto.search(/\bEtapas\b|\d+\s+de\s+\d+\s+conclu[ií]das|#\s+ETAPA/i);
   const escopo = inicioEtapas >= 0 ? texto.slice(inicioEtapas) : texto;
-  // "+ o que vai fazer" e "+ pessoa" são botões: saem do começo da linha, mas o resto dela (responsável, tempo) fica
   const linhas = escopo
     .split(/\r?\n/)
-    .map((l) => l.trim().replace(/^(?:\+\s*o que vai fazer|\+\s*pessoa)\s*/i, '').trim())
-    .filter((l) => l && !/^(Etapas\b|#\s*ETAPA|Concluir card$|\d+\s+de\s+\d+\s+conclu)/i.test(l));
+    .map((l) => l.replace(RE_PARTES_FEITAS, (_, feitas: string, total: string) =>
+      (Number(feitas) === 0 ? 'não iniciada' : Number(feitas) >= Number(total) ? 'concluída' : 'rodando')))
+    .map(tirarBotoes)
+    // linhas de subtarefa trazem outro responsável e outro status: entrariam na etapa de cima
+    .filter((l) => l && !/^(?:↳|parte\s+\d+\b)/i.test(l))
+    .filter((l) => !/^(Etapas\b|#\s*ETAPA|\d+\s+de\s+\d+\s+conclu)/i.test(l));
 
   // agrupa pelos índices numéricos de etapa (1, 2, 3...)
   const blocos: { ordem: number; texto: string }[] = [];
@@ -387,7 +404,7 @@ function lerEtapasModernas(texto: string, pessoas: Pessoa[]): EtapaCard[]
   const resultado: EtapaCard[] = [];
   for (const b of blocos)
   {
-    const bruto = b.texto.replace(/\b(?:Concluir\s+Subtarefa|Subtarefa|Concluir\s+card|\+\s*o que vai fazer|\+\s*pessoa)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+    const bruto = tirarBotoes(b.texto);
     if (!bruto) continue;
 
     const norm = semAcento(bruto);
@@ -428,6 +445,39 @@ function lerEtapasModernas(texto: string, pessoas: Pessoa[]): EtapaCard[]
   return resultado;
 }
 
+// o que a tela do card mostra em Status, Prioridade, Responsável, Conclusão e Previsão de resolução
+function lerCamposDaTela(texto: string, pessoas: Pessoa[]): Partial<CardSnapshot>
+{
+  const campos: Partial<CardSnapshot> = {};
+  const previsao = texto.match(/previs[aã]o de resolu[cç][aã]o\D{0,20}(\d{2}\/\d{2}\/\d{4})/i);
+  if (previsao) campos.previsao = lerDatas(previsao[1]!).datas[0]!;
+  const conclusao = texto.match(/conclus[aã]o\D{0,12}(\d{2}\/\d{2}\/\d{4})/i);
+  if (conclusao) campos.concluidoEm = lerDatas(conclusao[1]!).datas[0]!;
+  const status = texto.match(/\bstatus\b\s*\r?\n\s*(novo|planejado|em andamento|resolvido|cancelado)\b/i);
+  if (status)
+  {
+    const st = status[1]!.toLowerCase();
+    campos.statusCard = st === 'em andamento' ? 'Em andamento' : st[0]!.toUpperCase() + st.slice(1);
+    campos.situacao = st === 'resolvido' ? 'concluido' : st === 'em andamento' ? 'em_execucao' : 'a_iniciar';
+  }
+  const prioridade = texto.match(/\bprioridade\b\s*\r?\n\s*(baixa|normal|m[eé]dia|alta|cr[ií]tica|urgente)\b/i);
+  if (prioridade)
+  {
+    const p = semAcento(prioridade[1]!).toLowerCase();
+    // "Normal" no painel é a ausência de prioridade: a tela já mostra isso como Normal
+    if (p !== 'normal') campos.prioridadeCard = p === 'critica' ? 'Crítica' : p === 'media' ? 'Média' : p[0]!.toUpperCase() + p.slice(1);
+    campos.criticidade = p === 'critica' || p === 'urgente' ? 3 : p === 'alta' ? 2 : 1;
+  }
+  const dono = texto.match(/\brespons[aá]vel\b\s*\r?\n\s*([^\n]{3,60})/i);
+  const donoCadastrado = dono ? pessoas.find((p) => semAcento(dono[1]!).toLowerCase().includes(semAcento(p.nome).toLowerCase())) : undefined;
+  if (donoCadastrado)
+  {
+    campos.responsaveis = [donoCadastrado.id];
+    campos.responsavelEtapaAtual = donoCadastrado.id;
+  }
+  return campos;
+}
+
 // card aberto no painel: cabeçalho (código, abertura, tipo, prazo de resposta, ritmo), "O que foi pedido" e lista de etapas.
 function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
 {
@@ -446,6 +496,8 @@ function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
       origens: ['card'],
       fontesCorrelacionadas: ['pedido'],
       avisosLeitura: [AVISO_CONTINUACAO],
+      // a tela do card sem o código em cima ainda traz status, prioridade, responsável e previsão
+      ...lerCamposDaTela(texto, opcoes.pessoas),
     }];
   }
 
@@ -460,6 +512,8 @@ function lerCardAberto(texto: string, opcoes: OpcoesLeitura): CardSnapshot[]
   }
   const prazo = texto.match(/prazo de resposta[\s\S]*?(\d{2}\/\d{2}\/\d{4})/i);
   if (prazo) card.vencimento = lerDatas(prazo[1]!).datas[0]!;
+
+  Object.assign(card, lerCamposDaTela(texto, opcoes.pessoas));
   const tipo = tipoCanonico(texto.match(RE_TIPO)?.[0]);
   if (tipo) card.sistema = tipo;
   const posPrazoConsumido = texto.search(/prazo consumido/i);

@@ -278,7 +278,7 @@ export function calcularRelacoesEImpactoSemana(cards: CardSnapshot[]): CardSnaps
   });
 }
 
-export type CriterioOrdenacaoCards = 'prioridade_maior' | 'card_maior' | 'card_menor' | 'nomes_parecidos' | 'datas_proximas';
+export type CriterioOrdenacaoCards = 'prioridade_maior' | 'card_maior' | 'card_menor' | 'nomes_parecidos' | 'datas_proximas' | 'datas_distantes';
 
 function extrairNumeroCodigo(codigo: string): number
 {
@@ -309,10 +309,16 @@ export function ordenarCardsResumidos(cards: CardSnapshot[], criterio: CriterioO
   {
     return copia.sort((a, b) => extrairNumeroCodigo(a.codigo) - extrairNumeroCodigo(b.codigo));
   }
-  if (criterio === 'datas_proximas')
+  if (criterio === 'datas_proximas' || criterio === 'datas_distantes')
   {
     const dataDe = (c: CardSnapshot) => c.vencimento ?? c.previsao ?? c.planejadoPara ?? c.abertura ?? '9999-12-31';
-    return copia.sort((a, b) => dataDe(a).localeCompare(dataDe(b)) || extrairNumeroCodigo(b.codigo) - extrairNumeroCodigo(a.codigo));
+    // sem prazo nenhum o card fica no fim nas duas ordens: a lista começa pelo que tem data
+    const semData = (c: CardSnapshot) => (c.vencimento ?? c.previsao ?? c.planejadoPara ?? c.abertura ? 0 : 1);
+    const ordem = criterio === 'datas_proximas' ? 1 : -1;
+    return copia.sort((a, b) =>
+      semData(a) - semData(b)
+      || ordem * dataDe(a).localeCompare(dataDe(b))
+      || extrairNumeroCodigo(b.codigo) - extrairNumeroCodigo(a.codigo));
   }
   if (criterio === 'nomes_parecidos')
   {
