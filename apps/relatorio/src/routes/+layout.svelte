@@ -223,6 +223,7 @@
               </div>
               <DropdownMenu.Item class="menu-item" onSelect={() => goto('/perfil')}>Meu perfil e pedidos</DropdownMenu.Item>
               <DropdownMenu.Item class="menu-item" onSelect={() => goto('/perfil#seguranca')}>Trocar / recuperar senha</DropdownMenu.Item>
+              <DropdownMenu.Item class="menu-item" onSelect={() => goto('/comecar')}>Pasta e equipe (início)</DropdownMenu.Item>
               <DropdownMenu.Item class="menu-item" onSelect={() => goto('/retornos')}>Retornos dos links</DropdownMenu.Item>
               <DropdownMenu.Item class="menu-item" onSelect={() => exportarJson(carregar())}>Baixar backup</DropdownMenu.Item>
               <DropdownMenu.Item class="menu-item" onSelect={trocarTema}>Tema {escuro ? 'claro' : 'escuro'}</DropdownMenu.Item>
