@@ -144,7 +144,8 @@
       {#if ehCsv}
         <p class="faixa-csv"><b>CSV</b> planilha exportada do painel · {linhasCsv} {linhasCsv === 1 ? 'linha' : 'linhas'} no arquivo · {cap.cards.length} lidas</p>
       {/if}
-      <h4 class="rotulo-bloco">O que o {coisa} mostra</h4>
+      <section class="bloco">
+      <h4 class="rotulo-bloco"><span class="n">1</span> O que o {coisa} mostra</h4>
       {#if ehCsv}
         <p class="dica">Cada linha da planilha virou uma demanda. Confira abaixo se ID, status, prioridade e responsável caíram nas colunas certas.</p>
       {:else if cap.trouxe}
@@ -171,7 +172,9 @@
       {#if cap.repetidos?.some((r) => r.mudou.length)}
         <p class="mudou"><b>Mudou desde antes:</b> {cap.repetidos.filter((r) => r.mudou.length).slice(0, 5).map((r) => `${r.codigo} (${r.mudou.join('; ')})`).join(' | ')}</p>
       {/if}
-      <h4 class="rotulo-bloco">De quem é e por quê</h4>
+      </section>
+      <section class="bloco">
+      <h4 class="rotulo-bloco"><span class="n">2</span> De quem é e por quê</h4>
       <div class="linha-pessoa">
         <label class="mini">Este {coisa} é de
           <select value={cap.pessoaId ?? ''} onchange={(e) => { cap.pessoaId = e.currentTarget.value || undefined; aoRecalcular(); }}>
@@ -213,7 +216,9 @@
           {/if}
         </div>
       {/if}
-      <h4 class="rotulo-bloco">Seu comentário</h4>
+      </section>
+      <section class="bloco">
+      <h4 class="rotulo-bloco"><span class="n">3</span> Seu comentário</h4>
       <textarea rows="2" value={cap.comentario} oninput={(e) => { cap.comentario = e.currentTarget.value; }} placeholder={`Algo a mais sobre este ${coisa}: dependências, riscos, uso do tempo livre...`} aria-label={`Seu comentário sobre este ${coisa}`}></textarea>
       {#if cap.sugestoes.length}
         <p class="dica"><b>Sugestões:</b> {cap.sugestoes.join(' ')}
@@ -222,7 +227,8 @@
       {#if cap.coberturaPct !== undefined && cap.coberturaPct < 70}
         <p class="aviso">O leitor entendeu só {cap.coberturaPct}% das linhas deste texto. Confira as linhas sem card abaixo: o formato do painel pode ter mudado.</p>
       {/if}
-      <details>
+      </section>
+      <details class="bloco bloco-texto">
         <summary>{ehCsv ? 'Conteúdo do arquivo' : 'Texto lido e complemento'} {cap.coberturaPct !== undefined ? `· leitura ${cap.coberturaPct}%` : ''} {cap.naoReconhecido?.length ? `(${cap.naoReconhecido.length} linhas sem card)` : ''}</summary>
         {#if cap.naoReconhecido?.length}
           <p class="dica">Trechos do print que não viraram card nem número. Podem ser o complemento de algo já visto:</p>
@@ -265,7 +271,11 @@
   .item-pessoa-print { display: grid; grid-template-columns: minmax(140px, 200px) 1fr; gap: 10px; align-items: start; padding: 6px 10px; background: var(--superficie); border: 1px solid var(--borda); border-radius: 4px; color: var(--texto); }
   .codigos { display: flex; flex-wrap: wrap; gap: 4px; }
   .codigo { font-family: var(--fonte-maquina); font-size: 0.78rem; padding: 1px 6px; border: 1px solid var(--borda-forte); border-radius: 3px; }
-  .rotulo-bloco { margin: 14px 0 4px; padding-top: 10px; border-top: 1px dashed var(--borda); font-family: var(--fonte-maquina); font-size: 0.74rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--suave); }
+  .rotulo-bloco { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--borda); font-size: 0.95rem; font-weight: 700; color: var(--texto); }
+  .rotulo-bloco .n { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--marca-clara); color: var(--marca); font-family: var(--fonte-maquina); font-size: 0.78rem; }
+  .bloco { margin-top: 14px; padding: 12px 14px; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); }
+  .bloco > :last-child { margin-bottom: 0; }
+  .bloco-texto summary { margin: 0; }
   .captura { display: grid; grid-template-columns: minmax(180px, 280px) 1fr; gap: 14px; padding: 12px; margin: 10px 0; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie-2); }
   .captura.colapsada { grid-template-columns: 1fr; padding: 8px 12px; }
   .conteudo { min-width: 0; }
