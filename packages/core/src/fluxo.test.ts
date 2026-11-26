@@ -63,6 +63,14 @@ describe('CSV com ponto e vírgula (Excel pt-BR) e colunas novas', () =>
     expect(cards[0]).toMatchObject({ titulo: 'Tarefa com, vírgula no meio', statusCard: 'Novo', responsaveis: ['mariana-coutinho'] });
     expect(cards[1]).toMatchObject({ statusCard: 'Em andamento', responsaveis: ['rodrigo-cinelli'] });
   });
+
+  it('pasta com outro nome que o prefixo dos IDs: lê todas as linhas e diz o prefixo achado', () =>
+  {
+    const r = lerCsvDemandas(csvComPontoVirgula, { ...opcoes, prefixo: 'KITU' });
+    expect(r.cards.map((c) => c.codigo)).toEqual(['DEV-400', 'DEV-401']);
+    expect(r.outrosPrefixos).toEqual(['DEV']);
+    expect(lerCsvDemandas(csvComPontoVirgula, opcoes).outrosPrefixos).toBeUndefined();
+  });
 });
 
 // saída real da leitura de imagem do card aberto (prints de 10/11/26)

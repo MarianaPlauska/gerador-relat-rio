@@ -267,6 +267,9 @@
     const csv = vaiComoCsv ? lerCsvDemandas(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas }) : undefined;
     return {
       ehCsv: vaiComoCsv,
+      avisoCsv: csv?.outrosPrefixos
+        ? `Os IDs deste arquivo começam com ${csv.outrosPrefixos.map((p) => `${p}-`).join(', ')} e a pasta aberta é ${pastaAtual}. Li todas as linhas assim mesmo.`
+        : '',
       totais: csv ? {} : lerTotais(conteudo),
       cards: (csv ? csv.cards : lerCards(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas, origem, hoje: dataRegistro, regrasDescarte: dados.regrasDescarte, codigosConhecidos }))
         // print de uma pessoa: tudo nele é dela
@@ -415,7 +418,7 @@
         totais: Object.keys(j.totais) as ChaveTotal[],
         cards: a.cards.map((x) => x.codigo),
         ondas: a.ondas.length,
-        avisos: a.avisos,
+        avisos: [leituras.get(id)!.avisoCsv, ...a.avisos].filter(Boolean),
         sugestoes: a.sugestoes,
         naoReconhecido: a.naoReconhecido,
         coberturaPct: a.coberturaPct,

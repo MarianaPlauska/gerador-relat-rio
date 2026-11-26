@@ -68,6 +68,8 @@ export interface LeituraCsv
   cards: CardSnapshot[];
   // o painel repete alguns IDs; fica a linha mais recente
   repetidos: string[];
+  // nenhum ID começa com o prefixo da pasta aberta: as linhas foram lidas assim mesmo, e estes são os prefixos achados
+  outrosPrefixos?: string[];
 }
 
 // "Exportar CSV" da lista de Demandas do painel
@@ -81,10 +83,13 @@ export function lerCsvDemandas(texto: string, opcoes: { prefixo: string; pessoas
   };
   const porCodigo = new Map<string, CardSnapshot>();
   const repetidos: string[] = [];
-  for (const l of linhas)
+  const codigoDe = (l: string[]) => l[i.id]?.trim().toUpperCase() ?? '';
+  const comId = linhas.filter((l) => /^[A-Z][A-Z0-9]*-\d+$/.test(codigoDe(l)));
+  const daPasta = comId.filter((l) => codigoDe(l).startsWith(`${opcoes.prefixo.toUpperCase()}-`));
+  // a pasta pode ter outro nome que o prefixo dos IDs (pasta "Kitu", IDs DEV-): o CSV é estruturado, então lê tudo
+  for (const l of daPasta.length ? daPasta : comId)
   {
-    const codigo = l[i.id]?.trim() ?? '';
-    if (!codigo.startsWith(`${opcoes.prefixo}-`)) continue;
+    const codigo = codigoDe(l);
     if (porCodigo.has(codigo))
     {
       repetidos.push(codigo);
@@ -108,5 +113,6 @@ export function lerCsvDemandas(texto: string, opcoes: { prefixo: string; pessoas
     definir('horasAteConcluir', horas ? numeroBr(horas) : undefined);
     porCodigo.set(codigo, card);
   }
-  return { cards: [...porCodigo.values()], repetidos };
+  const outrosPrefixos = daPasta.length ? [] : [...new Set(comId.map((l) => codigoDe(l).split('-')[0]!))];
+  return { cards: [...porCodigo.values()], repetidos, ...(outrosPrefixos.length ? { outrosPrefixos } : {}) };
 }
