@@ -42,6 +42,9 @@
   const nomeDaPessoa = $derived(pessoas.find((p) => p.id === cap.pessoaId)?.nome);
   const ehCsv = $derived(!!cap.arquivoCsv || ehCsvDeDemandas(cap.texto));
   const coisa = $derived(ehCsv ? 'arquivo' : 'print');
+  // planilha: o "por quê" já pode ter sido escrito tarefa por tarefa dentro da tabela; o bloco 2 só serve para quem ficou sem
+  const semPorque = $derived(ehCsv ? cap.cards.filter((codigo) => !cardsLidos.find((c) => c.codigo === codigo)?.porque?.trim()).length : 0);
+  const mostrarBloco2 = $derived(!ehCsv || semPorque > 0);
   const linhasCsv = $derived(ehCsv ? Math.max(0, cap.texto.split(/\r?\n(?=[A-Za-z][A-Za-z0-9]*-\d+[,;])/).length - 1) : 0);
 </script>
   <article class="captura" class:colapsada={!aberta || ehCsv}>
@@ -173,8 +176,10 @@
         <p class="mudou"><b>Mudou desde antes:</b> {cap.repetidos.filter((r) => r.mudou.length).slice(0, 5).map((r) => `${r.codigo} (${r.mudou.join('; ')})`).join(' | ')}</p>
       {/if}
       </section>
+      {#if mostrarBloco2}
       <section class="bloco">
       <h4 class="rotulo-bloco"><span class="n">2</span> De quem é e por quê</h4>
+      {#if ehCsv}<p class="dica">{semPorque} {semPorque === 1 ? 'tarefa ainda sem' : 'tarefas ainda sem'} o "por quê". Clique no ID da tarefa na tabela para escrever, ou preencha aqui.</p>{/if}
       <div class="linha-pessoa">
         <label class="mini">Este {coisa} é de
           <select value={cap.pessoaId ?? ''} onchange={(e) => { cap.pessoaId = e.currentTarget.value || undefined; aoRecalcular(); }}>
@@ -217,6 +222,7 @@
         </div>
       {/if}
       </section>
+      {/if}
       <section class="bloco">
       <h4 class="rotulo-bloco"><span class="n">3</span> Seu comentário</h4>
       <textarea rows="2" value={cap.comentario} oninput={(e) => { cap.comentario = e.currentTarget.value; }} placeholder={`Algo a mais sobre este ${coisa}: dependências, riscos, uso do tempo livre...`} aria-label={`Seu comentário sobre este ${coisa}`}></textarea>

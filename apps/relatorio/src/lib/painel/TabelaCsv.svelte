@@ -30,7 +30,7 @@
 </script>
 
 {#if linhas.length}
-  {#if podeAbrir}<p class="dica">Clique numa tarefa para dizer por quê, continuar a descrição ou colar prints dela.</p>{/if}
+  {#if podeAbrir}<p class="dica">Clique no ID (seta) para dizer por quê, continuar a descrição ou colar prints. Clique no nome da tarefa para abrir a inspeção completa dela.</p>{/if}
   <div class="rolagem">
     <table>
       <thead>
@@ -45,7 +45,7 @@
               </button>
             </td>
             <td class="tarefa">
-              <button type="button" disabled={!podeAbrir} onclick={() => alternar(c.codigo)}>{c.titulo ?? '-'}</button>
+              <button type="button" disabled={!aoAbrirCard} title="Abrir a inspeção desta tarefa" onclick={() => aoAbrirCard?.(c.codigo)}>{c.titulo ?? '-'}</button>
               {#if c.porque}<small>por quê: {c.porque}</small>{/if}
             </td>
             <td>{c.statusCard ?? '-'}</td>
@@ -110,6 +110,11 @@
   .clicavel:hover, .aberta
   {
     background: var(--marca-clara);
+  }
+  .tarefa button:not(:disabled):hover
+  {
+    text-decoration: underline;
+    color: var(--marca);
   }
   td button
   {

@@ -13,6 +13,7 @@
   import { lerColagem } from '#lib/colagem.ts';
   import { guardarOrdem, ordemManualDoProjeto } from '#lib/fila.ts';
   import { lerImagem, miniaturaDataUrl } from '#lib/ocr.ts';
+  import { tick } from 'svelte';
   import ArvoreEnvio from '#lib/painel/ArvoreEnvio.svelte';
   import CapturaItem from '#lib/painel/CapturaItem.svelte';
   import CapturaUmClique from '#lib/painel/CapturaUmClique.svelte';
@@ -108,6 +109,7 @@
   let pessoaExpandidaEnvio = $state<string | null>(null);
   let cardSelecionadoCodigo = $state<string | null>(null);
   let modalCardAberto = $state(false);
+  let arvoreAberta = $state(false);
   let capturaModalId = $state<string | null>(null);
   let modalGerenciarPessoas = $state(false);
   let confirmacaoRemoverPessoa = $state<{
@@ -457,6 +459,15 @@
     // código corrigido à mão: a seleção acompanha o card
     if (parcial.codigo && cardSelecionadoCodigo === codigo) cardSelecionadoCodigo = parcial.codigo;
     aplicarAjuste(ajustarCampos(ajustes, codigo, parcial));
+  }
+
+  // clicar no nome da tarefa na planilha leva para a inspeção dela, na árvore de tarefas por pessoa
+  async function irParaTarefa(codigo: string)
+  {
+    cardSelecionadoCodigo = codigo;
+    arvoreAberta = true;
+    await tick();
+    document.getElementById('arvore-envio')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
 
   function removerCardDaLista(codigo: string)
@@ -945,11 +956,11 @@
 
 
         {#each capturas as cap, idx (cap.id)}
-          <CapturaItem {cap} indice={idx} {cardsLidos} {nomesOrigemPadrao} origensPersonalizadas={dados.origensPersonalizadas} {obterNomeOrigem} aoAmpliar={() => (capturaModalId = cap.id)} aoRecalcular={recalcular} aoRemover={() => removerCaptura(cap.id)} aoCriarOpcao={(nome) => criarOpcaoOrigem(cap.id, nome)} aoDescartarTexto={(l) => adicionarRegras([l])} pessoas={dados.pessoas} aoRelerImagem={() => relerImagem(cap.id)} abertaInicialmente={idx === capturas.length - 1} acoes={acoesCards} anexos={anexosCard} aoAbrirCard={(codigo) => { cardSelecionadoCodigo = codigo; modalCardAberto = true; }} />
+          <CapturaItem {cap} indice={idx} {cardsLidos} {nomesOrigemPadrao} origensPersonalizadas={dados.origensPersonalizadas} {obterNomeOrigem} aoAmpliar={() => (capturaModalId = cap.id)} aoRecalcular={recalcular} aoRemover={() => removerCaptura(cap.id)} aoCriarOpcao={(nome) => criarOpcaoOrigem(cap.id, nome)} aoDescartarTexto={(l) => adicionarRegras([l])} pessoas={dados.pessoas} aoRelerImagem={() => relerImagem(cap.id)} abertaInicialmente={idx === capturas.length - 1} acoes={acoesCards} anexos={anexosCard} aoAbrirCard={irParaTarefa} />
         {/each}
 
         {#if cardsLidos.length}
-          <details class="conferir">
+          <details class="conferir" id="arvore-envio" bind:open={arvoreAberta}>
             <summary>Tarefas por pessoa: etapas, impacto na semana e cronograma ({cardsLidos.length} demandas)</summary>
             <ArvoreEnvio {cardsLidos} {pessoasDaPasta} {pastaAtual} {dataRegistro} {analiseEnvio} gantt={ganttEnvio} acoes={acoesCards} anexos={anexosCard} bind:ordenacaoTarefas={dados.ordemTarefas} bind:selecionadoCodigo={cardSelecionadoCodigo} bind:pessoaExpandidaEnvio aoAmpliarModal={() => (modalCardAberto = true)} />
           </details>
