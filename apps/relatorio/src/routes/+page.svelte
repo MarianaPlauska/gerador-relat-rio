@@ -12,7 +12,7 @@
   } from '@supervisao/core';
   import { goto } from '$app/navigation';
   import { carregar, salvar, type Dados } from '#lib/armazenamento.ts';
-  import CobrinhaMascote from '#lib/CobrinhaMascote.svelte';
+  import OrbitaIcone from '#lib/OrbitaIcone.svelte';
   import { guardarOrdem, ordemManualDoProjeto } from '#lib/fila.ts';
   import GanttSemana from '#lib/painel/GanttSemana.svelte';
   import { chaveDoRelatorio } from '#lib/modelos.ts';
@@ -181,7 +181,7 @@
 <main class="dashboard-executivo">
   <header class="topo-dashboard">
     <div class="boas-vindas">
-      <CobrinhaMascote />
+      <OrbitaIcone />
       <div class="titulos">
         <span class="prompt">&gt; {saudacao.toLowerCase()}, {primeiroNome.toLowerCase()} · projeto {projetoAtual.toLowerCase()}</span>
         <h1>Visão Executiva<span class="cursor">_</span></h1>

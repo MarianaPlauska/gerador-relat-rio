@@ -1,0 +1,15 @@
+/* cor de cada tipo de marca do calendário: filtros, grade e lista do dia usam as mesmas */
+.ev-vencimento { background: var(--vermelho-fundo); color: var(--vermelho); }
+.ev-previsao { background: var(--azul-fundo); color: var(--azul); }
+.ev-inicio, .ev-reuniao { background: var(--marca-clara); color: var(--marca); }
+.ev-onda { background: var(--superficie-2); color: var(--texto); box-shadow: inset 0 0 0 1px var(--borda-forte); }
+.ev-plano { background: var(--verde-fundo); color: var(--verde); }
+.ev-combinado { background: var(--amarelo-fundo); color: var(--amarelo); }
+.ev-risco { background: var(--laranja-fundo); color: var(--laranja); }
+.ev-marca { background: var(--marca); color: var(--sobre-marca); }
+.ev-ausencia
+{
+  background: repeating-linear-gradient(135deg, var(--superficie-2), var(--superficie-2) 4px, var(--borda) 4px, var(--borda) 5px);
+  color: var(--suave);
+}
+.ev-atrasado { box-shadow: inset 3px 0 0 var(--vermelho); }

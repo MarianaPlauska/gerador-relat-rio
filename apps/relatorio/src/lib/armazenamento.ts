@@ -1,7 +1,7 @@
 import
 {
   agoraLocal, dicionarioPadrao, migrarAta, migrarFluxograma, migrarLista, migrarMatriz, migrarPlanilha, migrarVivo,
-  type Ata, type Fluxograma, type MatrizPriorizacao, type Planilha, type RelatorioVivo, type Bloco, type ControleCard, type CriterioOrdenacaoCards, type Lista, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type RegistroPainel, type Risco, type Snapshot,
+  type Ata, type Fluxograma, type MatrizPriorizacao, type Planilha, type RelatorioVivo, type Bloco, type ControleCard, type CriterioOrdenacaoCards, type MarcaCalendario, type Lista, type Modelo, type CorSemaforo, type Pessoa, type PlanoSemana, type Promessa, type RegistroPainel, type Risco, type Snapshot,
 } from '@supervisao/core';
 import { agendarEnvio, baixarImagem, chaveDoEspaco, enviarPendenteAgora, imagemConfirmada, iniciarNuvem, marcarLocal, nuvemPronta, somenteLeitura } from './nuvem.svelte.ts';
 import { capturasSemImagem, separarImagens } from './imagens.ts';
@@ -90,6 +90,8 @@ export interface Dados
   regrasDescarte?: string[];
   // ordem escolhida no painel para as tarefas; o relatório da semana lista cada pessoa nessa ordem
   ordemTarefas?: CriterioOrdenacaoCards;
+  // marcas que a pessoa põe à mão no calendário
+  marcasCalendario: MarcaCalendario[];
   // já passou pelas perguntas de início (uso, pasta e equipe) depois de criar a conta
   onboardingFeito?: boolean;
   // governança semanal (metas de prazo/qualidade, extrato de segunda, backlog, etapas e horas reais) por segunda-feira ISO
@@ -98,7 +100,7 @@ export interface Dados
 
 function padrao(): Dados
 {
-  return { pessoas: [], prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [], vivos: [], planilhas: [], atas: [], matrizes: [], registros: [], origensPersonalizadas: [], projetos: [], regrasDescarte: [], ordemTarefas: 'prioridade_maior', governancaSemanal: {} };
+  return { pessoas: [], prefixo: 'DEV', fotos: [], controle: {}, relatorios: {}, planos: [], riscos: [], promessas: [], identificacao: { area: 'Desenvolvimento', elaboradoPor: '', cargo: 'Supervisão de desenvolvimento', destinatario: 'Gestão' }, dicionario: dicionarioPadrao, modelos: [], ultimoModelo: 'semanal', listas: [], fluxos: [], vivos: [], planilhas: [], atas: [], matrizes: [], registros: [], origensPersonalizadas: [], projetos: [], regrasDescarte: [], ordemTarefas: 'prioridade_maior', marcasCalendario: [], governancaSemanal: {} };
 }
 
 // campos que faltam ganham o padrão; listas antigas ganham fases e diário

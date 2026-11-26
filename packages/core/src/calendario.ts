@@ -2,7 +2,7 @@ import type { Ata } from './ata';
 import { segundaDaSemana, somarDias } from './datas';
 import type { CardSnapshot, Onda, Pessoa, PlanoSemana, Risco, Snapshot } from './tipos';
 
-export type TipoEventoCalendario = 'vencimento' | 'previsao' | 'inicio' | 'onda' | 'plano' | 'combinado' | 'risco' | 'ausencia' | 'reuniao';
+export type TipoEventoCalendario = 'vencimento' | 'previsao' | 'inicio' | 'onda' | 'plano' | 'combinado' | 'risco' | 'ausencia' | 'reuniao' | 'marca';
 
 export const tiposEventoCalendario: { id: TipoEventoCalendario; nome: string }[] = [
   { id: 'vencimento', nome: 'Vencimento' },
@@ -14,6 +14,7 @@ export const tiposEventoCalendario: { id: TipoEventoCalendario; nome: string }[]
   { id: 'risco', nome: 'Risco' },
   { id: 'ausencia', nome: 'Ausência' },
   { id: 'reuniao', nome: 'Reunião' },
+  { id: 'marca', nome: 'Minha marca' },
 ];
 
 export interface EventoCalendario
@@ -27,6 +28,17 @@ export interface EventoCalendario
   pessoa?: string | undefined;
   concluido: boolean;
   href: string;
+}
+
+// marca que a pessoa põe à mão no calendário (um dia ou um período)
+export interface MarcaCalendario
+{
+  id: string;
+  titulo: string;
+  inicio: string;
+  fim: string;
+  detalhe?: string | undefined;
+  feita?: boolean | undefined;
 }
 
 export interface GradeMes
@@ -54,6 +66,7 @@ export interface FontesCalendario
   pessoas: Pessoa[];
   atas: Pick<Ata, 'id' | 'titulo' | 'data' | 'combinados'>[];
   riscos: Pick<Risco, 'id' | 'descricao' | 'decisaoNecessaria' | 'prazoDecisao' | 'status'>[];
+  marcasCalendario?: MarcaCalendario[] | undefined;
 }
 
 function diaIso(valor?: string | undefined): string | undefined
@@ -245,6 +258,23 @@ export function eventosDoCronograma(fontes: FontesCalendario): EventoCalendario[
         href: '/painel',
       });
     }
+  }
+
+  for (const marca of fontes.marcasCalendario ?? [])
+  {
+    const de = diaIso(marca.inicio);
+    const ate = diaIso(marca.fim) ?? de;
+    if (!de || !ate || ate < de || !marca.titulo.trim()) continue;
+    eventos.push({
+      id: `marca|${marca.id}`,
+      tipo: 'marca',
+      titulo: marca.titulo.trim(),
+      detalhe: marca.detalhe?.trim() || undefined,
+      inicio: de,
+      fim: ate,
+      concluido: !!marca.feita,
+      href: `/calendario?dia=${de}`,
+    });
   }
 
   return eventos.sort((a, b) => a.inicio.localeCompare(b.inicio) || a.tipo.localeCompare(b.tipo) || a.titulo.localeCompare(b.titulo));

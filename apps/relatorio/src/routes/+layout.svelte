@@ -14,6 +14,7 @@
   import Abertura from '#lib/Abertura.svelte';
   import FaixaSomenteLeitura from '#lib/FaixaSomenteLeitura.svelte';
   import Paleta from '#lib/Paleta.svelte';
+  import Rodape from '#lib/Rodape.svelte';
   import { onMount } from 'svelte';
   import { nuvem, sairDaNuvem } from '#lib/nuvem.svelte.ts';
   import { fecharSessao, lerSessao } from '#lib/sessao.ts';
@@ -254,42 +255,8 @@
     <Paleta bind:aberta={paletaAberta} {trocarTema} baixarBackup={() => exportarJson(carregar())} {sair} />
   {/if}
 
-  <!-- o rodapé aparece em quase todas as páginas; nas telas abertas (entrada e relatório por link) fica sem os atalhos do app -->
   {#if !semRodape}
-  <footer>
-    <div class="rodape">
-      <div class="rodape-sobre">
-        <div class="rodape-marca">
-          <a href={aberta ? undefined : '/'} class="nome-rodape">OrbisOS<span>_</span></a>
-          <span class="badge-autor">Mariana Coutinho (Plauska)</span>
-        </div>
-        <p class="sobre-resumo">
-          Ferramenta de supervisão de desenvolvimento. Transforma o painel do gestor (prints, texto ou CSV) em acompanhamento e relatório: lê cards, prazos, ritmo e totais; compara semana com semana; gera semáforo e constatações; guarda plano, riscos e compromissos; emite PDF ou link interativo para a gestão responder (Ciente, Concordo, Dúvida).
-        </p>
-      </div>
-
-      <div class="rodape-direita">
-        {#if !aberta}
-          <div class="rodape-links">
-            <a href="/painel">Diário</a>
-            <a href="/cards">Cards</a>
-            <a href="/semana">Semana</a>
-            <a href="/calendario">Calendário</a>
-            <a href="/atas">Atas</a>
-            <a href="/fluxos">Fluxos</a>
-            <a href="/priorizacao">Priorização</a>
-            <a href="/relatorio">Relatório</a>
-            <a href="/modelos">Modelos</a>
-            <a href="/roadmap">Roadmap</a>
-          </div>
-        {/if}
-        <a href="https://github.com/MarianaPlauska/gerador-relat-rio" target="_blank" rel="noopener noreferrer" class="card-github">
-          <svg class="git-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
-          <span class="git-repo">GitHub: MarianaPlauska/gerador-relat-rio</span>
-        </a>
-      </div>
-    </div>
-  </footer>
+    <Rodape linkInicio={!aberta} />
   {/if}
 </div>
 
@@ -303,128 +270,6 @@
   .conteudo
   {
     flex: 1 0 auto;
-  }
-  footer
-  {
-    margin-top: var(--size-6);
-    flex-shrink: 0;
-    background: var(--barra);
-    border-top: 1px solid var(--borda-forte);
-    color: #9aa5b4;
-    font-size: 0.78rem;
-  }
-  .rodape
-  {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 14px var(--size-6);
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px 32px;
-  }
-  .rodape-sobre
-  {
-    flex: 1 1 480px;
-    max-width: 720px;
-  }
-  .rodape-marca
-  {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 4px;
-  }
-  .nome-rodape
-  {
-    font-family: var(--fonte-maquina);
-    font-weight: 700;
-    font-size: 0.98rem;
-    color: #fff;
-    text-decoration: none;
-  }
-  .nome-rodape span
-  {
-    color: var(--marca);
-  }
-  .badge-autor
-  {
-    font-family: var(--fonte-maquina);
-    font-size: 0.72rem;
-    color: var(--marca);
-  }
-  .sobre-resumo
-  {
-    margin: 0;
-    font-size: 0.76rem;
-    line-height: 1.4;
-    color: #9aa5b4;
-  }
-  .rodape-direita
-  {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 8px;
-  }
-  .rodape-links
-  {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 14px;
-  }
-  .rodape-links a
-  {
-    font-family: var(--fonte-maquina);
-    color: #c9d3cd;
-    text-decoration: none;
-    font-size: 0.76rem;
-    transition: color 0.15s;
-  }
-  .rodape-links a:hover
-  {
-    color: var(--marca);
-  }
-  .card-github
-  {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 10px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: var(--raio-pequeno);
-    text-decoration: none;
-    color: #e4ebe7;
-    transition: border-color 0.15s, color 0.15s;
-  }
-  .card-github:hover
-  {
-    border-color: var(--marca);
-    color: var(--marca);
-  }
-  .git-icon
-  {
-    width: 15px;
-    height: 15px;
-    flex: none;
-  }
-  .git-repo
-  {
-    font-family: var(--fonte-maquina);
-    font-size: 0.74rem;
-  }
-  @media (max-width: 760px)
-  {
-    .rodape
-    {
-      padding: 14px var(--size-3);
-    }
-    .rodape-direita
-    {
-      align-items: flex-start;
-    }
   }
   canvas
   {

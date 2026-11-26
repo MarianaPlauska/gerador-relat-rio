@@ -94,6 +94,21 @@ describe('eventos do cronograma', () =>
     expect(eventos.find((e) => e.tipo === 'ausencia')).toMatchObject({ inicio: '2026-11-10', fim: '2026-11-12', detalhe: 'Ana' });
     expect(eventos.filter((e) => e.pessoa === 'Bruno')).toEqual([]);
   });
+
+  it('marcas feitas à mão entram com o período, e as sem título ou com data errada ficam de fora', () =>
+  {
+    const eventos = eventosDoCronograma(fontes({
+      marcasCalendario: [
+        { id: 'm1', titulo: 'Entrega do portal', inicio: '2026-11-27', fim: '2026-11-27', detalhe: 'cliente X' },
+        { id: 'm2', titulo: 'Homologação', inicio: '2026-11-23', fim: '2026-11-25', feita: true },
+        { id: 'm3', titulo: '  ', inicio: '2026-11-23', fim: '2026-11-23' },
+        { id: 'm4', titulo: 'Invertida', inicio: '2026-11-25', fim: '2026-11-23' },
+      ],
+    }));
+    expect(eventos.map((e) => e.id)).toEqual(['marca|m2', 'marca|m1']);
+    expect(eventos[0]).toMatchObject({ tipo: 'marca', inicio: '2026-11-23', fim: '2026-11-25', concluido: true });
+    expect(eventos[1]).toMatchObject({ detalhe: 'cliente X', href: '/calendario?dia=2026-11-27' });
+  });
 });
 
 describe('grade e barras', () =>
