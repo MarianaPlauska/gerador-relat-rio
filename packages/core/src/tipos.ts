@@ -76,6 +76,8 @@ export interface CardSnapshot
   impactoSemana?: string | undefined;
   etapas?: EtapaCard[];
   comentario?: string | undefined;
+  // por que esta tarefa está na semana (prioridade, prazo, pedido do cliente...), escrito por quem confere
+  porque?: string | undefined;
   origens: OrigemLeitura[];
   avisosLeitura?: string[];
 }

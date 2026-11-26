@@ -945,7 +945,7 @@
 
 
         {#each capturas as cap, idx (cap.id)}
-          <CapturaItem {cap} indice={idx} {cardsLidos} {nomesOrigemPadrao} origensPersonalizadas={dados.origensPersonalizadas} {obterNomeOrigem} aoAmpliar={() => (capturaModalId = cap.id)} aoRecalcular={recalcular} aoRemover={() => removerCaptura(cap.id)} aoCriarOpcao={(nome) => criarOpcaoOrigem(cap.id, nome)} aoDescartarTexto={(l) => adicionarRegras([l])} pessoas={dados.pessoas} aoRelerImagem={() => relerImagem(cap.id)} abertaInicialmente={idx === capturas.length - 1} />
+          <CapturaItem {cap} indice={idx} {cardsLidos} {nomesOrigemPadrao} origensPersonalizadas={dados.origensPersonalizadas} {obterNomeOrigem} aoAmpliar={() => (capturaModalId = cap.id)} aoRecalcular={recalcular} aoRemover={() => removerCaptura(cap.id)} aoCriarOpcao={(nome) => criarOpcaoOrigem(cap.id, nome)} aoDescartarTexto={(l) => adicionarRegras([l])} pessoas={dados.pessoas} aoRelerImagem={() => relerImagem(cap.id)} abertaInicialmente={idx === capturas.length - 1} acoes={acoesCards} anexos={anexosCard} aoAbrirCard={(codigo) => { cardSelecionadoCodigo = codigo; modalCardAberto = true; }} />
         {/each}
 
         {#if cardsLidos.length}

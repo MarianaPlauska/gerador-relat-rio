@@ -1,9 +1,13 @@
 <script lang="ts">
   import { ehCsvDeDemandas, type CapturaLida, type CardSnapshot } from '@supervisao/core';
+  import type { AcoesCards, AnexosCard } from './acoes';
   import TabelaCsv from './TabelaCsv.svelte';
 
   // um print enviado: miniatura, "Entendi como", card ao qual pertence, resumo do que foi lido, comentÃ¡rio e texto lido
-  let { cap, indice, cardsLidos, nomesOrigemPadrao, origensPersonalizadas, obterNomeOrigem, aoAmpliar, aoRecalcular, aoRemover, aoCriarOpcao, aoDescartarTexto, pessoas = [], aoRelerImagem, abertaInicialmente = true }: {
+  let { cap, indice, cardsLidos, nomesOrigemPadrao, origensPersonalizadas, obterNomeOrigem, aoAmpliar, aoRecalcular, aoRemover, aoCriarOpcao, aoDescartarTexto, pessoas = [], aoRelerImagem, abertaInicialmente = true, acoes, anexos, aoAbrirCard }: {
+    acoes?: AcoesCards | undefined;
+    anexos?: AnexosCard | undefined;
+    aoAbrirCard?: ((codigo: string) => void) | undefined;
     cap: CapturaLida;
     indice: number;
     cardsLidos: CardSnapshot[];
@@ -40,8 +44,8 @@
   const coisa = $derived(ehCsv ? 'arquivo' : 'print');
   const linhasCsv = $derived(ehCsv ? Math.max(0, cap.texto.split(/\r?\n(?=[A-Za-z][A-Za-z0-9]*-\d+[,;])/).length - 1) : 0);
 </script>
-  <article class="captura" class:colapsada={!aberta}>
-    {#if aberta}
+  <article class="captura" class:colapsada={!aberta || ehCsv}>
+    {#if aberta && !ehCsv}
       <button
         type="button"
         class="img btn-img-modal"
@@ -51,12 +55,6 @@
         {#if cap.imagemDataUrl}
           <img src={cap.imagemDataUrl} alt={cap.nome} />
           <span class="selo-ampliar-img">Clique para ampliar em modal</span>
-        {:else if ehCsv}
-          <div class="sem-img csv">
-            <b>CSV</b>
-            <span>planilha exportada do painel</span>
-            <span>{linhasCsv} {linhasCsv === 1 ? 'linha' : 'linhas'} no arquivo · {cap.cards.length} lidas</span>
-          </div>
         {:else}
           <div class="sem-img">texto colado (clique para abrir em modal)</div>
         {/if}
@@ -143,6 +141,9 @@
         {/if}
       </div>
       {#if aberta}
+      {#if ehCsv}
+        <p class="faixa-csv"><b>CSV</b> planilha exportada do painel · {linhasCsv} {linhasCsv === 1 ? 'linha' : 'linhas'} no arquivo · {cap.cards.length} lidas</p>
+      {/if}
       <h4 class="rotulo-bloco">O que o {coisa} mostra</h4>
       {#if ehCsv}
         <p class="dica">Cada linha da planilha virou uma demanda. Confira abaixo se ID, status, prioridade e responsável caíram nas colunas certas.</p>
@@ -157,7 +158,8 @@
         {#if cap.repetidos?.length}<span class="pilula repetido">{cap.repetidos.length} já vistos</span>{/if}
       </div>
       {#if ehCsv}
-        <TabelaCsv codigos={cap.cards} {cardsLidos} {pessoas} />
+        <!-- colar um print numa linha cria um print novo no fim da lista; a planilha fica aberta mesmo assim -->
+        <TabelaCsv codigos={cap.cards} {cardsLidos} {pessoas} {acoes} {anexos} {aoAbrirCard} aoAbrirLinha={() => (manual = true)} />
       {:else if cap.porPessoa?.length}
         <ul class="por-pessoa-print">
           {#each cap.porPessoa as gp (gp.pessoa)}
@@ -272,8 +274,8 @@
   .resumo-colapsada { color: var(--suave); font-size: 0.84rem; }
   .img img { width: 100%; max-height: 240px; object-fit: contain; border-radius: 6px; border: 1px solid var(--borda); background: var(--fundo); }
   .sem-img { height: 100px; display: grid; place-items: center; border: 1px dashed var(--borda); border-radius: 6px; color: var(--suave); }
-  .sem-img.csv { height: auto; place-items: start; gap: 2px; padding: 12px; border-style: solid; border-left: 3px solid var(--marca); font-size: 0.82rem; }
-  .sem-img.csv b { font-family: var(--fonte-maquina); font-size: 1.3rem; color: var(--marca); }
+  .faixa-csv { margin: 8px 0 0; padding: 6px 10px; border-left: 3px solid var(--marca); background: var(--superficie); font-family: var(--fonte-maquina); font-size: 0.78rem; color: var(--suave); }
+  .faixa-csv b { color: var(--marca); margin-right: 6px; }
   .mini { font-size: 0.78rem; display: flex; gap: 6px; align-items: center; }
   .chips { margin: 8px 0; }
   .pilula.novo { background: var(--verde-fundo); color: var(--verde); }

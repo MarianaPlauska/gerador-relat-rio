@@ -12,6 +12,10 @@
 
   const ritmos: Ritmo[] = ['no_ritmo', 'em_risco', 'atrasado'];
   const situacoes: Situacao[] = ['concluido', 'atrasado', 'vence_15_dias', 'a_iniciar', 'em_execucao', 'sem_data'];
+  const nomesRitmo: Record<Ritmo, string> = { no_ritmo: 'No ritmo', em_risco: 'Em risco', atrasado: 'Atrasado' };
+  const nomesSituacao: Record<Situacao, string> = {
+    concluido: 'Concluída', atrasado: 'Atrasada', vence_15_dias: 'Vence em até 15 dias', a_iniciar: 'A iniciar', em_execucao: 'Em execução', sem_data: 'Sem data',
+  };
 
   function editar(card: CardSnapshot, parcial: Partial<CardSnapshot>)
   {
@@ -22,12 +26,17 @@
   const opcional = (valor: string) => valor || undefined;
 </script>
 
+<p class="explica">
+  <b>Corrigir a leitura, campo por campo.</b> Cada linha é uma tarefa como o sistema entendeu.
+  Só mexa se algo veio errado ou faltando: o que você mudar aqui vale para este registro e entra no relatório.
+  Linhas em vermelho são as que o leitor pediu para conferir. Role para o lado para ver as datas.
+</p>
 <div class="rolagem">
   <table>
     <thead>
       <tr>
-        <th>Card</th><th>Título</th><th>Pessoa (etapa atual)</th><th>Etapa</th><th>Comentário</th>
-        <th>Início</th><th>Previsão</th><th>Vencimento</th><th>Ritmo</th><th>Situação</th><th>Status do card</th><th>Conferir</th><th></th>
+        <th>ID</th><th>Tarefa</th><th title="Quem está cuidando da etapa em que a tarefa está agora">Com quem está agora</th><th>Etapa atual</th><th>Sua anotação</th>
+        <th>Começou em</th><th title="Quando o painel prevê a entrega">Previsão de entrega</th><th title="Data limite combinada">Prazo final</th><th title="No ritmo, em risco ou atrasado, como o painel mostra">Ritmo</th><th title="Calculado pelas datas">Situação do prazo</th><th>Status no painel</th><th title="O que o leitor pediu para conferir">Conferir leitura</th><th></th>
       </tr>
     </thead>
     <tbody>
@@ -35,7 +44,7 @@
       {#each cards as card, i (i)}
         <tr class:conferir={card.avisosLeitura?.length}>
           <td><input class="curto" value={card.codigo} oninput={(e) => editar(card, { codigo: e.currentTarget.value })} /></td>
-          <td><input value={card.titulo ?? ''} oninput={(e) => editar(card, { titulo: opcional(e.currentTarget.value) })} /></td>
+          <td><input class="titulo" title={card.titulo} value={card.titulo ?? ''} oninput={(e) => editar(card, { titulo: opcional(e.currentTarget.value) })} /></td>
           <td>
             <select value={card.responsavelEtapaAtual ?? ''} onchange={(e) => editar(card, { responsavelEtapaAtual: opcional(e.currentTarget.value) })}>
               <option value="">-</option>
@@ -55,13 +64,13 @@
           <td>
             <select value={card.ritmoPainel ?? ''} onchange={(e) => editar(card, { ritmoPainel: ritmos.find((r) => r === e.currentTarget.value) })}>
               <option value="">-</option>
-              {#each ritmos as r (r)}<option value={r}>{r.replace('_', ' ')}</option>{/each}
+              {#each ritmos as r (r)}<option value={r}>{nomesRitmo[r]}</option>{/each}
             </select>
           </td>
           <td>
             <select value={card.situacao ?? ''} onchange={(e) => editar(card, { situacao: situacoes.find((s) => s === e.currentTarget.value) })}>
               <option value="">-</option>
-              {#each situacoes as s (s)}<option value={s}>{s.replaceAll('_', ' ')}</option>{/each}
+              {#each situacoes as s (s)}<option value={s}>{nomesSituacao[s]}</option>{/each}
             </select>
           </td>
           <td>
@@ -85,6 +94,16 @@
 </div>
 
 <style>
+  .explica
+  {
+    font-size: 0.84rem;
+    color: var(--suave);
+    margin: 10px 0 6px;
+  }
+  .explica b
+  {
+    color: var(--texto);
+  }
   table input, table select
   {
     padding: 3px 6px;
@@ -92,6 +111,10 @@
   .rolagem
   {
     overflow-x: auto;
+  }
+  .titulo
+  {
+    min-width: 280px;
   }
   .curto
   {

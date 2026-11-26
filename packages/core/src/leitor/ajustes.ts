@@ -15,7 +15,7 @@ export interface AjusteEtapa
 // campos do card que a pessoa pode corrigir à mão (inclui o código, para consertar leitura errada do print)
 export type CamposAjustaveis = Partial<Pick<CardSnapshot,
   'codigo' | 'prioridadeCard' | 'criticidade' | 'statusCard' | 'situacao' | 'responsavelEtapaAtual' | 'responsaveis' |
-  'horasEstimadas' | 'origemHoras' | 'notaHoras' | 'descricaoCompleta' | 'titulo' | 'assunto' | 'comentario' | 'previsao' | 'vencimento' |
+  'horasEstimadas' | 'origemHoras' | 'notaHoras' | 'descricaoCompleta' | 'titulo' | 'assunto' | 'comentario' | 'porque' | 'previsao' | 'vencimento' |
   'inicio' | 'etapaAtual' | 'ritmoPainel'>>;
 
 export interface AjusteCard
