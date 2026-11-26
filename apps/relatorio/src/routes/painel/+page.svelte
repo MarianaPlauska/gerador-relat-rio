@@ -261,10 +261,12 @@
   // códigos já vistos: corrigem leituras do OCR como DEV-8061 -> DEV-061
   const codigosConhecidos = $derived([...new Set(dados.fotos.flatMap((f) => f.cards.map((c) => c.codigo)))]);
 
-  function lerConteudo(conteudo: string, origem: OrigemLeitura, pessoaId?: string)
+  function lerConteudo(conteudo: string, origem: OrigemLeitura, pessoaId?: string, arquivoCsv?: boolean)
   {
-    const csv = ehCsvDeDemandas(conteudo) ? lerCsvDemandas(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas }) : undefined;
+    const vaiComoCsv = arquivoCsv || ehCsvDeDemandas(conteudo);
+    const csv = vaiComoCsv ? lerCsvDemandas(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas }) : undefined;
     return {
+      ehCsv: vaiComoCsv,
       totais: csv ? {} : lerTotais(conteudo),
       cards: (csv ? csv.cards : lerCards(conteudo, { prefixo: pastaAtual, pessoas: dados.pessoas, origem, hoje: dataRegistro, regrasDescarte: dados.regrasDescarte, codigosConhecidos }))
         // print de uma pessoa: tudo nele é dela
@@ -278,6 +280,7 @@
     totais: TotaisPainel,
     anteriores: CardSnapshot[],
     correlacionado: SaidaCapturaLote,
+    ehCsv?: boolean,
   )
   {
     const cards = correlacionado.cards.filter((c) => c.codigo !== '__ORFAO__');
@@ -289,6 +292,7 @@
       avisos.push('Este print não mostra o código do card e ainda não achei o card dele. A ordem de envio não importa: envie o print que mostra o código ou escolha o card ao lado.');
     }
     const porPessoa = agruparPorPessoa(cards, dados.pessoas).map(({ pessoa, tarefas }) => ({ pessoa, tarefas }));
+    // o CSV já foi lido linha a linha por um leitor próprio: a conferência de cobertura é feita para texto de print, não serve aqui
     return {
       origem,
       totais,
@@ -296,8 +300,8 @@
       ondas,
       avisos,
       sugestoes,
-      naoReconhecido: linhasNaoReconhecidas(conteudo, pastaAtual, dados.regrasDescarte, cards, dados.pessoas),
-      coberturaPct: coberturaDaLeitura(conteudo, pastaAtual, dados.regrasDescarte, cards, dados.pessoas).pct,
+      naoReconhecido: ehCsv ? [] : linhasNaoReconhecidas(conteudo, pastaAtual, dados.regrasDescarte, cards, dados.pessoas),
+      coberturaPct: ehCsv ? undefined : coberturaDaLeitura(conteudo, pastaAtual, dados.regrasDescarte, cards, dados.pessoas).pct,
       repetidos: comp.repetidos,
       novos: comp.novos,
       porPessoa,
@@ -365,14 +369,14 @@
   }
 
   // o print entra na lista e tudo é refeito: assim a ordem de envio não muda o resultado
-  function registrarCaptura(conteudo: string, nome: string, imagemDataUrl?: string, presoAoCard?: string)
+  function registrarCaptura(conteudo: string, nome: string, imagemDataUrl?: string, presoAoCard?: string, arquivoCsv?: boolean)
   {
     const origem = presoAoCard ? 'card' : detectarOrigem(conteudo);
     const textoLimpo = aplicarRegrasDescarte(conteudo, dados.regrasDescarte);
     capturas = [
       ...capturas,
       {
-        id: idCurto(), nome: `${nome} · ${nomesOrigem[origem]}`, origem, texto: textoLimpo, ...(imagemDataUrl ? { imagemDataUrl } : {}), ...(pessoaDaSemana ? { pessoaId: pessoaDaSemana } : {}), ...(presoAoCard ? { cardPaiManual: presoAoCard } : {}),
+        id: idCurto(), nome: `${nome} · ${nomesOrigem[origem]}`, origem, texto: textoLimpo, ...(imagemDataUrl ? { imagemDataUrl } : {}), ...(pessoaDaSemana ? { pessoaId: pessoaDaSemana } : {}), ...(presoAoCard ? { cardPaiManual: presoAoCard } : {}), ...(arquivoCsv ? { arquivoCsv: true } : {}),
         totais: [], cards: [], ondas: 0, avisos: [], sugestoes: [], comentario: '',
       },
     ];
@@ -389,7 +393,7 @@
     let c: CardSnapshot[] = [];
     let o: Onda[] = [];
     const base = fotoBase?.cards ?? [];
-    const leituras = new Map(capturas.map((cap) => [cap.id, lerConteudo(cap.texto, cap.origem, cap.pessoaId)]));
+    const leituras = new Map(capturas.map((cap) => [cap.id, lerConteudo(cap.texto, cap.origem, cap.pessoaId, cap.arquivoCsv)]));
     const lote = correlacionarLote(
       capturas.map((cap) => ({ id: cap.id, origem: cap.origem, cards: leituras.get(cap.id)!.cards, cardPaiForcado: cap.cardPaiManual })),
       base,
@@ -400,7 +404,7 @@
     for (const id of lote.ordemProcessamento)
     {
       const cap = capturas.find((x) => x.id === id)!;
-      const a = analisar(cap.texto, cap.origem, leituras.get(id)!.totais, [...c, ...base], lote.porCaptura.get(id)!);
+      const a = analisar(cap.texto, cap.origem, leituras.get(id)!.totais, [...c, ...base], lote.porCaptura.get(id)!, leituras.get(id)!.ehCsv);
       const j = juntar(t, c, a.totais, a.cards);
       t = j.totais;
       c = j.cards;
@@ -688,7 +692,7 @@
     if (!imagens.length && !csvs.length) return;
     e.preventDefault();
     if (imagens.length) lerImagens(imagens);
-    for (const f of csvs) void f.text().then((texto) => registrarCaptura(texto, `CSV ${f.name}`));
+    for (const f of csvs) void f.text().then((texto) => registrarCaptura(texto, `CSV ${f.name}`, undefined, undefined, true));
   }
 
   function limpar()
@@ -888,7 +892,7 @@
         ></textarea>
         <div class="linha botoes-upload">
           <label class="botao mini">Escolher imagens <input type="file" accept="image/*" multiple hidden onchange={(e) => { const arquivos = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; lerImagens(arquivos); }} /></label>
-          <label class="botao mini">Escolher CSV <input type="file" accept=".csv,text/csv" hidden onchange={async (e) => { const f = e.currentTarget.files?.[0]; if (f) registrarCaptura(await f.text(), `CSV ${f.name}`); e.currentTarget.value = ''; }} /></label>
+          <label class="botao mini">Escolher CSV <input type="file" accept=".csv,text/csv" hidden onchange={async (e) => { const alvo = e.currentTarget; const f = alvo.files?.[0]; alvo.value = ''; if (f) registrarCaptura(await f.text(), `CSV ${f.name}`, undefined, undefined, true); }} /></label>
           <button class="mini" onclick={() => { registrarCaptura(caixa, `Texto ${capturas.length + 1}`); caixa = ''; }} disabled={!caixa.trim()}>Ler o texto digitado</button>
           {#if progresso !== null}<progress value={progresso}></progress>{/if}
         </div>
@@ -912,7 +916,7 @@
             ></textarea>
             <div class="botoes-upload-feita">
               <label class="botao mini">＋ Imagens <input type="file" accept="image/*" multiple hidden onchange={(e) => { const arquivos = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; lerImagens(arquivos); }} /></label>
-              <label class="botao mini">＋ CSV <input type="file" accept=".csv,text/csv" hidden onchange={async (e) => { const f = e.currentTarget.files?.[0]; if (f) registrarCaptura(await f.text(), `CSV ${f.name}`); e.currentTarget.value = ''; }} /></label>
+              <label class="botao mini">＋ CSV <input type="file" accept=".csv,text/csv" hidden onchange={async (e) => { const alvo = e.currentTarget; const f = alvo.files?.[0]; alvo.value = ''; if (f) registrarCaptura(await f.text(), `CSV ${f.name}`, undefined, undefined, true); }} /></label>
               {#if caixa.trim()}
                 <button class="mini" onclick={() => { registrarCaptura(caixa, `Texto ${capturas.length + 1}`); caixa = ''; }}>Ler texto</button>
               {/if}

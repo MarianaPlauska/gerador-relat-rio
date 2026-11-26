@@ -201,6 +201,8 @@ export interface CapturaLida
   cardPaiManual?: string | undefined;
   confiancaVinculoPct?: number | undefined;
   motivoVinculo?: string | undefined;
+  // veio de um arquivo .csv escolhido ou arrastado: lê como CSV de demandas mesmo que o cabeçalho não bata com o padrão
+  arquivoCsv?: boolean | undefined;
 }
 
 // uma entrada do diário da pasta: prints + comentários unidos em um texto, guardada com dia e motivo
