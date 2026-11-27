@@ -16,6 +16,8 @@
   import { tick } from 'svelte';
   import ArvoreEnvio from '#lib/painel/ArvoreEnvio.svelte';
   import CapturaItem from '#lib/painel/CapturaItem.svelte';
+  import RetomarRascunho from '#lib/painel/RetomarRascunho.svelte';
+  import { apagarRascunho, lerRascunho, salvarRascunho, type Rascunho } from '#lib/rascunho.ts';
   import CapturaUmClique from '#lib/painel/CapturaUmClique.svelte';
   import EstadoNuvem from '#lib/EstadoNuvem.svelte';
   import type { AcoesCards, AnexosCard } from '#lib/painel/acoes.ts';
@@ -110,6 +112,8 @@
   let cardSelecionadoCodigo = $state<string | null>(null);
   let modalCardAberto = $state(false);
   let arvoreAberta = $state(false);
+  // o que ficou pela metade da última vez: aparece como "continuar de onde parou" enquanto a tela está vazia
+  let rascunho = $state<Rascunho | null>(lerRascunho());
   let capturaModalId = $state<string | null>(null);
   let modalGerenciarPessoas = $state(false);
   let confirmacaoRemoverPessoa = $state<{
@@ -709,6 +713,38 @@
     for (const f of csvs) void f.text().then((texto) => registrarCaptura(texto, `CSV ${f.name}`, undefined, undefined, true));
   }
 
+  // guarda o que está sendo estruturado, para não perder se a página fechar antes de guardar o registro
+  $effect(() =>
+  {
+    const agora = { capturas: $state.snapshot(capturas), ajustes: $state.snapshot(ajustes), motivo, dataRegistro, pasta: pastaAtual, caixa };
+    const vazio = !agora.capturas.length && !motivo.trim();
+    // com a tela vazia e um rascunho à espera, não apaga o que ainda pode ser retomado
+    if (vazio && rascunho) return;
+    const espera = setTimeout(() => (vazio ? apagarRascunho() : salvarRascunho(agora)), 500);
+    return () => clearTimeout(espera);
+  });
+
+  function continuarRascunho()
+  {
+    const r = rascunho;
+    if (!r) return;
+    rascunho = null;
+    pastaAtual = r.pasta;
+    dataRegistro = r.dataRegistro;
+    motivo = r.motivo;
+    caixa = r.caixa;
+    ajustes = r.ajustes;
+    capturas = r.capturas;
+    recalcular();
+    aviso = 'Voltei para onde você parou. Confira os prints e guarde o registro.';
+  }
+
+  function descartarRascunho()
+  {
+    apagarRascunho();
+    rascunho = null;
+  }
+
   function limpar()
   {
     caixa = '';
@@ -758,6 +794,7 @@
     }
     salvar($state.snapshot(dados));
     limpar();
+    apagarRascunho();
     if (emitir)
     {
       emitirRelatorio([registro.id]);
@@ -889,6 +926,9 @@
   <CapturaUmClique receber={(texto, url) => { aba = 'novo'; registrarCaptura(texto, 'Painel em 1 clique'); aviso = `Página do painel recebida (${url}). Confira a leitura e salve o registro.`; }} />
 
   {#if aba === 'novo'}
+    {#if rascunho && capturas.length === 0 && !motivo.trim()}
+      <RetomarRascunho {rascunho} aoContinuar={continuarRascunho} aoDescartar={descartarRascunho} />
+    {/if}
     {#if capturas.length === 0}
       <section class="cartao passo upload-reduzido">
         <div class="linha-entre topo-upload">
