@@ -193,7 +193,7 @@
   {
     display: flex;
     gap: 2px;
-    width: 84px;
+    width: 64px;
     height: 6px;
     border-radius: 3px;
     overflow: hidden;
@@ -223,7 +223,9 @@
   }
   .pilula
   {
-    margin-left: 6px;
+    display: block;
+    width: max-content;
+    margin: 3px 0 0 14px;
   }
   .linha-detalhe td
   {
