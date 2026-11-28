@@ -9,17 +9,17 @@
 :root
 {
   color-scheme: dark;
-  --fundo: #0b0e11;
-  --superficie: #12161a;
-  --superficie-2: #181e24;
-  --borda: #252e37;
-  --borda-forte: #364350;
-  --texto: #f0f4f7;
-  --suave: #8b99a6;
+  --fundo: #1c222a;
+  --superficie: #232a33;
+  --superficie-2: #2b333d;
+  --borda: #35404c;
+  --borda-forte: #485564;
+  --texto: #e6ebf0;
+  --suave: #a0abb7;
   --marca: #00e599;
   --sobre-marca: #011910;
   --marca-escura: #07120e;
-  --barra: #0b0e11;
+  --barra: #181d24;
   --marca-clara: rgb(0 229 153 / 14%);
   --verde: #00e599;
   --verde-fundo: rgb(0 229 153 / 13%);
@@ -31,20 +31,20 @@
   --vermelho-fundo: rgb(239 68 68 / 14%);
   --azul: #38bdf8;
   --azul-fundo: rgb(56 189 248 / 13%);
-  --grade-fundo: rgb(0 229 153 / 11%);
-  --sombra: 0 0 0 1px rgb(0 0 0 / 40%), 0 8px 24px rgb(0 0 0 / 45%);
-  --brilho: 0 0 0 1px rgb(0 229 153 / 40%), 0 0 24px rgb(0 229 153 / 15%);
+  --grade-fundo: rgb(255 255 255 / 4%);
+  --sombra: 0 1px 2px rgb(0 0 0 / 28%);
+  --brilho: 0 0 0 1px var(--borda-forte);
   --raio: var(--radius-2);
   --raio-pequeno: 3px;
   --fonte-pixel: "Pixelify Sans", "Courier Prime", monospace;
-  --brilho-mouse: rgb(0 229 153 / 7%);
-  --brilho-hover: rgb(0 229 153 / 14%);
+  --brilho-mouse: rgb(255 255 255 / 3%);
+  --brilho-hover: rgb(255 255 255 / 6%);
   --espaco: var(--size-5);
   --curva: var(--ease-3);
   --fonte-maquina: "Courier Prime", "Courier New", monospace;
   --fonte-texto: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --cor-barra: #00e599;
-  --fundo-barra: #151c22;
+  --fundo-barra: #2b333d;
   --cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2720%27%20height%3D%2722%27%20viewBox%3D%270%200%2026%2028%27%3E%3Cpath%20d%3D%27M3%202%20L3%2021%20L8%2016%20L12%2025%20L16%2023.5%20L12%2015%20L19%2015%20Z%27%20fill%3D%27%230b0e11%27%20stroke%3D%27%2300e599%27%20stroke-width%3D%272%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E") 2 2, auto;
   --cursor-clique: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2720%27%20height%3D%2722%27%20viewBox%3D%270%200%2026%2028%27%3E%3Cpath%20d%3D%27M3%202%20L3%2021%20L8%2016%20L12%2025%20L16%2023.5%20L12%2015%20L19%2015%20Z%27%20fill%3D%27%2300e599%27%20stroke%3D%27%230b0e11%27%20stroke-width%3D%272%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E") 2 2, pointer;
 }
@@ -156,7 +156,7 @@ a
 
 h1, h2, h3
 {
-  font-family: var(--fonte-maquina);
+  font-family: var(--fonte-texto);
   line-height: 1.2;
   margin: 0 0 var(--size-3);
   letter-spacing: -0.01em;
@@ -171,7 +171,8 @@ h1
 }
 h2
 {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
+  font-weight: 600;
 }
 h3
 {
@@ -215,16 +216,15 @@ main > header h1
   display: flex;
   align-items: center;
   gap: var(--size-3);
-  font-size: 0.95rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 1rem;
+  font-weight: 600;
 }
-/* linha pontilhada depois do título de cada quadro */
+/* filete depois do título de cada quadro: só estrutura, sem enfeite */
 .cartao > h2:first-child::after
 {
   content: '';
   flex: 1;
-  border-top: 2px dotted var(--borda-forte);
+  border-top: 1px solid var(--borda);
 }
 @media (max-width: 700px)
 {
@@ -237,7 +237,8 @@ main > header h1
 button, .botao
 {
   font: inherit;
-  font-family: var(--fonte-maquina);
+  font-family: var(--fonte-texto);
+  font-weight: 500;
   font-size: 0.88rem;
   padding: var(--size-2) var(--size-3);
   border-radius: var(--raio-pequeno);
@@ -250,8 +251,8 @@ button, .botao
 }
 button:hover:not(:disabled), .botao:hover
 {
-  border-color: var(--marca);
-  box-shadow: 0 0 14px var(--brilho-hover);
+  border-color: var(--suave);
+  background: color-mix(in srgb, var(--superficie-2) 80%, var(--texto));
 }
 button:active:not(:disabled)
 {
@@ -273,14 +274,9 @@ button.principal:hover:not(:disabled)
 {
   filter: brightness(1.1);
 }
-/* rótulos de ação entre colchetes */
-button.principal::before
+button.principal:hover:not(:disabled)
 {
-  content: '[ ';
-}
-button.principal::after
-{
-  content: ' ]';
+  border-color: var(--marca);
 }
 :focus-visible
 {
@@ -328,12 +324,11 @@ table
 th
 {
   text-align: left;
-  font-family: var(--fonte-maquina);
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--suave);
-  font-weight: 700;
+  font-weight: 600;
 }
 th, td
 {
@@ -354,8 +349,7 @@ th, td
 }
 .cartao:hover
 {
-  border-color: color-mix(in srgb, var(--marca) 45%, var(--borda));
-  box-shadow: var(--sombra), 0 0 22px var(--brilho-mouse);
+  border-color: var(--borda-forte);
 }
 
 /* cabeçalho padrão das telas: "> nome" + título + linha de apoio */
@@ -430,10 +424,10 @@ th, td
 
 .etiqueta
 {
-  font-family: var(--fonte-maquina);
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
+  font-weight: 500;
   color: var(--suave);
 }
 
@@ -480,21 +474,19 @@ th, td
 .kpi
 {
   position: relative;
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
 }
 .kpi::after
 {
   content: '';
   position: absolute;
   top: 14px;
-  right: 22px;
+  right: 16px;
   width: 8px;
   height: 8px;
+  border-radius: 50%;
   background: var(--marca);
-  box-shadow: 0 0 8px var(--marca);
 }
 .kpi.alerta::after
 {
   background: var(--amarelo);
-  box-shadow: 0 0 8px var(--amarelo);
 }

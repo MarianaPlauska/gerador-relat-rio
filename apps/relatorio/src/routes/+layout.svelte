@@ -165,7 +165,7 @@
 <div class="pagina">
   {#if !aberta}
     <nav>
-      <canvas class="chuva-nav" use:chuva={{ fundo: 'rgba(15, 19, 24, 0.2)', cor: '#4cc38a', tamanho: 12 }}></canvas>
+      <canvas class="chuva-nav" use:chuva={{ fundo: 'rgba(24, 29, 36, 0.2)', cor: '#4cc38a', tamanho: 12 }}></canvas>
       <a href="/" class="marca">OrbisOS<span>_</span></a>
       <div class="links" role="menubar">
         <a href="/" class="item-topo" class:ativo={page.url.pathname === '/'}>Início</a>

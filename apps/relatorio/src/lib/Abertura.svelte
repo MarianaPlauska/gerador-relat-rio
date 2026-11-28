@@ -62,7 +62,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div class="abertura" class:saindo onclick={fim}>
-  <canvas use:chuva={{ fundo: 'rgba(15, 19, 24, 0.14)', cor: '#4cc38a', tamanho: 16, fps: 16 }}></canvas>
+  <canvas use:chuva={{ fundo: 'rgba(28, 34, 42, 0.14)', cor: '#4cc38a', tamanho: 16, fps: 16 }}></canvas>
   <div class="miolo">
     <h1>{nome}<span class="cursor">_</span></h1>
     <div class="terminal">
