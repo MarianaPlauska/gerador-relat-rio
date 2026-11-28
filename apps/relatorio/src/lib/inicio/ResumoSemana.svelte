@@ -10,7 +10,7 @@
       <span class="etiqueta">{i.rotulo}</span>
       <div class="valor">
         {#if i.ponto}<span class="ponto {i.ponto}" aria-hidden="true"></span>{/if}
-        <strong class:num={i.numero} class:semcor={!i.tom} class={i.tom}>{i.valor}</strong>
+        <strong class:num={i.numero} class:semcor={!i.tom} class:tom-vermelho={i.tom === 'vermelho'} class:tom-amarelo={i.tom === 'amarelo'}>{i.valor}</strong>
         {#if i.sub}<span class="sub">{i.sub}</span>{/if}
       </div>
       {#if i.barra !== undefined}<div class="trilho"><div class="enchimento" style:width="{i.barra}%"></div></div>{/if}
@@ -63,11 +63,11 @@
   {
     color: var(--texto);
   }
-  strong.vermelho
+  strong.tom-vermelho
   {
     color: var(--vermelho);
   }
-  strong.amarelo
+  strong.tom-amarelo
   {
     color: var(--amarelo);
   }

@@ -128,7 +128,7 @@
   }
   th, td
   {
-    padding: 9px 8px;
+    padding: 9px 6px;
     vertical-align: middle;
     white-space: nowrap;
   }
@@ -193,7 +193,7 @@
   {
     display: flex;
     gap: 2px;
-    width: 120px;
+    width: 84px;
     height: 6px;
     border-radius: 3px;
     overflow: hidden;

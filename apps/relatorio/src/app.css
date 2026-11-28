@@ -263,18 +263,18 @@ button:disabled
   opacity: 0.45;
   cursor: var(--cursor);
 }
-button.principal
+button.principal, a.botao.principal
 {
   background: var(--marca);
   border-color: var(--marca);
   color: var(--sobre-marca);
   font-weight: 700;
 }
-button.principal:hover:not(:disabled)
+button.principal:hover:not(:disabled), a.botao.principal:hover
 {
   filter: brightness(1.1);
 }
-button.principal:hover:not(:disabled)
+button.principal:hover:not(:disabled), a.botao.principal:hover
 {
   border-color: var(--marca);
 }

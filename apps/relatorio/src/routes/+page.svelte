@@ -352,7 +352,7 @@
   .duas
   {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
     gap: 16px;
     align-items: start;
   }
